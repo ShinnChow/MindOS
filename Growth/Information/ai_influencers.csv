@@ -1,0 +1,19 @@
+name,handle,region,tags,description,stats
+Andrej Karpathy,@karpathy,英文,教育科普|工具测评,"前特斯拉AI总监、OpenAI创始成员。Neural Networks: Zero to Hero 系列封神。造词""vibe coding""。现创办 Eureka Labs 做AI教育。",X粉丝:~100万 | YouTube:~90万
+Matt Wolfe,@mreflow,英文,工具测评|行业资讯,"AI工具界""导购王""。YouTube每周出新工具合集，风格平易近人，面向非技术用户。The Future Tools 网站创始人。",X粉丝:~55万 | YouTube:~120万
+Theo Browne,@t3dotgg,英文,观点评论|工具测评,"程序员+AI评论员。观点鲜明敢骂人，发文""Vibe Coding是在害人""引发广泛讨论。YouTube/X双修，开发者群体必关注。",X粉丝:~60万 | YouTube:~55万
+Pieter Levels,@levelsio,英文,独立开发|观点评论,"""doing in public""标杆人物。边做indie hacker项目边直播分享，NomadList/RemoteOK创始人。AI时代最具代表性的solo builder。",X粉丝:~60万
+Simon Willison,@simonw,英文,行业资讯|工具测评,Django联合创始人。博客simonwillison.net几乎每天更新，追踪所有LLM工具进展。LLM实践领域最活跃的工程师博主。,X粉丝:~60万
+Ben Tossell,Ben's Bites,英文,行业资讯|教育科普,Ben's Bites Newsletter创始人。每日AI资讯精华，信噪比极高，订阅量超10万。英文AI资讯首选信源之一。,X粉丝:~11万 | Newsletter:10万+
+Yannic Kilcher,@ykilcher,英文,教育科普|研究学术,逐行解读顶级AI论文。每周发布论文精读视频，技术深度极高，是AI研究者最爱的学习频道。,X粉丝:~18万 | YouTube:~70万
+Jeremy Howard,@jeremyphoward,英文,教育科普|工具测评,"fast.ai创始人，""自上而下""教学法开创者。把深度学习从象牙塔拉到普通工程师。与Karpathy并列最佳AI教育者。",X粉丝:~14万
+Liam Ottley,@liamottley,英文,工具测评|独立开发,AI Agent构建领域最活跃的YouTuber之一。专注自动化工作流，n8n/Make/LangChain实战教程，面向创业者。,YouTube:~40万
+Eliezer Yudkowsky,@ESYudkowsky,英文,AI安全|观点评论,AI对齐领域先驱，LessWrong创始人。极度悲观派，认为当前AI路线大概率毁灭人类。X上与AI乐观派互怼是常态。,X粉丝:~40万
+Garry Tan,@garrytan,英文,观点评论|行业资讯,YC现任CEO。从硅谷投资人视角分享AI创业机会与趋势，影响YC每届数百家创业公司的技术方向。,X粉丝:~35万
+3Blue1Brown,Grant Sanderson,英文,教育科普|行业资讯,数学/AI可视化第一人。《神经网络》系列动画封神，把Transformer、反向传播讲得无比直觉化。YouTube 600万+订阅。,YouTube:650万+
+David Shapiro,@DavidShapiroAI,英文,工具测评|独立开发,AGI/未来社会影响专注博主，哲学+技术混搭风格。YouTube讨论AI对就业、意义、文明的深远影响。,YouTube:~25万
+George Hotz (geohot),@realGeorgeHotz,英文,行业资讯|观点评论,18岁破解iPhone，comma.ai开源自动驾驶，tinygrad极简框架。风格极其犀利，技术过硬，反建制精神的黑客代表。,X粉丝:~25万
+Ilya Sutskever,@ilyasut,研究者,研究学术|AI安全,"OpenAI联合创始人&前首席科学家，GPT系列核心设计者。2024年创立SSI（安全超级智能公司）。圈内流传""Ilya看到了什么""。",X粉丝:~60万
+Yann LeCun,@ylecun,研究者,研究学术|观点评论,Meta首席AI科学家，CNN之父，图灵奖得主。是Transformer/LLM路线的最大公开质疑者，X上和AI乐观派互怼是家常便饭。,X粉丝:~80万
+Geoffrey Hinton,"""深度学习之父""",研究者,研究学术|AI安全,"深度学习之父，图灵奖得主。2023年从Google辞职专门警告AI风险，""我后悔了""引发全球轰动。",X粉丝:~30万
+Chris Lattner,@clattner_llvm,研究者,独立开发|研究学术,LLVM和Swift之父（苹果编译器体系奠基人）。现创立Modular，做Mojo语言——号称比Python快35000倍的AI编程语言。,X粉丝:~6万

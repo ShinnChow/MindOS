@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Influencer 名单 · 2026</title>
+  <style>
+    :root {
+      --bg: #080c14;
+      --bg2: #0d1117;
+      --card: #111720;
+      --card2: #161e2a;
+      --border: #1c2738;
+      --accent: #3b82f6;
+      --cyan: #06b6d4;
+      --green: #10b981;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --purple: #8b5cf6;
+      --pink: #ec4899;
+      --orange: #f97316;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --dim: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif; font-size: 15px; line-height: 1.6; }
+
+    /* NAV */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(8,12,20,.93); backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 16px;
+    }
+    .nav-inner {
+      max-width: 900px; margin: 0 auto;
+      display: flex; align-items: center; gap: 0; overflow-x: auto; scrollbar-width: none;
+    }
+    .nav-inner::-webkit-scrollbar { display: none; }
+    .nav-tab {
+      padding: 13px 14px; font-size: 0.78rem; font-weight: 600;
+      color: var(--muted); white-space: nowrap; cursor: pointer;
+      border-bottom: 2px solid transparent; transition: all .2s; text-decoration: none;
+    }
+    .nav-tab:hover, .nav-tab.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+
+    /* HEADER */
+    header {
+      background: linear-gradient(160deg, #04091a 0%, #080c14 70%);
+      border-bottom: 1px solid var(--border);
+      padding: 36px 16px 30px;
+    }
+    .header-inner { max-width: 900px; margin: 0 auto; }
+    .hbadge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 0.7rem; font-weight: 700; letter-spacing: .08em;
+      color: var(--cyan); background: rgba(6,182,212,.1);
+      border: 1px solid rgba(6,182,212,.2); border-radius: 20px;
+      padding: 4px 12px; margin-bottom: 14px;
+    }
+    h1 { font-size: 1.7rem; font-weight: 800; line-height: 1.2; margin-bottom: 8px; }
+    h1 em { color: var(--cyan); font-style: normal; }
+    .hsub { color: var(--dim); font-size: 0.86rem; margin-bottom: 20px; }
+    .hstats { display: flex; flex-wrap: wrap; gap: 10px; }
+    .hstat {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 16px; text-align: center;
+    }
+    .hstat-n { font-size: 1.3rem; font-weight: 800; color: var(--cyan); }
+    .hstat-l { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+    /* FILTERS */
+    .filters-wrap { max-width: 900px; margin: 0 auto; padding: 20px 16px 0; }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+    .filter-btn {
+      padding: 6px 14px; border-radius: 20px; font-size: 0.76rem; font-weight: 600;
+      border: 1px solid var(--border); background: transparent; color: var(--muted);
+      cursor: pointer; transition: all .18s;
+    }
+    .filter-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+    .filter-btn.active { background: var(--cyan); border-color: var(--cyan); color: #000; }
+
+    /* SEARCH */
+    .search-wrap { max-width: 900px; margin: 0 auto; padding: 14px 16px 0; }
+    .search-input {
+      width: 100%; background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 16px; color: var(--text); font-size: 0.88rem;
+      outline: none; transition: border-color .2s;
+    }
+    .search-input:focus { border-color: var(--cyan); }
+    .search-input::placeholder { color: var(--muted); }
+
+    /* GRID */
+    main { max-width: 900px; margin: 0 auto; padding: 20px 16px 80px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+    @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+
+    /* CARD */
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 16px; overflow: hidden;
+      transition: transform .18s, border-color .18s;
+      cursor: default;
+    }
+    .card:hover { transform: translateY(-2px); border-color: #2a3a52; }
+    .card.hidden { display: none; }
+
+    .card-top { padding: 16px 16px 12px; display: flex; gap: 12px; align-items: flex-start; }
+    .avatar {
+      width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 800; border: 2px solid var(--border);
+    }
+    .card-meta { flex: 1; min-width: 0; }
+    .card-name { font-size: 0.95rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-handle { font-size: 0.75rem; color: var(--muted); margin-top: 1px; }
+    .card-region {
+      font-size: 0.65rem; font-weight: 700; letter-spacing: .06em;
+      padding: 2px 7px; border-radius: 5px; margin-top: 5px; display: inline-block;
+    }
+
+    .card-body { padding: 0 16px 14px; }
+    .card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+    .tag {
+      font-size: 0.68rem; padding: 2px 8px; border-radius: 5px;
+      border: 1px solid; font-weight: 600;
+    }
+    .card-desc { font-size: 0.8rem; color: var(--dim); line-height: 1.6; }
+
+    .card-footer {
+      padding: 10px 16px; border-top: 1px solid var(--border);
+      display: flex; gap: 10px; flex-wrap: wrap;
+    }
+    .stat-block { display: flex; align-items: center; gap: 5px; }
+    .stat-val { font-size: 0.82rem; font-weight: 700; }
+    .stat-lbl { font-size: 0.7rem; color: var(--muted); }
+
+    .platform-icons { display: flex; gap: 6px; margin-left: auto; align-items: center; }
+    .picon {
+      width: 26px; height: 26px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; background: var(--card2); border: 1px solid var(--border);
+    }
+
+    /* SECTION HEADERS */
+    .section-head {
+      display: flex; align-items: center; gap: 10px;
+      margin: 28px 0 14px; padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-icon {
+      width: 32px; height: 32px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .section-title { font-size: 0.95rem; font-weight: 700; }
+    .section-count { font-size: 0.75rem; color: var(--muted); }
+
+    .no-results { text-align: center; padding: 60px 20px; color: var(--muted); font-size: 0.9rem; display: none; }
+
+    footer { text-align: center; padding: 24px 16px; font-size: 0.72rem; color: var(--muted); border-top: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a class="nav-tab active" href="#en">🌍 英文圈</a>
+    <a class="nav-tab" href="#cn">🇨🇳 中文圈</a>
+    <a class="nav-tab" href="#researcher">🔬 研究者</a>
+  </div>
+</nav>
+
+<header>
+  <div class="header-inner">
+    <div class="hbadge">📊 AI INFLUENCER DATABASE · 2026</div>
+    <h1>AI Influencer<br/><em>全景名单</em></h1>
+    <div class="hsub">涵盖英文圈 · 中文圈 · 研究者 · 共 35+ 人 · 含平台、粉丝量、内容领域</div>
+    <div class="hstats">
+      <div class="hstat"><div class="hstat-n">35+</div><div class="hstat-l">收录人物</div></div>
+      <div class="hstat"><div class="hstat-n">3</div><div class="hstat-l">地区分类</div></div>
+      <div class="hstat"><div class="hstat-n">8</div><div class="hstat-l">内容领域</div></div>
+      <div class="hstat"><div class="hstat-n">2026</div><div class="hstat-l">数据更新</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="filters-wrap">
+  <div class="filters" id="filters">
+    <button class="filter-btn active" data-filter="all">全部</button>
+    <button class="filter-btn" data-filter="工具测评">🔧 工具测评</button>
+    <button class="filter-btn" data-filter="教育科普">📚 教育科普</button>
+    <button class="filter-btn" data-filter="行业资讯">📡 行业资讯</button>
+    <button class="filter-btn" data-filter="观点评论">💬 观点评论</button>
+    <button class="filter-btn" data-filter="视觉创作">🎨 视觉创作</button>
+    <button class="filter-btn" data-filter="独立开发">🛠️ 独立开发</button>
+    <button class="filter-btn" data-filter="AI安全">🔐 AI安全</button>
+    <button class="filter-btn" data-filter="研究学术">🔬 研究学术</button>
+  </div>
+</div>
+<div class="search-wrap">
+  <input class="search-input" id="search" type="text" placeholder="🔍 搜索人名、平台、领域…"/>
+</div>
+
+<main>
+  <div class="no-results" id="noResults">没有找到匹配的结果 🤷</div>
+
+  <!-- ══ 英文圈 ══ -->
+  <div class="section-head" id="en">
+    <div class="section-icon" style="background:rgba(59,130,246,.15)">🌍</div>
+    <div class="section-title">英文圈</div>
+    <div class="section-count">21 人</div>
+  </div>
+  <div class="grid" id="grid-en">
+
+    <div class="card" data-tags="教育科普 工具测评" data-region="英文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(59,130,246,.15);color:#60a5fa">AK</div>
+        <div class="card-meta">
+          <div class="card-name">Andrej Karpathy</div>
+          <div class="card-handle">@karpathy</div>
+          <span class="card-region" style="background:rgba(59,130,246,.1);color:#60a5fa">英文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#3b82f6;color:#60a5fa;background:rgba(59,130,246,.08)">教育科普</span>
+          <span class="tag" style="border-color:#10b981;color:#34d399;background:rgba(16,185,129,.08)">工程实践</span>
+        </div>
+        <div class="card-desc">前特斯拉AI总监、OpenAI创始成员。Neural Networks: Zero to Hero 系列封神。造词"vibe coding"。现创办 Eureka Labs 做AI教育。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~100万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="stat-block"><span class="stat-val" style="color:#f59e0b">~90万</span><span class="stat-lbl">YouTube</span></div>
+        <div class="platform-icons">
+          <div class="picon" title="X">𝕏</div>
+          <div class="picon" title="YouTube">▶</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="工具测评 行业资讯" data-region="英文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(245,158,11,.15);color:#fbbf24">MW</div>
+        <div class="card-meta">
+          <div class="card-name">Matt Wolfe</div>
+          <div class="card-handle">@mreflow</div>
+          <span class="card-region" style="background:rgba(59,130,246,.1);color:#60a5fa">英文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#f59e0b;color:#fbbf24;background:rgba(245,158,11,.08)">工具测评</span>
+          <span class="tag" style="border-color:#06b6d4;color:#22d3ee;background:rgba(6,182,212,.08)">行业资讯</span>
+        </div>
+        <div class="card-desc">AI工具界"导购王"。YouTube每周出新工具合集，风格平易近人，面向非技术用户。The Future Tools 网站创始人。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~55万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="stat-block"><span class="stat-val" style="color:#f59e0b">~120万</span><span class="stat-lbl">YouTube</span></div>
+        <div class="platform-icons">
+          <div class="picon">𝕏</div><div class="picon">▶</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="观点评论 工具测评" data-region="英文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(239,68,68,.15);color:#f87171">TB</div>
+        <div class="card-meta">
+          <div class="card-name">Theo Browne</div>
+          <div class="card-handle">@t3dotgg</div>
+          <span class="card-region" style="background:rgba(59,130,246,.1);color:#60a5fa">英文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#ef4444;color:#f87171;background:rgba(239,68,68,.08)">观点评论</span>
+          <span class="tag" style="border-color:#10b981;color:#34d399;background:rgba(16,185,129,.08)">工程实践</span>
+        </div>
+        <div class="card-desc">程序员+AI评论员。观点鲜明敢骂人，发文"Vibe Coding是在害人"引发广泛讨论。YouTube/X双修，开发者群体必关注。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~60万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="stat-block"><span class="stat-val" style="color:#f59e0b">~55万</span><span class="stat-lbl">YouTube</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div><div class="picon">▶</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="独立开发 观点评论" data-region="英文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(16,185,129,.15);color:#34d399">PL</div>
+        <div class="card-meta">
+          <div class="card-name">Pieter Levels</div>
+          <div class="card-handle">@levelsio</div>
+          <span class="card-region" style="background:rgba(59,130,246,.1);color:#60a5fa">英文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#10b981;color:#34d399;background:rgba(16,185,129,.08)">独立开发</span>
+          <span class="tag" style="border-color:#8b5cf6;color:#a78bfa;background:rgba(139,92,246,.08)">观点评论</span>
+        </div>
+        <div class="card-desc">"doing in public"标杆人物。边做indie hacker项目边直播分享，NomadList/RemoteOK创始人。AI时代最具代表性的solo builder。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~60万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="行业资讯 工具测评" data-region="英文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(6,182,212,.15);color:#22d3ee">SW</div>
+        <div class="card-meta">
+          <div class="card-name">Simon Willison</div>
+          <div class="card-handle">@simonw</div>
+          <span class="card-region" style="background:rgba(59,130,246,.1);color:#60a5fa">英文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#06b6d4;color:#22d3ee;background:rgba(6,182,212,.08)">行业资讯</span>
+          <span class="tag" style="border-color:#10b981;color:#34d399;background:rgba(16,185,129,.08)">工程实践</span>
+        </div>
+        <div class="card-desc">Django联合创始人。博客simonwillison.net几乎每天更新，追踪所有LLM工具进展。LLM实践领域最活跃的工程师博主。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~60万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="行业资讯 教育科普" data-region="英文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(245,158,11,.15);color:#fbbf24">BT</div>
+        <div class="card-meta">
+          <div class="card-name">Ben Tossell</div>
+          <div class="card-handle">Ben's Bites</div>
+          <span class="card-region" style="background:rgba(59,130,246,.1);color:#60a5fa">英文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#f59e0b;color:#fbbf24;background:rgba(245,158,11,.08)">行业资讯</span>
+          <span class="tag" style="border-color:#06b6d4;color:#22d3ee;background:rgba(6,182,212,.08)">Newsletter</span>
+        </div>
+        <div class="card-desc">Ben's Bites Newsletter创始人。每日AI资讯精华，信噪比极高，订阅量超10万。英文AI资讯首选信源之一。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~11万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="stat-block"><span class="stat-val" style="color:#10b981">10万+</span><span class="stat-lbl">Newsletter</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div><div class="picon">✉</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="教育科普 研究学术" data-region="英文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(139,92,246,.15);color:#a78bfa">YK</div>
+        <div class="card-meta">
+          <div class="card-name">Yannic Kilcher</div>
+          <div class="card-handle">@ykilcher</div>
+          <span class="card-region" style="background:rgba(59,130,246,.1);color:#60a5fa">英文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#8b5cf6;color:#a78bfa;background:rgba(139,92,246,.08)">研究学术</span>
+          <span class="tag" style="border-color:#3b82f6;color:#60a5fa;background:rgba(59,130,246,.08)">教育科普</span>
+        </div>
+        <div class="card-desc">逐行解读顶级AI论文。每周发布论文精读视频，技术深度极高，是AI研究者最爱的学习频道。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~18万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="stat-block"><span class="stat-val" style="color:#f59e0b">~70万</span><span class="stat-lbl">YouTube</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div><div class="picon">▶</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="教育科普 工具测评" data-region="英文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(16,185,129,.15);color:#34d399">JH</div>
+        <div class="card-meta">
+          <div class="card-name">Jeremy Howard</div>
+          <div class="card-handle">@jeremyphoward</div>
+          <span class="card-region" style="background:rgba(59,130,246,.1);color:#60a5fa">英文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#10b981;color:#34d399;background:rgba(16,185,129,.08)">教育科普</span>
+          <span class="tag" style="border-color:#3b82f6;color:#60a5fa;background:rgba(59,130,246,.08)">工程实践</span>
+        </div>
+        <div class="card-desc">fast.ai创始人，"自上而下"教学法开创者。把深度学习从象牙塔拉到普通工程师。与Karpathy并列最佳AI教育者。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~14万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div><div class="picon">▶</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="工具测评 独立开发" data-region="英文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(249,115,22,.15);color:#fb923c">LL</div>
+        <div class="card-meta">
+          <div class="card-name">Liam Ottley</div>
+          <div class="card-handle">@liamottley</div>
+          <span class="card-region" style="background:rgba(59,130,246,.1);color:#60a5fa">英文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#f97316;color:#fb923c;background:rgba(249,115,22,.08)">AI Agent</span>
+          <span class="tag" style="border-color:#10b981;color:#34d399;background:rgba(16,185,129,.08)">工具测评</span>
+        </div>
+        <div class="card-desc">AI Agent构建领域最活跃的YouTuber之一。专注自动化工作流，n8n/Make/LangChain实战教程，面向创业者。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#f59e0b">~40万</span><span class="stat-lbl">YouTube</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div><div class="picon">▶</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="AI安全 观点评论" data-region="英文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(239,68,68,.15);color:#f87171">EY</div>
+        <div class="card-meta">
+          <div class="card-name">Eliezer Yudkowsky</div>
+          <div class="card-handle">@ESYudkowsky</div>
+          <span class="card-region" style="background:rgba(59,130,246,.1);color:#60a5fa">英文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#ef4444;color:#f87171;background:rgba(239,68,68,.08)">AI安全</span>
+          <span class="tag" style="border-color:#8b5cf6;color:#a78bfa;background:rgba(139,92,246,.08)">哲学思辨</span>
+        </div>
+        <div class="card-desc">AI对齐领域先驱，LessWrong创始人。极度悲观派，认为当前AI路线大概率毁灭人类。X上与AI乐观派互怼是常态。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~40万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="观点评论 行业资讯" data-region="英文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(245,158,11,.15);color:#fbbf24">GT</div>
+        <div class="card-meta">
+          <div class="card-name">Garry Tan</div>
+          <div class="card-handle">@garrytan</div>
+          <span class="card-region" style="background:rgba(59,130,246,.1);color:#60a5fa">英文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#f59e0b;color:#fbbf24;background:rgba(245,158,11,.08)">创业投资</span>
+          <span class="tag" style="border-color:#06b6d4;color:#22d3ee;background:rgba(6,182,212,.08)">行业资讯</span>
+        </div>
+        <div class="card-desc">YC现任CEO。从硅谷投资人视角分享AI创业机会与趋势，影响YC每届数百家创业公司的技术方向。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~35万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div><div class="picon">▶</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="教育科普 行业资讯" data-region="英文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(6,182,212,.15);color:#22d3ee">3B</div>
+        <div class="card-meta">
+          <div class="card-name">3Blue1Brown</div>
+          <div class="card-handle">Grant Sanderson</div>
+          <span class="card-region" style="background:rgba(59,130,246,.1);color:#60a5fa">英文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#06b6d4;color:#22d3ee;background:rgba(6,182,212,.08)">教育科普</span>
+          <span class="tag" style="border-color:#8b5cf6;color:#a78bfa;background:rgba(139,92,246,.08)">数学可视化</span>
+        </div>
+        <div class="card-desc">数学/AI可视化第一人。《神经网络》系列动画封神，把Transformer、反向传播讲得无比直觉化。YouTube 600万+订阅。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#f59e0b">650万+</span><span class="stat-lbl">YouTube</span></div>
+        <div class="platform-icons"><div class="picon">▶</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="工具测评 独立开发" data-region="英文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(16,185,129,.15);color:#34d399">DS</div>
+        <div class="card-meta">
+          <div class="card-name">David Shapiro</div>
+          <div class="card-handle">@DavidShapiroAI</div>
+          <span class="card-region" style="background:rgba(59,130,246,.1);color:#60a5fa">英文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#10b981;color:#34d399;background:rgba(16,185,129,.08)">AGI未来</span>
+          <span class="tag" style="border-color:#8b5cf6;color:#a78bfa;background:rgba(139,92,246,.08)">哲学思辨</span>
+        </div>
+        <div class="card-desc">AGI/未来社会影响专注博主，哲学+技术混搭风格。YouTube讨论AI对就业、意义、文明的深远影响。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#f59e0b">~25万</span><span class="stat-lbl">YouTube</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div><div class="picon">▶</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="行业资讯 观点评论" data-region="英文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(249,115,22,.15);color:#fb923c">GH</div>
+        <div class="card-meta">
+          <div class="card-name">George Hotz (geohot)</div>
+          <div class="card-handle">@realGeorgeHotz</div>
+          <span class="card-region" style="background:rgba(59,130,246,.1);color:#60a5fa">英文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#f97316;color:#fb923c;background:rgba(249,115,22,.08)">独立开发</span>
+          <span class="tag" style="border-color:#ef4444;color:#f87171;background:rgba(239,68,68,.08)">观点评论</span>
+        </div>
+        <div class="card-desc">18岁破解iPhone，comma.ai开源自动驾驶，tinygrad极简框架。风格极其犀利，技术过硬，反建制精神的黑客代表。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~25万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ 中文圈 ══ -->
+  <div class="section-head" id="cn">
+    <div class="section-icon" style="background:rgba(239,68,68,.15)">🇨🇳</div>
+    <div class="section-title">中文圈</div>
+    <div class="section-count">14 人</div>
+  </div>
+  <div class="grid" id="grid-cn">
+
+    <div class="card" data-tags="教育科普 行业资讯" data-region="中文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(16,185,129,.15);color:#34d399">宝玉</div>
+        <div class="card-meta">
+          <div class="card-name">宝玉xp</div>
+          <div class="card-handle">@dotey</div>
+          <span class="card-region" style="background:rgba(239,68,68,.1);color:#f87171">中文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#10b981;color:#34d399;background:rgba(16,185,129,.08)">教育科普</span>
+          <span class="tag" style="border-color:#3b82f6;color:#60a5fa;background:rgba(59,130,246,.08)">提示词</span>
+        </div>
+        <div class="card-desc">被誉为"AI领域的园丁"，微博108万粉，X活跃。翻译英文AI前沿内容+提示词方法论，入门首选信源。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~30万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="stat-block"><span class="stat-val" style="color:#ec4899">108万</span><span class="stat-lbl">微博</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div><div class="picon">微</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="工具测评 行业资讯" data-region="中文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(6,182,212,.15);color:#22d3ee">归藏</div>
+        <div class="card-meta">
+          <div class="card-name">归藏</div>
+          <div class="card-handle">@op7418</div>
+          <span class="card-region" style="background:rgba(239,68,68,.1);color:#f87171">中文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#06b6d4;color:#22d3ee;background:rgba(6,182,212,.08)">工具测评</span>
+          <span class="tag" style="border-color:#10b981;color:#34d399;background:rgba(16,185,129,.08)">效率工具</span>
+        </div>
+        <div class="card-desc">AI效率工具"宝藏"发掘者。X+即刻双平台，每日AI资讯整理，开源自动化脚本和本地部署方案，信噪比极高。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~15万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="stat-block"><span class="stat-val" style="color:#f59e0b">26万</span><span class="stat-lbl">微博</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div><div class="picon">微</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="视觉创作 工具测评" data-region="中文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(236,72,153,.15);color:#f472b6">阿文</div>
+        <div class="card-meta">
+          <div class="card-name">Simon_阿文</div>
+          <div class="card-handle">微博</div>
+          <span class="card-region" style="background:rgba(239,68,68,.1);color:#f87171">中文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#ec4899;color:#f472b6;background:rgba(236,72,153,.08)">视觉创作</span>
+          <span class="tag" style="border-color:#8b5cf6;color:#a78bfa;background:rgba(139,92,246,.08)">AIGC</span>
+        </div>
+        <div class="card-desc">AI视觉创作先锋，微博136万粉。Stable Diffusion/Midjourney玩得炉火纯青，探索AI商业设计落地，创意工作者必关注。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#ec4899">136万</span><span class="stat-lbl">微博</span></div>
+        <div class="platform-icons"><div class="picon">微</div><div class="picon">红</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="视觉创作 研究学术" data-region="中文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(139,92,246,.15);color:#a78bfa">海辛</div>
+        <div class="card-meta">
+          <div class="card-name">海辛 Hyacinth</div>
+          <div class="card-handle">微博</div>
+          <span class="card-region" style="background:rgba(239,68,68,.1);color:#f87171">中文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#8b5cf6;color:#a78bfa;background:rgba(139,92,246,.08)">视觉创作</span>
+          <span class="tag" style="border-color:#ec4899;color:#f472b6;background:rgba(236,72,153,.08)">艺术跨界</span>
+        </div>
+        <div class="card-desc">AI+传统工艺跨界实践，陶瓷纹样生成等独树一帜。不只追视觉惊艳，更探索AI艺术的文化与边界。微博28万粉。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#ec4899">28万</span><span class="stat-lbl">微博</span></div>
+        <div class="platform-icons"><div class="picon">微</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="工具测评 研究学术" data-region="中文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(239,68,68,.15);color:#f87171">牙医</div>
+        <div class="card-meta">
+          <div class="card-name">karminski-牙医</div>
+          <div class="card-handle">微博</div>
+          <span class="card-region" style="background:rgba(239,68,68,.1);color:#f87171">中文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#ef4444;color:#f87171;background:rgba(239,68,68,.08)">模型测评</span>
+          <span class="tag" style="border-color:#06b6d4;color:#22d3ee;background:rgba(6,182,212,.08)">硬核技术</span>
+        </div>
+        <div class="card-desc">"肝帝"，凌晨发评测是常态。全球新模型发布第一时间横向对比，数据详实观点犀利，不吹不黑。微博23万粉。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#ec4899">23万</span><span class="stat-lbl">微博</span></div>
+        <div class="platform-icons"><div class="picon">微</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="行业资讯 研究学术" data-region="中文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(59,130,246,.15);color:#60a5fa">梁赛</div>
+        <div class="card-meta">
+          <div class="card-name">梁赛</div>
+          <div class="card-handle">微博</div>
+          <span class="card-region" style="background:rgba(239,68,68,.1);color:#f87171">中文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#3b82f6;color:#60a5fa;background:rgba(59,130,246,.08)">AI硬件</span>
+          <span class="tag" style="border-color:#f59e0b;color:#fbbf24;background:rgba(245,158,11,.08)">产业链</span>
+        </div>
+        <div class="card-desc">聚焦AI硬件产业链，覆盖芯片/存储/液冷等核心环节。跟踪英伟达、AI算力动态的最佳中文信源。微博31万粉。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#ec4899">31万</span><span class="stat-lbl">微博</span></div>
+        <div class="platform-icons"><div class="picon">微</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="行业资讯" data-region="中文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(245,158,11,.15);color:#fbbf24">互联</div>
+        <div class="card-meta">
+          <div class="card-name">互联网的那点事</div>
+          <div class="card-handle">微博</div>
+          <span class="card-region" style="background:rgba(239,68,68,.1);color:#f87171">中文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#f59e0b;color:#fbbf24;background:rgba(245,158,11,.08)">行业资讯</span>
+          <span class="tag" style="border-color:#10b981;color:#34d399;background:rgba(16,185,129,.08)">资讯聚合</span>
+        </div>
+        <div class="card-desc">AI行业动态"雷达"和"过滤器"。全球融资/产品发布/政策变动全覆盖，信息密度和时效性顶级。微博527万粉（榜单最高）。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#ec4899">527万</span><span class="stat-lbl">微博</span></div>
+        <div class="platform-icons"><div class="picon">微</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="观点评论 行业资讯" data-region="中文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(16,185,129,.15);color:#34d399">高飞</div>
+        <div class="card-meta">
+          <div class="card-name">高飞</div>
+          <div class="card-handle">至顶科技主编</div>
+          <span class="card-region" style="background:rgba(239,68,68,.1);color:#f87171">中文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#10b981;color:#34d399;background:rgba(16,185,129,.08)">商业分析</span>
+          <span class="tag" style="border-color:#06b6d4;color:#22d3ee;background:rgba(6,182,212,.08)">观点评论</span>
+        </div>
+        <div class="card-desc">20年产业一线观察，AI商业模式解码者。深挖企业AI落地和本地部署，有一手调研报告。微博36万粉。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#ec4899">36万</span><span class="stat-lbl">微博</span></div>
+        <div class="platform-icons"><div class="picon">微</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="研究学术 教育科普" data-region="中文">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(59,130,246,.15);color:#60a5fa">马少</div>
+        <div class="card-meta">
+          <div class="card-name">马少平thu</div>
+          <div class="card-handle">清华大学教授</div>
+          <span class="card-region" style="background:rgba(239,68,68,.1);color:#f87171">中文圈</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#3b82f6;color:#60a5fa;background:rgba(59,130,246,.08)">研究学术</span>
+          <span class="tag" style="border-color:#8b5cf6;color:#a78bfa;background:rgba(139,92,246,.08)">教育科普</span>
+        </div>
+        <div class="card-desc">清华大学教授，稀缺的学术视角。讲解AI基础理论和前沿研究，不追热点但保证深度，理论基础最靠谱中文信源。微博44万粉。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#ec4899">44万</span><span class="stat-lbl">微博</span></div>
+        <div class="platform-icons"><div class="picon">微</div></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ 研究者 ══ -->
+  <div class="section-head" id="researcher">
+    <div class="section-icon" style="background:rgba(139,92,246,.15)">🔬</div>
+    <div class="section-title">研究者 / 技术领袖</div>
+    <div class="section-count">7 人</div>
+  </div>
+  <div class="grid" id="grid-researcher">
+
+    <div class="card" data-tags="研究学术 AI安全" data-region="研究者">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(139,92,246,.15);color:#a78bfa">IS</div>
+        <div class="card-meta">
+          <div class="card-name">Ilya Sutskever</div>
+          <div class="card-handle">@ilyasut</div>
+          <span class="card-region" style="background:rgba(139,92,246,.1);color:#a78bfa">研究者</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#8b5cf6;color:#a78bfa;background:rgba(139,92,246,.08)">研究学术</span>
+          <span class="tag" style="border-color:#ef4444;color:#f87171;background:rgba(239,68,68,.08)">AI安全</span>
+        </div>
+        <div class="card-desc">OpenAI联合创始人&前首席科学家，GPT系列核心设计者。2024年创立SSI（安全超级智能公司）。圈内流传"Ilya看到了什么"。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~60万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="研究学术 观点评论" data-region="研究者">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(239,68,68,.15);color:#f87171">YL</div>
+        <div class="card-meta">
+          <div class="card-name">Yann LeCun</div>
+          <div class="card-handle">@ylecun</div>
+          <span class="card-region" style="background:rgba(139,92,246,.1);color:#a78bfa">研究者</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#ef4444;color:#f87171;background:rgba(239,68,68,.08)">研究学术</span>
+          <span class="tag" style="border-color:#f59e0b;color:#fbbf24;background:rgba(245,158,11,.08)">观点评论</span>
+        </div>
+        <div class="card-desc">Meta首席AI科学家，CNN之父，图灵奖得主。是Transformer/LLM路线的最大公开质疑者，X上和AI乐观派互怼是家常便饭。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~80万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="研究学术 AI安全" data-region="研究者">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(16,185,129,.15);color:#34d399">GH</div>
+        <div class="card-meta">
+          <div class="card-name">Geoffrey Hinton</div>
+          <div class="card-handle">"深度学习之父"</div>
+          <span class="card-region" style="background:rgba(139,92,246,.1);color:#a78bfa">研究者</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#10b981;color:#34d399;background:rgba(16,185,129,.08)">研究学术</span>
+          <span class="tag" style="border-color:#ef4444;color:#f87171;background:rgba(239,68,68,.08)">AI安全</span>
+        </div>
+        <div class="card-desc">深度学习之父，图灵奖得主。2023年从Google辞职专门警告AI风险，"我后悔了"引发全球轰动。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~30万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div></div>
+      </div>
+    </div>
+
+    <div class="card" data-tags="独立开发 研究学术" data-region="研究者">
+      <div class="card-top">
+        <div class="avatar" style="background:rgba(249,115,22,.15);color:#fb923c">CL</div>
+        <div class="card-meta">
+          <div class="card-name">Chris Lattner</div>
+          <div class="card-handle">@clattner_llvm</div>
+          <span class="card-region" style="background:rgba(139,92,246,.1);color:#a78bfa">研究者</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-tags">
+          <span class="tag" style="border-color:#f97316;color:#fb923c;background:rgba(249,115,22,.08)">工程实践</span>
+          <span class="tag" style="border-color:#8b5cf6;color:#a78bfa;background:rgba(139,92,246,.08)">编程语言</span>
+        </div>
+        <div class="card-desc">LLVM和Swift之父（苹果编译器体系奠基人）。现创立Modular，做Mojo语言——号称比Python快35000倍的AI编程语言。</div>
+      </div>
+      <div class="card-footer">
+        <div class="stat-block"><span class="stat-val" style="color:#06b6d4">~6万</span><span class="stat-lbl">X粉丝</span></div>
+        <div class="platform-icons"><div class="picon">𝕏</div></div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<footer>
+  由 OpenClaw AI 整理 · 粉丝数据为近似估算（2026年初）· 如有出入请以各平台实时数据为准<br/>
+  生成时间：2026-03-07
+</footer>
+
+<script>
+  // Filter
+  const btns = document.querySelectorAll('.filter-btn');
+  const cards = document.querySelectorAll('.card');
+  const searchEl = document.getElementById('search');
+  const noResults = document.getElementById('noResults');
+
+  let activeFilter = 'all';
+  let searchVal = '';
+
+  function applyFilter() {
+    let visible = 0;
+    cards.forEach(card => {
+      const tags = card.dataset.tags || '';
+      const name = card.querySelector('.card-name')?.textContent || '';
+      const handle = card.querySelector('.card-handle')?.textContent || '';
+      const desc = card.querySelector('.card-desc')?.textContent || '';
+      const region = card.dataset.region || '';
+      const text = (tags + name + handle + desc + region).toLowerCase();
+
+      const matchFilter = activeFilter === 'all' || tags.includes(activeFilter);
+      const matchSearch = searchVal === '' || text.includes(searchVal.toLowerCase());
+
+      if (matchFilter && matchSearch) {
+        card.classList.remove('hidden');
+        visible++;
+      } else {
+        card.classList.add('hidden');
+      }
+    });
+    noResults.style.display = visible === 0 ? 'block' : 'none';
+  }
+
+  btns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      btns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeFilter = btn.dataset.filter;
+      applyFilter();
+    });
+  });
+
+  searchEl.addEventListener('input', e => {
+    searchVal = e.target.value;
+    applyFilter();
+  });
+
+  // Nav tabs
+  const navTabs = document.querySelectorAll('.nav-tab');
+  const sections = ['en','cn','researcher'];
+  window.addEventListener('scroll', () => {
+    let current = 'en';
+    sections.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && window.scrollY >= el.offsetTop - 120) current = id;
+    });
+    navTabs.forEach(t => {
+      t.classList.toggle('active', t.getAttribute('href') === '#' + current);
+    });
+  });
+</script>
+</body>
+</html>
