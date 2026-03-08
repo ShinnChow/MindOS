@@ -76,6 +76,25 @@ npx skills check                                     # 检查可用更新
 | felo-slides | 根据文字描述自动生成 PPT | 需要快速生成演示文稿时 | [Felo-Inc/felo-skills](https://github.com/Felo-Inc/felo-skills) |
 | doc-coauthoring | 结构化协作撰写文档、技术规范、提案 | 需要写文档、起草规范或提案时 | [anthropics/skills](https://github.com/anthropics/skills) |
 | internal-comms | 撰写内部通知、状态报告、项目更新等 | 需要写内部沟通文案时 | [anthropics/skills](https://github.com/anthropics/skills) |
+| ticktick-cli | 通过 Python CLI 管理滴答清单项目/任务（增删改查、完成） | 需要让 Agent 自动读写 Dida365 任务时 | [dcjanus/prompts](https://github.com/dcjanus/prompts/tree/main/skills/ticktick-cli) |
+
+#### ticktick-cli 额外配置说明
+
+运行前需要先准备 OAuth Token（否则会报缺少 token）：
+
+```bash
+export TICKTICK_TOKEN="<your_oauth_token>"
+```
+
+可选环境变量：
+
+| 变量名 | 默认值 | 说明 |
+|------|------|------|
+| `TICKTICK_TOKEN` | 无 | 必填，滴答清单 OAuth Token |
+| `TICKTICK_BASE_URL` | `https://api.dida365.com/open/v1` | API 基础地址 |
+| `TICKTICK_TIMEOUT` | `30s` | 请求超时，如 `20s`、`1m` |
+
+> 不要用 `python` 或 `uv run python` 直接执行脚本，按 shebang 方式调用即可。
 
 ### 📱 社交媒体
 
