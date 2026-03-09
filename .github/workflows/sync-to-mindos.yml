@@ -16,27 +16,46 @@ on:
       - 'README.md'
       - 'README_zh.md'
 
+permissions:
+  contents: write
+
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout mindos-dev
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Sync to mindos repo
         env:
           PAT: ${{ secrets.MINDOS_SYNC_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+
           git config --global user.name "GeminiLight"
           git config --global user.email "wtfly2018@163.com"
+
+          # Ensure push to current repo (mindos-dev) uses GitHub Actions token.
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
 
           # === 1. Deploy landing/ to mindos-dev gh-pages ===
           git subtree split --prefix landing -b gh-pages-tmp
           git push origin gh-pages-tmp:gh-pages --force
           git branch -D gh-pages-tmp
 
+          # PAT is required for cross-repo sync/publish to GeminiLight/mindos.
+          if [ -z "${PAT:-}" ]; then
+            echo "::error::Missing secret MINDOS_SYNC_TOKEN."
+            echo "::error::Set repo secret MINDOS_SYNC_TOKEN with repo write access to GeminiLight/mindos and GeminiLight/mindos-dev."
+            exit 1
+          fi
+
           # === 2. Sync to mindos main branch ===
-          git clone --depth 1 https://x-access-token:${PAT}@github.com/GeminiLight/mindos.git /tmp/mindos || {
-            echo "Target repo not found. Please create GeminiLight/mindos first."
+          git clone --depth 1 "https://x-access-token:${PAT}@github.com/GeminiLight/mindos.git" /tmp/mindos || {
+            echo "Target repo not found or token has no access: GeminiLight/mindos"
             exit 1
           }
 
@@ -58,25 +77,27 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to sync."
           else
-            git commit -m "sync: update from mindos-dev @ $(git -C $GITHUB_WORKSPACE rev-parse --short HEAD)"
+            git commit -m "sync: update from mindos-dev @ $(git -C "$GITHUB_WORKSPACE" rev-parse --short HEAD)"
             git push
           fi
 
           # === 3. Deploy landing/ to mindos gh-pages ===
-          cd $GITHUB_WORKSPACE
-          git clone --depth 1 -b gh-pages https://x-access-token:${PAT}@github.com/GeminiLight/mindos.git /tmp/mindos-pages 2>/dev/null || {
-            git clone --depth 1 https://x-access-token:${PAT}@github.com/GeminiLight/mindos.git /tmp/mindos-pages
+          cd "$GITHUB_WORKSPACE"
+          git clone --depth 1 -b gh-pages "https://x-access-token:${PAT}@github.com/GeminiLight/mindos.git" /tmp/mindos-pages 2>/dev/null || {
+            git clone --depth 1 "https://x-access-token:${PAT}@github.com/GeminiLight/mindos.git" /tmp/mindos-pages
             cd /tmp/mindos-pages
             git checkout --orphan gh-pages
             git rm -rf .
           }
-          cd $GITHUB_WORKSPACE
+
+          cd "$GITHUB_WORKSPACE"
           rsync -av --delete landing/ /tmp/mindos-pages/
+
           cd /tmp/mindos-pages
           git add -A
           if git diff --cached --quiet; then
             echo "No landing changes to deploy."
           else
-            git commit -m "deploy: landing page from mindos-dev @ $(git -C $GITHUB_WORKSPACE rev-parse --short HEAD)"
+            git commit -m "deploy: landing page from mindos-dev @ $(git -C "$GITHUB_WORKSPACE" rev-parse --short HEAD)"
             git push origin gh-pages
           fi
