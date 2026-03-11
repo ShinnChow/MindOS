@@ -356,6 +356,59 @@ expressApp.all(MCP_ENDPOINT, async (req, res) => {
 
 ---
 
+---
+
+## 第四阶段改动（2026-03-12）
+
+### 25. 首次进 GUI 无侧边栏 / AskFab 不显示
+
+**根因：** `isLoginPage` 在 Server Component（`layout.tsx`）里通过 `x-pathname` header 判断。登录成功后 `router.replace('/')` 是客户端导航，layout 不重新 SSR，`isLoginPage` 仍为登录时的 `true`，导致 `SidebarLayout` 整个不渲染。刷新后触发完整 SSR 才恢复正常。
+
+**修法：** 新建 `components/ShellLayout.tsx`（client component），用 `usePathname()` 实时判断路径，替换 layout 里的静态 header 判断：
+
+```tsx
+// ShellLayout.tsx
+'use client';
+export default function ShellLayout({ fileTree, children }) {
+  const pathname = usePathname();
+  if (pathname === '/login') return <>{children}</>;
+  return <SidebarLayout fileTree={fileTree}>{children}</SidebarLayout>;
+}
+```
+
+`layout.tsx` 改为同步函数，去掉 `headers()` import，直接用 `<ShellLayout>`。
+
+---
+
+### 26. 默认打开 .md 文件显示 graph 视图
+
+**根因：** `mindos-use-raw` localStorage 为空时默认 `true`（显示 renderer），新用户首次访问 .md 文件直接走 GraphRenderer。
+
+**修法：** `ViewPageClient.tsx` 中把默认值从 `true` 改为 `false`（显示 markdown）。
+
+---
+
+### 27. 全局 hydration flash 修复
+
+**根因：** 多个组件用 `useState(default) + useEffect(localStorage)` 模式，server snapshot 与 client snapshot 不同，导致首次渲染用错误默认值，hydration 后 flash 到正确值。最严重的是 `LocaleContext`，影响全局所有翻译文本。
+
+**统一修法：** 将所有 `useState + useEffect` 读 localStorage 的模式改为 `useSyncExternalStore`，server snapshot 返回安全默认值，client snapshot 直接读 localStorage，彻底消除 flash。
+
+| 文件 | 问题 | 修法 |
+|------|------|------|
+| `lib/LocaleContext.tsx` | 中文用户全局 UI 闪 English→中文 | `useSyncExternalStore` + `mindos-locale-change` 事件 |
+| `components/ThemeToggle.tsx` | 亮色用户图标闪 Sun→Moon | `useSyncExternalStore` + `mindos-theme-change` 事件 |
+| `components/DirView.tsx` | 列表偏好用户目录页闪 grid→list | `useSyncExternalStore` + `mindos-dir-view-change` 事件 |
+| `components/SettingsModal.tsx` | modal 打开时 font/width/dark 闪默认值 | `useState(() => localStorage.get...)` 惰性初始化 |
+| `components/settings/KnowledgeTab.tsx` | MCP URL 闪 localhost→真实 origin | `useSyncExternalStore` 读 `window.location` |
+
+**设计原则：**
+- `useSyncExternalStore(subscribe, clientSnapshot, serverSnapshot)` — server 返回安全默认，client 读真实值，React 不报 hydration error
+- 自定义 `window.dispatchEvent(new Event('mindos-xxx-change'))` 作为跨组件同步机制，取代 context re-render
+- `SettingsModal` 是纯 client component（用户交互后才渲染），用惰性初始化函数即可，无需 `useSyncExternalStore`
+
+---
+
 ### 关键设计决策补充
 
 | 决策 | 原因 |
@@ -365,3 +418,5 @@ expressApp.all(MCP_ENDPOINT, async (req, res) => {
 | workspaces 保留 + ensureAppDeps --no-workspaces | workspaces 保证本地开发体验；--no-workspaces 保证全局安装时 next 装到 app/node_modules 而非被 hoist |
 | daemon 启动后轮询验证 | systemctl start 返回不代表进程健康，轮询 is-active 才能真正确认 |
 | MCP handleRequest 传 req.body | SDK 1.27.1+ express.json() 已消费流，必须透传 parsed body |
+| isLoginPage 改用 usePathname | Server Component header 判断不随客户端导航更新；client hook 实时反映路径 |
+| useSyncExternalStore 替代 useState+useEffect | server/client snapshot 分离，彻底消除 localStorage 读取的 hydration flash |
