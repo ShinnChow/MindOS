@@ -1,14 +1,8 @@
-template重命名为templates
-
 - 历史对话的问题。
 
 1. 优化模版
 
 1. 优化Skill
-
-1. 加上Agent沉淀到笔记。
-
-2. 开放MCP公开API
 
 n. 优化REAMDE.md
 - 优化VISION文本，独立出一个product-vision.md放在wiki
@@ -36,17 +30,6 @@ LANDING page 节日祝福的例子
 [Auth] Token for MCP
 
 <!--  -->
-
-Skill Creator，我现在要给我们这个MindOS创建一个极其好的Skills，请你也关联起来MCP的能力，帮我写一个极其好的，你觉得叫 mindos-mcp 怎么样？
-
-
-Landing的
-即刻开启 Shared Mind
-应该体现下安装Skill
-
-
-git add landing/ && git commit -m "update landing page" || true
-git subtree push --prefix landing origin gh-pages
 
 有一些零散的想法agent 就可以自主执行，然后人机literally 共享第二大脑了是吗
 
