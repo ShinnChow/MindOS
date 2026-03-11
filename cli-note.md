@@ -130,6 +130,25 @@ openclaw skills                      插件管理
 - 数字自动 coerce：`port 3002` → `"port": 3002`
 - 直接写回 `~/.mindos/config.json`
 
+---
+
+### 3. `printStartupInfo` 远程服务器友好提示
+
+**背景：** 通过 SSH 连接服务器运行 `mindos start` 时，打印的 `localhost` URL 在本地浏览器打不开，因为 localhost 指向用户自己的机器而非服务器。
+
+**改动：**
+- Network URL 颜色从 `dim` 改为 `cyan`，与 localhost 一致，更醒目
+- 检测到有网卡 IP 时，在 URL 列表下方追加一行提示：
+  ```
+  💡 Running on a remote server? Open the Network URL (x.x.x.x) in your browser,
+     or use SSH port forwarding: ssh -L <port>:localhost:<port> user@x.x.x.x
+  ```
+- 纯本机运行（无 localIP）时不显示此提示
+
+**关键文件：** `bin/cli.js` `printStartupInfo()`
+
+---
+
 ### 不适合 MindOS 的
 
 - in-chat commands（`/status`、`/think`）：MindOS 用标准 MCP 协议，不是自己的消息通道

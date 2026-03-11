@@ -205,3 +205,163 @@ function parseProvider(raw: unknown, defaults: ProviderConfig): ProviderConfig {
 - `AiTab.tsx`：检测当前 provider 的 apiKey 为空且无 env override 时，底部显示红色警告
 - `i18n.ts`：新增 `noApiKey` 中英文文案
 - 不做连通性测试（需消耗 token），静态提示足够
+
+---
+
+## 第三阶段改动（2026-03-12 晚）
+
+### 16. proxy.ts x-pathname header 注入修复
+
+**问题：** `proxy.ts` 的 `next()` helper 用 `res.headers.set('x-pathname', ...)` 设置响应 header，但 `headers()` from `next/headers` 读的是**请求** header，导致 `RootLayout` 里 `isLoginPage` 永远是 `false`，登录页也会渲染 SidebarLayout。
+
+**修法：** 改用 `NextResponse.next({ request: { headers: newHeaders } })` 注入到转发请求的 header 中。
+
+```typescript
+function next(): NextResponse {
+  const newHeaders = new Headers(req.headers);
+  newHeaders.set('x-pathname', pathname);
+  return NextResponse.next({ request: { headers: newHeaders } });
+}
+```
+
+---
+
+### 17. API 保护与 webPassword session 打通
+
+**问题：** 用户通过外部 IP 访问时，浏览器 fetch `/api/settings` 的 `Sec-Fetch-Site` 不一定是 `same-origin`（如登录后 redirect），导致被 `AUTH_TOKEN` 拦截返回 401，Settings 页面报"Failed to load settings"。
+
+**修法：** 在 API 保护逻辑里增加 JWT cookie 检查——持有合法 `webPassword` session 的用户直接放行，无需 Bearer token。
+
+```typescript
+if (webPassword) {
+  const token = req.cookies.get(COOKIE_NAME)?.value ?? '';
+  if (token && await verifyJwt(token, webPassword)) return NextResponse.next();
+}
+```
+
+---
+
+### 18. Settings GUI 新增 webPassword 和 authToken 管理
+
+**webPassword（Knowledge Base tab）：**
+- 密码输入框，已设置显示 `••••••••`，点击清空可改新密码
+- Show/Hide 切换明文
+- 保存后写入 `~/.mindos/config.json`
+
+**authToken（Knowledge Base tab → Security section）：**
+- 显示 masked token（首尾各 4 位可见，中间 `••••`）
+- 一键复制按钮
+- 显示 MCP URL（localhost + 机器 IP 两个版本）
+- Regenerate：调 `POST /api/settings/reset-token` 生成新 token，新 token 明文展示一次并提示"copy now"
+- Clear：清除 token（API 变为开放）
+
+**新增接口：**
+- `GET /api/settings`：返回 `authToken`（masked）、`mcpPort`、`webPassword`（masked）
+- `POST /api/settings/reset-token`：生成新 token，写入 config，返回明文新 token
+
+**涉及文件：**
+- `app/components/settings/types.ts`：`SettingsData` 加 `webPassword`、`authToken`、`mcpPort`
+- `app/components/settings/KnowledgeTab.tsx`：新增 Security section
+- `app/lib/settings.ts`：`readSettings` / `writeSettings` 支持 `webPassword`、`authToken`、`mcpPort`
+- `app/app/api/settings/route.ts`：GET/POST 适配新字段
+- `app/app/api/settings/reset-token/route.ts`：新建，生成 token
+- `app/lib/i18n.ts`：新增 `webPassword`、`authToken` 相关文案
+
+---
+
+### 19. 启动信息展示优化
+
+- `printStartupInfo`：Web UI 和 MCP 地址各展示两行（localhost + 机器 IP）
+- `mindos start --daemon` 安装完 service 后也调用 `printStartupInfo`，展示完整 MCP 配置再退出
+
+---
+
+### 20. daemon 启动验证
+
+**问题：** `systemctl start` 成功只代表 systemd 接受了请求，不代表进程真正运行。`--install-daemon` 之前不验证，用户无感知失败。
+
+**修法：** `systemd.start()` / `launchd.start()` 里加 `waitForService()`——启动后轮询最多 10 秒检查 `is-active`，失败则打出最近 30 行日志并 `process.exit(1)`。
+
+```javascript
+async function waitForService(check, { retries = 10, intervalMs = 1000 } = {}) {
+  for (let i = 0; i < retries; i++) {
+    if (check()) return true;
+    await new Promise(r => setTimeout(r, intervalMs));
+  }
+  return check();
+}
+```
+
+---
+
+### 21. onboard --install-daemon 流程修复
+
+**问题：** `setup.js` 完全不读 `process.argv`，不知道自己被 `--install-daemon` 调用；`cli.js` 里的 daemon 安装逻辑在 `run(setup.js)` 之后才执行，但 setup.js 在前台启动了 server，永远不会返回。
+
+**修法：**
+- `cli.js` 把 `--install-daemon` flag 透传给 `setup.js`
+- `setup.js` 读 `process.argv`，`finish()` 接收 `installDaemon` 参数
+- `installDaemon=true` 时 `finish()` 调 `mindos start --daemon`（非阻塞），而不是 `mindos start`（阻塞前台）
+
+---
+
+### 22. 全局包 Turbopack build 修复（最终方案）
+
+**问题：** 根 `package.json` 有 `"workspaces": ["app", "mcp"]`，Turbopack 把 `mindos/` 识别为 monorepo root，把 project dir 推断为 `mindos/app/app`（路径多一层），找不到 `next/package.json`，build 失败。
+
+**第一次尝试（§22 原始）：** 去掉 `workspaces`——但导致本地开发需要 cd 进各子目录分别 `npm install`，体验变差。
+
+**最终修法（恢复 workspaces + 正确隔离安装）：**
+1. **恢复 `workspaces: ["app", "mcp"]`**——本地开发体验不变
+2. **`ensureAppDeps()` 加 `--no-workspaces` flag**：
+   ```javascript
+   run('npm install --prefer-offline --no-workspaces', resolve(ROOT, 'app'));
+   ```
+   关键：`--no-workspaces` 阻止 npm 把依赖 hoist 到 monorepo root，强制安装到 `app/node_modules/`，Turbopack 能从 `app/` 目录正确找到 `next/package.json`
+3. **`mindos dev` 也加 `ensureAppDeps()`**——之前只有 `start` 和 `build` 有，`dev` 漏了
+
+**为什么 `turbopack.root` 不够：** Turbopack 在读取 `next.config.ts` 之前就做了 workspace root 推断；且如果 `app/node_modules` 为空，config 本身读取就会失败。必须保证 `app/node_modules/next` 存在，`turbopack.root` 才能生效。
+
+**测试验证：**
+- 删除 `app/node_modules` 模拟全局安装 → `mindos build` 自动 install + build 成功
+- `npm ls next` 确认本地 workspaces 解析正常
+- vitest 134 tests 全通过
+
+---
+
+### 23. .next/lock 残留修复
+
+- `bin/cli.js` 加 `clearBuildLock()`：build 前删除 `app/.next/lock`，防止上次被中断的 build 留下的锁文件阻塞新 build
+
+---
+
+### 24. MCP SDK 1.27.1 breaking change 修复
+
+**问题：** `@modelcontextprotocol/sdk` 1.27.1 修改了 `StreamableHTTPServerTransport.handleRequest()` 的签名——需要把已经被 `express.json()` 解析好的 body 作为第 3 个参数传入（否则 SDK 无法再从已消费的请求流中读取 body，导致 `Parse error: Invalid JSON`）。
+
+**修法：** `mcp/src/index.ts` 中把 `transport.handleRequest(req, res)` 改为 `transport.handleRequest(req, res, req.body)`：
+
+```typescript
+expressApp.all(MCP_ENDPOINT, async (req, res) => {
+  // Pass pre-parsed body: express.json() already parsed it, SDK >= 1.7 expects it as 3rd arg
+  await transport.handleRequest(req, res, req.body);
+});
+```
+
+**验证（测试结果）：**
+- `initialize` → HTTP 200，返回 `protocolVersion: "2024-11-05"` + `capabilities: {tools: {listChanged: true}}`
+- `tools/list` → 20 个工具全部注册正确
+- `tools/call (mindos_list_files)` → 成功返回知识库文件列表
+- AUTH_TOKEN 保护正常（MCP endpoint 要求 `Authorization: Bearer <token>`）
+
+---
+
+### 关键设计决策补充
+
+| 决策 | 原因 |
+|------|------|
+| webPassword JWT session 同时放行 API 请求 | 已登录用户不应被 AUTH_TOKEN 拦截，两层保护独立但不互斥 |
+| authToken 在 GUI 里 masked 展示（首尾可见）| 方便核对，又不完全暴露；Regenerate 后明文展示一次 |
+| workspaces 保留 + ensureAppDeps --no-workspaces | workspaces 保证本地开发体验；--no-workspaces 保证全局安装时 next 装到 app/node_modules 而非被 hoist |
+| daemon 启动后轮询验证 | systemctl start 返回不代表进程健康，轮询 is-active 才能真正确认 |
+| MCP handleRequest 传 req.body | SDK 1.27.1+ express.json() 已消费流，必须透传 parsed body |

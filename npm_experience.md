@@ -25,7 +25,7 @@ git push && git push --tags   # 触发 npm 发布
 
 - `v0.0.1`：只有骨架，功能极少
 - `v0.1.0`：功能完整的早期版本（本项目从此起步）
-- 本项目 package.json 当前版本：`0.1.0`
+- 本项目 package.json 当前版本：`0.1.1`
 
 ## 版本号更新
 
@@ -37,6 +37,33 @@ git push && git push --tags   # 触发 npm 发布
   ```
 - 该命令会自动修改 `package.json` 并创建对应 git tag
 - 版本语义需人工判断，没有任何机制自动决定升哪个版本
+
+## 更新已发布版本的流程（包含 workflow 变更）
+
+当代码或 workflow 有改动需要重新发布时：
+
+```bash
+# 1. 提交改动
+git add <files> && git commit -m "..."
+
+# 2. 升版本号（自动改 package.json 并创建 tag）
+npm version patch
+
+# 3. 推送代码和 tag，触发 GitHub Actions 发布
+git push && git push --tags
+```
+
+如果需要重新发布同一版本（如之前 tag 打错了）：
+
+```bash
+# 删除旧 tag
+git tag -d v0.1.0
+git push origin :refs/tags/v0.1.0
+
+# 重新打 tag 并推送
+git tag v0.1.0
+git push --tags
+```
 
 ## 所需 Secret
 
