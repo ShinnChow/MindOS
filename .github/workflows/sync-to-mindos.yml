@@ -76,7 +76,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to sync."
           else
-            git commit -m "sync: update from mindos-dev @ $(git -C "$GITHUB_WORKSPACE" rev-parse --short HEAD)"
+            git commit -m "sync: from mindos-dev @ $(git -C "$GITHUB_WORKSPACE" rev-parse --short HEAD)"
             git push
           fi
 
@@ -101,6 +101,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No landing changes to deploy."
           else
-            git commit -m "deploy: landing page from mindos-dev @ $(git -C "$GITHUB_WORKSPACE" rev-parse --short HEAD)"
+            git commit -m "deploy: from mindos-dev @ $(git -C "$GITHUB_WORKSPACE" rev-parse --short HEAD)"
             git push origin gh-pages
           fi
