@@ -208,6 +208,52 @@ mindos update
 
 ---
 
+### 7. `mindos mcp install` 命令设计
+
+**背景：** 用户需要手动复制 JSON 片段粘贴到各 Agent 的配置文件，路径各不相同，体验割裂。
+
+**参数设计：**
+
+```bash
+mindos mcp install [agent]
+  -g / --global           写入全局配置（默认 project 级）
+  --transport stdio|http  传输方式（默认 stdio）
+  --url <url>             http transport 时的 MCP 地址（默认 http://localhost:8787/mcp）
+  --token <token>         http transport 时的 auth token（不传则从 config.json 读）
+```
+
+**典型用法：**
+```bash
+mindos mcp install                    # 交互式，列出支持的 Agent 让用户选
+mindos mcp install claude-code        # 写入项目级（默认）
+mindos mcp install claude-code -g     # 写入全局
+mindos mcp install claude-code --transport http --url http://192.168.1.5:8787/mcp --token abc123
+```
+
+**支持的 Agent 及配置路径：**
+
+| Agent | Project 配置路径 | Global 配置路径 |
+|---|---|---|
+| claude-code | `.mcp.json` | `~/.claude.json` |
+| claude-desktop | — | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+| cursor | `.cursor/mcp.json` | `~/.cursor/mcp.json` |
+| windsurf | — | `~/.codeium/windsurf/mcp_config.json` |
+| cline | — | `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json` |
+| trae | `.trae/mcp.json` | `~/.trae/mcp.json` |
+| gemini-cli | `.gemini/settings.json` | `~/.gemini/settings.json` |
+| openclaw | — | `~/.openclaw/mcp.json` |
+| codebuddy | — | `~/.claude-internal/.claude.json` |
+
+**写入逻辑：**
+- 配置文件存在则合并（保留其他 mcpServers），不存在则新建
+- stdio transport 写入：`{ type: "stdio", command: "mindos", args: ["mcp"], env: { MCP_TRANSPORT: "stdio" } }`
+- http transport 写入：`{ url, headers: { Authorization: "Bearer <token>" } }`
+- 写入前打印预览，写入后打印成功提示
+
+**关键文件：** `bin/cli.js`
+
+---
+
 ### 不适合 MindOS 的
 
 - in-chat commands（`/status`、`/think`）：MindOS 用标准 MCP 协议，不是自己的消息通道
