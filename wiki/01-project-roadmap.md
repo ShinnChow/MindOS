@@ -5,13 +5,13 @@
 ## 总览
 
 ```
-v0.1 (P0 ✅)              v0.2 (P1 ✅)              v0.3 (P2)                v0.4 (P3)                v0.5 (P4)
+v0.1 (P0 ✅)              v0.2 (P1 ✅)              v0.3-0.4 (P1 ✅)          v0.5 (P2)                v0.6+ (P3-P4)
 ┌──────────┐           ┌──────────┐           ┌──────────┐           ┌──────────┐           ┌──────────┐
-│ Next.js  │           │ CLI +    │           │ CLI +    │           │ RAG +    │           │ 自动化 +  │
-│ MCP Server│  ──────▶  │ 自启 daemon│  ──────▶  │ 桌面安装包│  ──────▶  │ Agent 治理│  ──────▶  │ 多模态    │
-│ 核心编辑器 │           │ Git 自动同步│           │ Cloud Hub│           │ Agent 记忆│           │ 工作流引擎 │
+│ Next.js  │           │ CLI +    │           │ 插件架构 + │           │ Cloud Hub│           │ RAG +    │
+│ MCP Server│  ──────▶  │ 自启 daemon│  ──────▶  │ CLI UX 增强│  ──────▶  │ 桌面安装包│  ──────▶  │ Agent 治理│
+│ 核心编辑器 │           │ Git 自动同步│           │ Lazy Load │           │ Knowledge│           │ 自动化引擎 │
 └──────────┘           └──────────┘           └──────────┘           └──────────┘           └──────────┘
-开发者 only             开发者 + 终端用户        所有人                  人机共生                个人自动化中枢
+开发者 only             开发者 + 终端用户        开发者生态              所有人                  人机共生
 ```
 
 **关键原则：** 每阶段独立可用 | 本地存储始终默认 | 优先高频场景
@@ -35,6 +35,14 @@ v0.1 (P0 ✅)              v0.2 (P1 ✅)              v0.3 (P2)                v
 **已交付：** daemon 自启动（systemd/launchd）、Git 自动同步（`mindos sync`）、CLI 模块化（13 个 lib）、首次启动引导页、PWA 支持、Agent Inspector 日志增强。
 
 剩余：局域网自动发现 (mDNS) — [详情](./13-stage-mdns.md)
+
+---
+
+## v0.3–0.4 — 插件架构 + CLI UX 增强 ✅
+
+> 插件零侵入注册；CLI 开发者体验全面提升；组件按需加载减小初始 bundle。
+
+**已交付：** 插件架构 4 阶段（目录拆分 → manifest 自注册 → codegen auto-discovery → lazy loading）、CLI 更新检查、`--version`/`--help`、`config unset`、debug 模块、MCP/Skills API、FindInPage、UpdateBanner。
 
 ---
 
@@ -86,7 +94,10 @@ v0.1 (P0 ✅)              v0.2 (P1 ✅)              v0.3 (P2)                v
 | Next.js 16 前端 | ✅ | v0.1 | 双模式编辑、搜索、AI 对话、图谱 |
 | MCP Server (20+ 工具) | ✅ | v0.1 | stdio + HTTP, Bearer Token |
 | 11 个渲染器插件 | ✅ | v0.1 | [详情](./10-stage-plugins.md) |
+| 插件架构 (manifest + codegen + lazy) | ✅ | v0.4 | [详情](./11-plugin-architecture.md) |
 | CLI 模块化 (13 个 lib) | ✅ | v0.2 | onboard/start/open/sync/mcp/gateway/token |
+| CLI UX 增强 | ✅ | v0.4 | --version/--help/config unset/debug/update-check |
+| MCP/Skills API | ✅ | v0.4 | /api/mcp/* + /api/skills |
 | daemon 自启动 | ✅ | P1 | systemd/launchd |
 | Git 自动同步 | ✅ | P1 | `mindos sync` |
 | 首次启动引导页 | ✅ | P1 | 模板选择（EN/ZH/Empty）→ 自动初始化 |
