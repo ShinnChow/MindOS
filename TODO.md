@@ -1,6 +1,6 @@
 ## PENDING
 
-MindOS 审计更改
+MindOS 审计文件更改的功能
 
 Review change
 
