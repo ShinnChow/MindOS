@@ -8,16 +8,20 @@
 
 - [x] **`mindos update` 端口硬编码**：重启后健康检查轮询 `localhost:3000`，但用户实际端口可能不是 3000，导致"did not come back up in time"误报。修复：直接从 config 文件读 `port` 字段；顺带将 `waitForHttp` 探测路径从 `/` 改为 `/api/health` — v0.5.2
 - [x] **进程生命周期 7-bug 链**：stop/restart 模块连环 bug（PID 不完整、端口清理跳过、env 继承覆盖、config 新旧端口不分、lsof 环境差异、ss 子串误匹配、health 被 auth 拦截）。详见 `wiki/81-postmortem-process-lifecycle.md` — v0.5.7
+- [x] **Onboard check-port 自回环误报端口占用**：`http://localhost:3013/setup` 配置端口时，3013 被报为"已被占用"。原因：server-to-self HTTP 回环在 Next.js 单线程模式下超时。修复：从 `req.nextUrl.port` 直接判断 self，跳过网络自检。详见 `wiki/80-known-pitfalls.md`
 
 ## 技术债
 
+- [ ] **P1：硬编码状态色 → CSS 变量**：定义 `--success`/`--error` 变量后全局替换 `#7aad80` → `var(--success)`、`#c85050` → `var(--error)`、`text-red-400` → 自定义 class。影响 20+ 文件，每处简单替换。详见 `wiki/03-design-principle.md` 状态色章节
+- [ ] **P2：`prefers-reduced-motion` 支持**：当前零实现。在 `globals.css` 添加 `@media (prefers-reduced-motion: reduce)` 将 `animation-duration` / `transition-duration` 置为 `0.01ms`
+- [ ] **P3：Focus ring 统一**：部分组件用 `focus-visible:ring-ring/50`（Tailwind 默认），部分用 `outline: 2px solid var(--amber)`（设计规范）。应统一为 amber outline 方案
 - [ ] 模板内容待优化（中英双语）
 - [ ] SearchModal / AskModal 添加 `role="dialog"` + `aria-modal="true"`（无障碍）
 - [ ] 13 个 renderer 插件文件仍使用 inline `fontFamily`，待迁移到 `.font-display`
 
 ## 改进想法
 
-- [ ] **增加更多 Agent 支持**：当前 `MCP_AGENTS` 仅 8 个（claude-code, cursor, windsurf, cline, trae, gemini-cli, openclaw, codebuddy），`npx skills` 支持 40 个。优先级高的候选：Augment, Roo Code, Kilo Code, Continue, Goose, Kiro CLI, Qwen Code。改动文件：`app/lib/mcp-agents.ts`（主定义）+ `app/app/api/mcp/install-skill/route.ts`（Skill 安装常量）。完整 agent 清单见 `wiki/ref-npx-skills-mechanism.md`
+- [x] **增加更多 Agent 支持**：当前 `MCP_AGENTS` 16 个（claude-code, cursor, windsurf, cline, trae, gemini-cli, openclaw, codebuddy, iflow-cli, kimi-cli, opencode, pi, augment, qwen-code, trae-cn, roo），`npx skills` 支持 40 个。改动文件：`app/lib/mcp-agents.ts`（主定义）+ `app/app/api/mcp/install-skill/route.ts`（Skill 安装常量）。完整 agent 清单见 `wiki/ref-npx-skills-mechanism.md`
 
 - [x] **GUI RestartBlock 健康检查**：polling 判断条件从 `d.service === 'mindos'`（依赖响应体）改为 `r.status < 500`（只看状态码），与 CLI `waitForHttp` 逻辑一致，不受响应结构变更影响 — v0.5.2
 
