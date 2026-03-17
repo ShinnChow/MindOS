@@ -1,4 +1,4 @@
-<!-- Last verified: 2026-03-17 | Current stage: P1 -->
+<!-- Last verified: 2026-03-18 | Current stage: P1 -->
 
 # Backlog
 
@@ -17,8 +17,10 @@
 
 > 当前无未完成技术债 🎉
 
-<details><summary>已完成 ✅ (16 项)</summary>
+<details><summary>已完成 ✅ (18 项)</summary>
 
+- [x] **默认端口从 3000/8787 改为 3456/8781** — 避免与 Next.js/Vite/Express（3000）和 Cloudflare Wrangler（8787）冲突。已有用户配置不受影响，仅改默认值
+- [x] **日志文件自动轮转** — daemon 模式启动时检查 `~/.mindos/mindos.log`，超过 2MB 自动轮转为 `.old`，最多保留 1 个备份（上限 ~4MB）
 - [x] **P1：硬编码状态色 → CSS 变量**：定义 `--success`/`--error` 变量后全局替换。涉及 15 文件
 - [x] **P2：`prefers-reduced-motion` 支持**
 - [x] **P3：Focus ring 统一**：`--ring` 改为 `var(--amber)`，涉及 7 文件
