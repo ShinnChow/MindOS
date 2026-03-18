@@ -11,6 +11,7 @@
 - [x] **Onboard check-port 自回环误报端口占用**：`http://localhost:3013/setup` 配置端口时，3013 被报为"已被占用"。原因：server-to-self HTTP 回环在 Next.js 单线程模式下超时。修复：从 `req.nextUrl.port` 直接判断 self，跳过网络自检。详见 `wiki/80-known-pitfalls.md`
 - [x] **云同步 P0 可靠性/安全 6 项修复**：O1 instrumentation.ts daemon 自启动 + O2 进程退出 flush + O3 push 失败重试 + O4 token 安全统一 + O5 .gitignore 自动创建 + bonus `now` action 冲突处理统一。详见 `wiki/specs/spec-kb-cloud-sync.md` 优化路线图 P0 节
 - [x] **Git Sync 可靠性 4 项修复**：B1 credential approve 假成功 → 加 fill 验证 + fallback；B2 首次 push 无 upstream → `push -u origin HEAD`；B3 冲突文件写入失败标记 `noBackup`；B4 config/state 原子写入。详见 `wiki/specs/spec-sync-reliability.md`
+- [x] **systemd daemon install 后不启动服务**：`systemctl --user enable` 只创建开机自启 symlink，不启动。launchd `bootstrap` 会自动启动，但 systemd 需要显式 `start`。导致 `mindos start --daemon` 在 Linux 上永远超时 — v0.5.15
 
 ## 技术债
 
@@ -50,6 +51,7 @@
 - [x] **I1：CLI `mindos status` 命令** — 已有 `mindos doctor` 覆盖此需求
 - [x] **I2：登录页产品标语** — 已实现（`loginT.tagline` + `loginT.subtitle`）
 - [x] **I3：API Key 连通性验证** — Settings AI Tab 已有 Test 按钮（`/api/settings/test-key`），支持 Anthropic/OpenAI，返回延迟和错误分类
+- [x] **I3.5：`mindos uninstall` 命令** — 一条命令干净卸载（停进程 + 卸 daemon + 删配置 + 删知识库三重保护 + npm uninstall）— v0.5.15
 
 ### 🟡 中优先
 
