@@ -1,5 +1,9 @@
 ## PENDING
 
+
+这种同步的方式，如何处理对于 MindOS 的 PR
+
+
 MindOS 审计文件更改的功能
 
 Review change
@@ -20,6 +24,10 @@ Review change
 - wiki 使用指南，比如roadmap到stage
 
 ## ADDRESSED
+
+### Sync "Remote not reachable" — credential 静默吞错 ✅
+- 原报错：`initSync` credential approve 失败被空 catch 吞掉 → `ls-remote` 无凭证 → 泛泛的 "Remote not reachable"
+- 修复：credential catch 记日志 + fallback URL token；`ls-remote` 提取 stderr 详细信息；sync.js 全量 `execSync` → `execFileSync`；route.ts `exec` → `execFile`（防注入）；context.ts null guard + Anthropic 消息格式兼容
 
 
 GUI Onboard 界面
