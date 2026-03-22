@@ -1,4 +1,4 @@
-<!-- Last verified: 2026-03-20 | Current stage: v0.5 -->
+<!-- Last verified: 2026-03-22 | Current stage: v0.5 -->
 
 # 产品路线图 (Product Roadmap)
 
