@@ -101,8 +101,7 @@ jobs:
             --exclude='architecture-review-summary.md' \
             --exclude='ui-audit-*.md' \
             --exclude='discussions/' \
-            --exclude='specs/spec-electron-desktop-app.md' \
-            --exclude='specs/spec-capacitor-mobile-app.md' \
+            --exclude='specs/' \
             wiki/ /tmp/mindos/wiki/
 
           [ -f .gitignore.prod ] && cp .gitignore.prod /tmp/mindos/.gitignore
