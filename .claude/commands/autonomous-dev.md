@@ -39,6 +39,11 @@
 ## 阶段 6：交付
 
 13. 更新文档：`wiki/`（架构变更、新坑记入 `80-known-pitfalls.md`）、`85-backlog.md`（打勾）
+
+## 阶段 7：更新
+
+如果用户在初始命令未主动提及，则跳过。
+
 14. commit + push（遵循 CLAUDE.md Git 流程，Conventional Commits）
 15. 如果涉及 release → 执行冒烟验证（临时目录 `npx @geminilight/mindos@latest --version`）
 

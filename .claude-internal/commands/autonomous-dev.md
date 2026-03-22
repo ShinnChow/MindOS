@@ -46,26 +46,23 @@
 12. 全局扫描同类模式：搜索代码库中是否存在与本次改动相同的模式/结构，统一处理，不留不一致
     - 大型替换使用 **Expand-Migrate-Contract** 策略：先新旧并存 → 逐步迁移调用方 → 最后移除旧版
 
-## 阶段 4：Code Review + 精简
+## 阶段 4：Code Review
 
-13. 执行 `/self-review`（复用其 3 轮框架 + 评分标准，避免重复定义）
-    - 有 🔴 Blocker → 修复后重新 review，直到零 🔴
+13. 执行 `/self-review`（4 维度 checklist：正确性→健壮性→架构+可维护性+精简→性能+前端合规）
+    - 有 🔴 Blocker → 修复后重新检查该文件
     - 有 🟡 Major → 修复后说明改了什么
-14. 执行 `/simplify`：检查改动中的代码复用、冗余消除和效率优化
-    - 重复代码 >3 行 → 提取函数
-    - 可用现有库替代的自定义实现 → 替换
-    - 未使用的 import/变量/函数 → 删除
+    - **最多执行 3 轮**：如果第 3 轮仍有 🔴 → 停止，向用户报告剩余问题和根因分析，等待决策（通常意味着 spec 方案本身需要调整）
 
 ## 阶段 5：验证
 
-15. 跑全量测试（`npx vitest run`），必须全部通过
-16. 如果改动涉及 UI → 用 Playwright 截图关键页面，保存到 `/tmp/`
+14. 跑全量测试（`npx vitest run`），必须全部通过
+15. 如果改动涉及 UI → 用 Playwright 截图关键页面，保存到 `/tmp/`
 
 ## 阶段 6：交付
 
-17. 更新文档：`wiki/`（架构变更、新坑记入 `80-known-pitfalls.md`）、`85-backlog.md`（打勾）
-18. commit + push（遵循 CLAUDE.md Git 流程，Conventional Commits）
-19. 如果涉及 release → 执行冒烟验证（临时目录 `npx @geminilight/mindos@latest --version`）
+16. 更新文档：`wiki/`（架构变更、新坑记入 `80-known-pitfalls.md`）、`85-backlog.md`（打勾）
+17. commit + push（遵循 CLAUDE.md Git 流程，Conventional Commits）
+18. 如果涉及 release → 执行冒烟验证（临时目录 `npx @geminilight/mindos@latest --version`）
 
 ## 失败处理
 
