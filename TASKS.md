@@ -4,7 +4,7 @@
 
   或者直接用本地版本（已经是最新代码）：
 
-  cd /data/home/geminitwang/code/sop_note && npm link
+  cd /data/home/geminitwang/code/mindos && npm link
 
 避免硬编码，比如json里面的变量
 

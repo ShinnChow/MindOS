@@ -212,7 +212,7 @@ Main Process                    Renderer (BrowserWindow)
 ### 项目结构
 
 ```
-sop_note/
+mindos/
 ├── desktop/                          # Electron 层
 │   ├── package.json
 │   ├── tsconfig.json

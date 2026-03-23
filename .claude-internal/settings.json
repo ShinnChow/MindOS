@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "file=\"$TOOL_INPUT_FILE_PATH\"; case \"$file\" in *.ts|*.tsx|*.js|*.jsx) cd /data/home/geminitwang/code/sop_note/app && npx eslint --no-warn-ignored --max-warnings 0 \"$file\" 2>&1 | head -20 ;; esac",
+            "command": "file=\"$TOOL_INPUT_FILE_PATH\"; case \"$file\" in *.ts|*.tsx|*.js|*.jsx) cd /data/home/geminitwang/code/mindos/app && npx eslint --no-warn-ignored --max-warnings 0 \"$file\" 2>&1 | head -20 ;; esac",
             "blocking": false
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cd /data/home/geminitwang/code/sop_note/app && npx vitest run --reporter=verbose 2>&1 | tail -30",
+            "command": "cd /data/home/geminitwang/code/mindos/app && npx vitest run --reporter=verbose 2>&1 | tail -30",
             "blocking": true,
             "timeout": 120000
           }

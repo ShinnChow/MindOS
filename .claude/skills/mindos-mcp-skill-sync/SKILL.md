@@ -23,7 +23,7 @@ When any layer changes, the others may need to catch up. This skill automates de
 ## Project Layout
 
 ```
-/data/home/geminitwang/code/sop_note/
+/data/home/geminitwang/code/mindos/
 ├── app/                          # Next.js 15 App
 │   ├── app/api/                  # API routes (REST endpoints)
 │   ├── lib/fs.ts                 # Core filesystem utilities (source of truth for capabilities)

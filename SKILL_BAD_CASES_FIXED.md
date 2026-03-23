@@ -505,7 +505,7 @@
 ● 现在在文件末尾追加新的 Spec 条目：
   ⎿  Interrupted · What should Claude do instead?
 
-❯ '/data/home/geminitwang/code/sop_note/wiki/task-spec-user-onboard.md'              
+❯ '/data/home/geminitwang/code/mindos/wiki/task-spec-user-onboard.md'              
 添加到这个文件                                                                       
   ⎿  ⧉ Selected 1 lines from wiki/task-spec-user-onboard.md in Visual Studio Code
 
@@ -629,7 +629,7 @@
                                       config）行为不变\n")
   ⎿  Interrupted · What should Claude do instead?
 
-❯ 我是让你更新'/data/home/geminitwang/code/sop_note/wiki/task-spec-user-onboard.md'  
+❯ 我是让你更新'/data/home/geminitwang/code/mindos/wiki/task-spec-user-onboard.md'  
 这个文件，而不是MindOS                                                               
   ⎿  ⧉ Selected 17 lines from wiki/task-spec-user-onboard.md in Visual Studio Code
 
