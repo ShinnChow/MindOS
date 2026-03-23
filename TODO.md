@@ -5,24 +5,11 @@ curl -L -o ~/Downloads/MindOS-0.1.0-arm64-mac.zip 'http://21.6.243.108:8080/desk
 cd ~/Downloads && unzip MindOS-0.1.0-arm64-mac.zip && open MindOS-0.1.0-arm64.dmg 
 
 
-帮我在Rail的智能体下方，加一个新的icon，叫做探索 Discover，里面包括使用案例、插件市场、技能市场
+1，使用案例的完善
+2，帮我理解下如果用户没有安装 MindOS 的 User Flow，你要考虑很多用户可能没有 NodeJs
 
-我很好奇，为什么桌面端已经不包括mindos app mcp等，为什么还是很大呢
 
 1. 现在模版下面有很多一级目录，其实是用户的一些Space，并且需要INTRUCTION.md来自动管理。新建一个新的一级目录也需要自动创建，帮我想想怎么提升用户体验。
-
-
-可以的，先加上这个：  把 "连接配置"        
-  标准化——所有非桌面客户端都需要：           
-                                             
-  1. 服务器地址（http://192.168.1.100:3456） 
-  2. Auth Token（已有）                      
-  3. 连接测试（调 /api/health）              
-                                             
-  这个流程在你的 MCP Settings                
-  里已经有雏形了（Remote 模式 +              
-  Token），只需要在移动端做一个独立的        
-  "首次连接" 页面。                          
 
 ● Explore(Explore auth and conne
 
@@ -90,6 +77,31 @@ Review change
 - wiki 使用指南，比如roadmap到stage
 
 ## ADDRESSED
+
+帮我理解下现在链接远程mindos的user flow
+
+
+可以的，先加上这个：  把 "连接配置"        
+  标准化——所有非桌面客户端都需要：
+                                             
+  1. 服务器地址（http://192.168.1.100:3456） 
+  2. Auth Token（已有）                      
+  3. 连接测试（调 /api/health）              
+                                             
+  这个流程在你的 MCP Settings                
+  里已经有雏形了（Remote 模式 +              
+  Token），只需要在移动端做一个独立的        
+  "首次连接" 页面。                 
+
+MindOS Agent的对话框上有很多按钮好像有问题，比如删除历史对话之类的。
+
+我很好奇，为什么桌面端已经不包括mindos app mcp等，为什么还是很大呢
+
+
+Rail的探索 下面 加个 空间模版，也是 即将推出，放在插件市场下面
+
+
+帮我在Rail的智能体下方，加一个新的icon，叫做探索 Discover，里面包括使用案例、插件市场、技能市场
 
 Waiting for Web UI 有可能展示出具体细节吗
 添加删除文件或更新文件名称，旁边文件目录的不更新
