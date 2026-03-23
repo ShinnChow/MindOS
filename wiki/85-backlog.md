@@ -49,6 +49,14 @@
 
 - [ ] **Electron Desktop App（Phase 1）** — 本地+远程双模式桌面端，含共享连接 SDK、服务端 CORS 增强、系统托盘/快捷键/自动更新。[spec](./specs/spec-electron-desktop-app.md)
 - [ ] **Capacitor 移动端（Phase 2）** — iOS/Android 原生壳，复用 Phase 1 连接 SDK。[spec](./specs/spec-capacitor-mobile-app.md)
+- [x] **Help 页面** — `/help` 路由 + ActivityBar 底部 `?` 图标入口。6 个 section，前 4 个默认展开：
+  - 什么是 MindOS（非技术版定位：你和 AI 共享同一个大脑）
+  - 核心概念：Space → Instruction → Skill（从"知识在哪"→"怎么控制 AI"→"AI 怎么干活"）
+  - 快速开始 3 步（浏览 → 对话 → 连接 Agent）
+  - 在 AI Agent 中使用 MindOS（5 个场景卡片 + 可复制 prompt）
+  - 快捷键速查
+  - FAQ 7 条
+  - **设计决策：** 核心概念选 Space/Instruction/Skill 而非 Plugin/AI Ask——Plugin 太窄（只是渲染），AI Ask 是功能入口不是概念。三者形成完整链路：结构层→控制层→执行层。"典型使用场景"不独立成 section，合并进"在 Agent 中使用"更连贯。
 - [x] **I1：CLI `mindos status` 命令** — 已有 `mindos doctor` 覆盖此需求
 - [x] **I2：登录页产品标语** — 已实现（`loginT.tagline` + `loginT.subtitle`）
 - [x] **I3：API Key 连通性验证** — Settings AI Tab 已有 Test 按钮（`/api/settings/test-key`），支持 Anthropic/OpenAI，返回延迟和错误分类

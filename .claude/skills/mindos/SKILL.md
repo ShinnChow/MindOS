@@ -22,7 +22,7 @@ This Skill defines the complete protocol for you (the Agent) to operate within a
 
 ## Core Philosophy
 
-**Human Thinks Here, Agent Acts There.**
+**Human Thinks Here, Agents Act There.**
 
 Three pillars:
 1. **Global Mind Sync** — Record once, reuse everywhere. Via MCP, any Agent connects zero-config to your Profile, SOPs, and experiences.
