@@ -71,6 +71,7 @@
 - [x] **McpSkillsSection 拆子组件** — 595→359 行，抽取 `McpSkillRow` (145 行) + `McpSkillCreateForm` (178 行)
 - [x] **补测试** — walkthrough-steps (4 cases) + explore-use-cases (7 cases) + i18n-new-keys (10 cases)，总计 50 文件 598 测试
 - [x] **I15：Discover 探索面板** — Activity Bar 新增 Discover 入口（Compass 图标），面板含使用案例（9 个，点击触发 Ask AI）+ 插件市场/技能市场占位。[spec](./specs/spec-discover-panel.md)
+- [x] **I16：Agents 面板 Hub 导航** — 顶部 Discover 同款大行导航（Overview / MCP & Skills / Skills / Usage & help / Agent insights 即将推出）+ 分隔线下列表；智能体行可展开查看路径、stdio|http、复制配置。[spec](./specs/spec-agents-panel-hub-nav.md)
 
 ### 🟡 中优先
 
