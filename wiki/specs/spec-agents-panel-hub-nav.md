@@ -44,8 +44,8 @@ SidebarLayout (McpProvider)
    - Skills 区块 `ref` 供 Skills 行滚动。  
    - 底部「高级配置」保留。
 
-3. **Agent 详情为面板内「内容页」**  
-   `AgentsPanelAgentListRow`：行内 Chevron + 状态点 + 名称；点击整行进入详情。`AgentsPanelAgentDetail`：顶栏「返回」+ 名称，正文为配置路径、transport、`generateSnippet` 预览与复制；Detected 在正文顶部保留 Install；`notFound` 仅说明文案。
+3. **Agent 详情为独立右侧内容页（不替换左侧列表）**  
+   `AgentsPanelAgentListRow`：优化后的列表行；点击后在 **`RightAgentDetailPanel`**（桌面端固定右侧、与 Ask 面板可并排、`rightOffset` 叠放）展示 `AgentsPanelAgentDetail`（`headerVariant="dock"`：标题 + X 关闭）。左侧 Agents 面板始终保持 Hub + 列表；`SidebarLayout` 持有 `agentDetailKey` 与宽度持久化；离开 Agents 面板时 Dock 收起但可保留 key 以便返回。
 
 4. **设计系统**  
    新增交互控件使用 `focus-visible:ring-2 focus-visible:ring-ring`；沿用面板既有色板（与现有 Agents 卡片一致），**不引入硬编码 hex**（保持与当前文件一致的语义类名）。
