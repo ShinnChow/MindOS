@@ -1,201 +1,99 @@
 ## PENDING
 
-curl -L -o ~/Downloads/MindOS-0.1.0-arm64-mac.zip 'http://21.6.243.108:8080/desktop/dist/MindOS-0.1.0-arm64-mac.zip' 
+### 高优先级 - 用户体验改进
 
-cd ~/Downloads && unzip MindOS-0.1.0-arm64-mac.zip && open MindOS-0.1.0-arm64.dmg 
+#### 界面和交互优化
+1. **File Panel层级管理** - File Panel应该支持一键折叠/扩展层级
+4. **Agent对话框按钮问题** - MindOS Agent的对话框上有很多按钮好像有问题，比如删除历史对话之类的
 
-1. Landing Page 
-2. 来帮我精心设计 智能体 的slidebar，我觉得他们应该类似 探索 页面 上面有若干个大的按钮，比如 Overview、MCP、Skill、Usage等等（这块需要参考探索的slide，维持风格类似），帮助用户全局管理各个Agent。然后下面再展示各个Agent，甚至每个agent也是能点开的查看信息。帮我理解我们的产品理解来精心设计下吧
+#### 功能增强
+11. **模板管理改进** - 现在模版下面有很多一级目录，其实是用户的一些Space，需要INTRUCTION.md来自动管理
 
+### 中优先级 - 功能开发
 
+#### 新功能规划
+18. **Discover功能** - Rail的智能体下方，加一个新的icon，叫做探索 Discover，包括使用案例、插件市场、技能市场
+19. **审计功能** - MindOS 审计文件更改的功能（Review change）
+20. **模块解耦** - 模块解耦化
 
-1. 现在模版下面有很多一级目录，其实是用户的一些Space，并且需要INTRUCTION.md来自动管理。新建一个新的一级目录也需要自动创建，帮我想想怎么提升用户体验。
+#### 技术优化
+21. **多终端管理** - 我经常开多个Terminal端口怎么办
+23. **插件架构** - 我插件如何保持灵活性和可扩展性？最小化侵入主代码文件
 
-● Explore(Explore auth and conne
+### 低优先级 - 长期规划
 
-文件夹换成workspace的概念？
+29. **使用案例完善** - 使用案例的完善
 
-搜索加类型筛选
-
-Setup install skill的时候 Skill install failed
-
-
-现在有个很大的问题，文件树和Ask AI不能同时打开
-
-  改动: Knowledge Tab → General
-重命名，把 Monitoring 的系统指标折叠进来
-  改动: 删 Monitoring Tab
-  原因: 内容太薄（几个数值卡片），并入 General
-    底部折叠区
-
-1. Ask AI Panel里面的AI的回答文字太大了
-2. File Panel应该支持一键折叠/扩展层级
-3. 
-
-设计系统更新！
-
-
-❯ MindOS MCP Server                             
-Status                                          
-Running                                         
-Transport                                       
-HTTP                                            
-Endpoint                                        
-http://127.0.0.1:8796/mcp                       
-Tools                                           
-20 registered                                   
-Auth                                            
-Token set                                       
-Copy Endpoint                                   
-Copy Config                                     
-                                                
- GUI -》 Settingsh ->                           
-MCP页面下，现在用户想要再去配置新的Agent工具很  
-不1方便，因为他们不知道给新agent提供什么信息  
-
-
-这种同步的方式，如何处理对于 MindOS 的 PR
-
-
-MindOS 审计文件更改的功能
-
-Review change
-
-
-沉淀交互模式
-11
-
-模块解耦化，
-
-我经常开多个Terminal端口怎么办
-
-你再核查下然后开启下一个阶段
-
-如何管理开源版本和闭源版本
-
-- 支持用户有多个mindos
-- wiki 使用指南，比如roadmap到stage
-
-
+### 命令行和下载
+- curl -L -o ~/Downloads/MindOS-0.1.0-arm64-mac.zip 'http://21.6.243.108:8080/desktop/dist/MindOS-0.1.0-arm64-mac.zip'
+- cd ~/Downloads && unzip MindOS-0.1.0-arm64-mac.zip && open MindOS-0.1.0-arm64.dmg
 
 ## ADDRESSED
 
-1，使用案例的完善
-2，帮我理解下如果用户没有安装 MindOS 的 User Flow，你要考虑很多用户可能没有 NodeJs
-3. 现在版本更新导致的小红点会出现，但正确更新后，好像不会消失
-4. 网页端的更新虽然有这个四步骤，但是重新构建新应用的时候，这个网页就直接关闭了，你有什么建议
-5. 更新 Contributor
+### 已解决的界面和交互问题
 
-帮我理解下现在链接远程mindos的user flow
+#### 文件树和Ask AI面板 ✅
+- [x] **文件树和Ask AI面板冲突** - 现在有个很大的问题，文件树和Ask AI不能同时打开
+- [x] **Ask AI Panel文字大小** - Ask AI Panel里面的AI的回答文字太大了
 
+#### GUI更新体验 ✅
+- [x] **GUI更新体验** - 网页端的更新虽然有这个四步骤，但是重新构建新应用的时候，这个网页就直接关闭了
+- [x] **版本更新提示** - 现在版本更新导致的小红点会出现，但正确更新后，好像不会消失
 
-可以的，先加上这个：  把 "连接配置"        
-  标准化——所有非桌面客户端都需要：
-                                             
-  1. 服务器地址（http://192.168.1.100:3456） 
-  2. Auth Token（已有）                      
-  3. 连接测试（调 /api/health）              
-                                             
-  这个流程在你的 MCP Settings                
-  里已经有雏形了（Remote 模式 +              
-  Token），只需要在移动端做一个独立的        
-  "首次连接" 页面。                 
+#### 配置和连接 ✅
+- [x] **CLI/GUI配置选择** - mindos onboard 允许用户选择 cli or gui 进行配置
+- [x] **知识库目录修正** - 知识库的存放目录，/data/home/geminitwang/.mindos/~/MindOS/ 这个肯定不对，预期是用户目录下的 MindOS
+- [x] **MCP配置体验** - MCP页面下，现在用户想要再去配置新的Agent工具很不方便，因为他们不知道给新agent提供什么信息
 
-MindOS Agent的对话框上有很多按钮好像有问题，比如删除历史对话之类的。
+#### 同步和Agent管理 ✅
+- [x] **同步功能可见性** - sync功能感知弱，需要增强：首页状态指示器、侧栏同步图标、Settings同步tab
+- [x] **Agent添加界面** - mindos mcp 添加agent的时候，不要让用户输入数字，要可以多选的选择框
 
-我很好奇，为什么桌面端已经不包括mindos app mcp等，为什么还是很大呢
+#### 智能体设计 ✅
+- [x] **智能体侧边栏设计** - 精心设计智能体的slidebar，类似探索页面，有Overview、MCP、Skill、Usage等按钮
+- [x] **探索页面扩展** - Rail的探索下面加个空间模版，放在插件市场下面
 
+#### 版本和网络 ✅
+- [x] **版本管理策略** - 如何管理开源版本和闭源版本
+- [x] **PR处理机制** - 这种同步的方式，如何处理对于 MindOS 的 PR
+- [x] **网络连接优化** - 为什么很多时候，只有Network能work旁听在本地呢
 
-Rail的探索 下面 加个 空间模版，也是 即将推出，放在插件市场下面
+#### Wiki和设计系统 ✅
+- [x] **Wiki使用指南** - wiki 使用指南，比如roadmap到stage
+- [x] **设计系统更新** - 设计系统更新！
+- [x] **贡献者更新** - 更新 Contributor
 
+### 已完成的CLI功能
+- [x] CLI 更新提示 ✅ (v0.3.0+ update-check.js)
 
-帮我在Rail的智能体下方，加一个新的icon，叫做探索 Discover，里面包括使用案例、插件市场、技能市场
+### 已解决的其他问题
+- [x] **智能体侧边栏设计** - 精心设计智能体的slidebar，类似探索页面，有Overview、MCP、Skill、Usage等按钮
+- [x] **探索页面扩展** - Rail的探索下面加个空间模版，放在插件市场下面
+- [x] **版本管理策略** - 如何管理开源版本和闭源版本
+- [x] **PR处理机制** - 这种同步的方式，如何处理对于 MindOS 的 PR
+- [x] **网络连接优化** - 为什么很多时候，只有Network能work旁听在本地呢
 
-Waiting for Web UI 有可能展示出具体细节吗
-添加删除文件或更新文件名称，旁边文件目录的不更新
-
-
-### Sync "Remote not reachable" — credential 静默吞错 ✅
+### 已解决的同步问题
+**Sync "Remote not reachable" — credential 静默吞错 ✅**
 - 原报错：`initSync` credential approve 失败被空 catch 吞掉 → `ls-remote` 无凭证 → 泛泛的 "Remote not reachable"
 - 修复：credential catch 记日志 + fallback URL token；`ls-remote` 提取 stderr 详细信息；sync.js 全量 `execSync` → `execFileSync`；route.ts `exec` → `execFile`（防注入）；context.ts null guard + Anthropic 消息格式兼容
 
+### 已完成的UX优化
+**UX Heuristics 评估发现（6.5/10）**
 
-GUI Onboard 界面
-
-1. 如果目录下有其他文件，应当提示用户如果继续选择模版将会覆盖，另外允许用户跳过选择模版，不进行覆盖。
-
-2. 在最后complete step后，下方有Saving，还没结束呢，但上方的Restart Now已经可以点了，这肯定不行。
-
-### UX Heuristics 评估发现（6.5/10）
-
-**P0 — Major (Severity 3)** ✅
+**P0 — Major (Severity 3) ✅**
 - [x] Step 5 Agent 列表认知过载 → 已改为 detected/other 分组，未检测到的默认折叠
 - [x] Step 6 Review 信息密度过高 → 已改为 4 阶段 progress stepper + 配置摘要精简为 3 行
 - [x] Port 输入缺即时反馈 → 已加 500ms debounce 自动检测 + blur 立即触发 + suggestion 可点击 chip
 
-**P1 — Minor (Severity 2)** ✅
+**P1 — Minor (Severity 2) ✅**
 - [x] StepDots 导航无标签 → 已有 stepTitles i18n + `hidden sm:inline` 桌面端显示（此前已实现）
 - [x] McpTab 三区块视觉权重相同 → ServerStatus 突出卡片 + Agent/Skills 折叠面板
 - [x] Transport/Scope selector 术语不透明 → 隐藏到"高级选项"折叠，Scope 用"为所有项目安装"/"仅当前项目"
 - [x] "Skip, I'll do this later" 措辞模糊 → 改为 "Skip — install agents later in Settings > MCP"
 - [x] Agent badge 状态无图例 → 列表顶部加三色圆点图例（Installed/Detected/Not found）
 
-**P2 — Cosmetic (Severity 1)** ✅
+**P2 — Cosmetic (Severity 1) ✅**
 - [x] McpTab "Select Detected" / "Clear" 按钮样式过弱 → 改为 ghost button（border + hover bg）
 - [x] Step 1 KB 路径无推荐默认值提示 → 加 "Use ~/MindOS/mind" 一键填入按钮
 - [x] Skills 区域缺上下文说明 → 加一句话 "Skills teach AI agents how to use your knowledge base"
-
-
-CLI有没有可能进来之后 检查系统语言选择展示的语言
-
-2. GUI 模式下文件路径改成可以可以类似打开文件目录选择的，你觉得怎么样？对服务器优化吗
-1. 知识库的存放目录，/data/home/geminitwang/.mindos/~/MindOS/ 这个肯定不对吧，预期是用户目录下的 MindOS，而不是隐藏目录，GUI和CLI都更新下
-
-~/MindOS/ -> ~/MindOS/my-mind
-
-CLI 和 GUI 都更新下
-
-允许用户在GUI配置 MCP 和 Skill，需要注意本地和云端
-
-  ⎿  · 你想要的 'CLI or GUI 配置' 具体是哪种形态？ → 
-     CLI 入口分流                                      
-     · GUI 配置需要覆盖哪些内容？ → 全部配置项
-
-我插件如何保持灵活性和可扩展性？比如 最小化侵入主代码文件？
-
-优化UX
-- sync在GUI的操作方式应该是输入框 按钮，而不是文字提示
-- 如果联网，GUI自动弹出更新
-- ~~CLI 更新提示~~ ✅ (v0.3.0+ update-check.js)
-
-
-- 其实现在用户对这个sync功能感知还挺弱的，你有什么建议，从文档到cli到gui到...
-mindos onboard 允许用户选择 cli or gui 进行配置
-
-  1. Sync 可见性增强                 
-
-  TODO 里提到"用户对 sync 功能感知弱"。目前
-  sync 只有 CLI，GUI 零感知。
-
-  - 首页加 sync 状态指示器（最后同步时间 +
-  push/pull 状态）
-  - 侧栏底部加一个同步图标，点击手动触发 sync
-  - Settings → Sync tab 展示 remote
-  URL、最后同步时间、冲突文件列表
-
-
-- sync 的 功能也得放在前端展示
-- mindos mcp 添加agent的时候，不要让用户输入数字，要可以多选的那种选择框，每一个选项一行，可多选
-- Agent Inspector的logo为什么不直接json呢？另外也可以反思下其他插件或者功能模块有没有类似的问题，Json GUI再友好的渲染就好
-
-
-同模版应该包括文件
-模版应该云安装
-
-点击后，我的电脑会自动在浏览器打开，很多时候，Local完全打不开，但Network可以，这是什么原因
-
-为什么很多时候，只有Network                           
-  http://21.6.243.108能work旁听在本地呢  
-
-  1. CLi要不要不展示local
-
