@@ -147,6 +147,8 @@
 
 **建议**：优先评估 **standalone** 是否与现有 `ProcessManager`、端口与健康检查一致；若短期成本过高，可阶段性采用「内置仅带 `.next` + 最小依赖」，但必须在 spec 附录记录差异与迁移计划。
 
+**现状（2026-03）**：已落地 **Next `output: 'standalone'`** + `prepare-mindos-runtime` 精简拷贝（无 `app/node_modules`，排除 `.next/cache` / `.next/dev`），详见 [spec-desktop-standalone-runtime.md](./spec-desktop-standalone-runtime.md)。
+
 ### 版本比较
 
 - 使用与 npm 一致的 **semver**（`semver` 库或等价实现），比较 `UserRuntime` 与 `BundledRuntime` 的 `package.json#version`。
