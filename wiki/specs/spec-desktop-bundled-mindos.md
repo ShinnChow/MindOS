@@ -220,6 +220,32 @@
 - **合规与许可证**：内置产物与主项目同源分发，保持 LICENSE 一致；第三方依赖清单随构建锁定。
 - **macOS Gatekeeper / 公证**：内置可执行文件若被标记隔离属性，需纳入 Desktop 发布 checklist（与现有 `identity: '-'` 说明共存，随签名策略演进更新）。
 
+## 发布与版本（npm 与 Desktop 对齐）
+
+与团队约定一致：**减少「npm 一版、Desktop 又一版」的割裂感**，同时保留壳与 Web 不同的迭代节奏。
+
+### 版本叙事
+
+| 概念 | 含义 |
+|------|------|
+| **MindOS 产品版本** | `@geminilight/mindos` 的 **`package.json#version`**，与 git **`vX.Y.Z`** tag、npm 发布一致；用户问「MindOS 几版」指它。 |
+| **Desktop 壳版本** | Electron 安装包版本（如 `desktop/package.json` / `app.getVersion()`）；负责壳、自动更新、平台打包。 |
+| **内置 MindOS 版本 `Vb`** | BundledRuntime 根目录的 `package.json#version`，**须与某次已发布的 MindOS `vX.Y.Z` 同源构建**，禁止手拷未 tag 目录。 |
+
+**关于页 / 诊断信息（建议）**：同时展示两行，例如 **MindOS 0.5.55**（内置或与当前运行根一致）与 **Desktop 1.3.0**，避免只显示壳版本导致与 npm 用户对不上号。
+
+### 发布节奏
+
+1. **主轴**：打 **`vX.Y.Z`** → publish npm（现有 `publish-npm` 流程）。  
+2. **发 Desktop 安装包时**：内置产物从 **同一 `vX.Y.Z` 检出构建**；Release Notes 写清「内置 MindOS vX.Y.Z」。  
+3. **日常**：允许 **只发 npm**（patch 频繁不必每次发 Desktop）；**一旦发 Desktop**，内置版本应对齐**本次要推给用户的 MindOS 版本**（通常为当时 `latest` 对应 tag）。  
+4. **工程目标（建议）**：CI 在 npm 发布成功后 **触发或参数化 Desktop 构建**，传入 **`X.Y.Z`**，避免安装包内嵌版本与 npm 漂移；落地前可在发版 checklist 中人工核对。
+
+### 与本文档其它条目的关系
+
+- **`bundledMindOsVersion` / 择优**：`Vb` 即上述内置版本，与 npm 同 semver 可比。  
+- **详细 GitHub workflow 与 `npm run release`**：见 [git-sync-workflow.md](../refs/git-sync-workflow.md#发版流程)。
+
 ## 待决问题（实现前收口）
 
 1. **内置产物形态**：standalone-only 是否足以覆盖 `mcp` 的 tsx 依赖（是否 copy mcp `node_modules` 子集）；若否，首版最小文件清单需列清。
