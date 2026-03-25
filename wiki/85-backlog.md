@@ -80,6 +80,7 @@
 - [x] **I19：Agents Dashboard UX/UI Polish（P1.5）** — `/agents` 导航补齐 tab 语义（tablist/tab/tabpanel）；MCP 增加 Connection Graph（light）+ 健康表联动；Skills 增加搜索、来源过滤、按需兼容矩阵；保持 Content-first 路由与可访问性一致。[spec](./specs/spec-agents-content-dashboard-ux-polish.md)
 - [x] **I20：Agents Sidebar MCP/Skills 深链到 Content Panel（P1.6）** — Sidebar 的 Hub 行为与 Content 页信息架构对齐：`Overview/MCP/Skills` 分别跳转 `/agents`、`/agents?tab=mcp`、`/agents?tab=skills`；MCP 内容页增加“搜索 + 状态筛选（All/Connected/Detected/Not found）”以提升多 Agent 管理效率。[spec](./specs/spec-agents-sidebar-mcp-skills-content-routing.md)
 - [x] **I21：Agents Skills Workspace（P1.7）** — Skills 页升级为多维管理工作台：状态过滤（Enabled/Disabled/Needs Attention）、能力过滤、批量启停筛选结果、Agent 聚焦矩阵；MCP 管理视图补充筛选结果计数。并新增模型层测试覆盖正常/边界/错误路径。[spec](./specs/spec-agents-skills-workspace-multi-agent.md)
+- [x] **I22：Agents MCP Control Plane（P1.8）** — MCP 页升级为统一管理工作台：新增传输筛选（All/stdio/http/other）、风险队列（MCP 停止/Detected 待配置/Not found）、筛选结果批量重连与执行反馈；补充模型层 + 页面渲染测试覆盖正常/边界/错误路径。[spec](./specs/spec-agents-mcp-control-plane-upgrade.md)
 - [x] **Ask 输入不中断（执行中可草拟）** — 修复 Agent 执行期间输入框被禁用：允许边执行边输入，提交仍串行；新增“可先输入下一步”提示与 jsdom 回归测试。测试：`app/__tests__/ask/ask-content-input-during-run.test.tsx`
 
 ### 🟡 中优先
