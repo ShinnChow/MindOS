@@ -4,6 +4,13 @@
 1. 合并插件到主程序
 2. Diff
 
+ACP for call
+Agent as Workflow
+
+模版优化 - 中英文，勾选 空间
+
+Editer for skill & agent & file
+
 Agents 面板开发
 
 - Agents SideBar，点击每个 Agent，应该直接弹出Content页，而不是右侧边栏
