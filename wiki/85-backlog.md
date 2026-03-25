@@ -84,6 +84,7 @@
 - [x] **I23：Agents Sidebar Agent Click 路由统一（P1.9）** — Sidebar 中点击任意 Agent 行统一跳转 `/agents/[agentKey]`，详情在 Content 展示（skill/mcp/usage/space reach），不再走右侧详情抽屉；面板行高亮改为路由驱动。[spec](./specs/spec-agents-sidebar-agent-open-content-detail.md)
 - [x] **I24：Agents 统一配置与运行信号可视化（P2.0）** — `/api/mcp/agents` 增补 skill 模式与隐藏目录 runtime 信号（conversation/usage/last activity）；MCP/Skills 页新增多 Agent 配置可见性摘要，Agent 详情页新增 Runtime & Config Signals 区块。[spec](./specs/spec-agents-unified-multi-agent-config-visualization.md)
 - [x] **I25：Agent Detail 全量 Skill/MCP 管理工作台（P2.1）** — `/agents/[agentKey]` 展示全部 skills（含 disabled）并支持搜索/来源过滤/启停；user skill 支持就地 read+edit+save；新增 MCP 管理区（scope/transport 应用、复制 snippet、刷新状态）实现“可见即可管”。[spec](./specs/spec-agent-detail-manage-all-skills-mcp.md)
+- [x] **I26：Agent 原生已安装 Skill/MCP 扫描可视化（P2.2）** — `/api/mcp/agents` 新增按 agent 隐藏目录/配置文件扫描：`configuredMcpServers`、`installedSkillNames` 与来源路径；`/agents/[agentKey]` 展示真实安装列表与空态，避免仅显示全局 catalog 造成“信息量不足”。[spec](./specs/spec-agents-agent-native-installed-scan-visualization.md)
 - [x] **Ask 输入不中断（执行中可草拟）** — 修复 Agent 执行期间输入框被禁用：允许边执行边输入，提交仍串行；新增“可先输入下一步”提示与 jsdom 回归测试。测试：`app/__tests__/ask/ask-content-input-during-run.test.tsx`
 
 ### 🟡 中优先
@@ -95,6 +96,7 @@
 - [x] **I14：新建心智空间** — 首页 Spaces grid 末尾 "+" 卡片，inline 表单输入名称+描述，一键创建 Space（目录 + INSTRUCTION.md + README.md）。复用 createFile + scaffoldIfNewSpace。[spec](./specs/spec-create-space.md)
 - [x] **I17：Space-Aware Sidebar** — 文件树空间感知：含 INSTRUCTION.md 的目录用 Layers 图标 + amber 色 + 左边框标识为空间；隐藏系统文件（INSTRUCTION.md/README.md）；空间展开时上方显示 Rules+About 预览卡片（可滚动）；右键菜单支持 Edit Rules/Rename/Delete Space；双击空间不触发重命名。[spec](./specs/spec-space-aware-sidebar.md)
 - [x] **Diff 主程序化（JSON 变更中心）** — Diff 不再依赖 `Agent-Diff.md` 插件入口；新增 `.mindos/change-log.json` 结构化事件流、`/api/changes`（summary/list/mark_seen）、全局变化提醒条与 `/changes` 下钻视图（可展开 line diff）。[spec](./specs/spec-diff-core-change-center.md)
+- [x] **TODO Board 内建化（非插件面板）** — TODO 渲染器升级为 app-builtin feature：保留 `core` 渲染能力与首页入口，同时从插件管理表层移除，语义与 CSV/Agent Inspector/Config Panel 保持一致。[spec](./specs/spec-todo-core-builtin.md)
 - [x] **I6：首页 Plugins 展示优化** — 卡片展示 description + tags，消除 RENDERER_ENTRY / PLUGIN_ENTRY_FILES 重复映射，不可用 plugin 点击提示创建引导，补齐 3 个漏注册 renderer（backlinks/workflow/diff）
 - [x] **I6.5：Skill 管理面板改进** — 分组显示（Custom/Built-in）+ 搜索过滤 + 全文查看（read API）+ 内联编辑 + 预填模板创建（General/Tool-use/Workflow）+ Markdown 渲染。解决"不知道给新 agent 提供什么信息"的 pain point
 - [x] **I7：文件视图 topbar 文件图标** — Breadcrumb 组件已有 `FileTypeIcon`（.csv → Table，.md → FileText，目录 → Folder）
