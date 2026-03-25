@@ -1,4 +1,4 @@
-<!-- Last verified: 2026-03-22 | Current stage: P1 -->
+<!-- Last verified: 2026-03-25 | Current stage: P1 -->
 
 # 商业模式 (Business Model)
 
@@ -283,9 +283,10 @@ P4 Personal Intelligence Engine（智能层五个投射逐步上线）
 | **Obsidian + AI 插件** | 给人用的编辑器，AI 插件是"人操作 AI"——手动触发、手动粘贴上下文 | MindOS 里 Agent 是一等公民：MCP 直接读写，Skill 路由自动分发，操作全程可审计。区别不在编辑器能力，在于 Agent 能否独立访问知识库 |
 | **Notion AI** | 云端协作平台加了 AI 总结/生成功能，虽有官方 MCP Server，但数据锁在云端私有格式中，不可本地存储 | MindOS 本地优先 + 开源 + 纯文本数据主权。Notion 即使有 MCP，数据仍在云端、格式私有、不可迁移。MindOS 的数据属于用户，Notion 的数据属于 Notion |
 | **Mem.ai / Reflect** | AI-native 笔记，自动关联 + 语义搜索，但闭源云端，数据不可迁移 | MindOS 本地纯文本，数据可迁移，不锁定。且 Mem/Reflect 不支持外部 Agent 接入，只有自己的 AI |
+| **跨 Agent 记忆聚合服务** | 聚合多个 Agent 的对话记忆，但记忆模型与权限策略由平台定义，用户通常只能消费结果 | MindOS 的核心是"人侧治理"：记忆落本地纯文本、规则可写、执行可审计、结果可纠偏。不是换一个更大的记忆黑箱，而是把主权交还用户 |
 | **Agent 自带记忆**（Claude Projects、GPT Memory） | Agent 厂商各自维护记忆，互不通气，用户无法跨 Agent 统一管理 | 这正是 MindOS 解决的"孤岛效应"——统一知识入口，所有 Agent 读写同一份上下文 |
 
-**一句话差异：** 竞品要么是"人的工具加了 AI"，要么是"某个 AI 的专属记忆"。MindOS 是"所有 Agent 共享的、人可审计的知识层"。
+**一句话差异：** 竞品要么是"人的工具加了 AI"，要么是"平台侧 Agent 记忆"。MindOS 是"每次思考都能持续生长的人侧 Context OS"——所有 Agent 共享上下文，但主权始终在用户手里。
 
 ---
 

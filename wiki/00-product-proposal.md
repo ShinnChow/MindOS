@@ -1,20 +1,22 @@
-<!-- Last verified: 2026-03-22 | Current stage: P1 -->
+<!-- Last verified: 2026-03-25 | Current stage: P1 -->
 
 # 产品建议书 (Product Proposal): MindOS
 
 ## 一句话介绍 (Elevator Pitch)
 
-**MindOS 是 Agent 时代的人机协同心智平台——和所有 AI 共享你的大脑，用户可审计、可修正、越用越是你。**
+**MindOS 是 Agent 时代的 Personal Context OS——每次思考，都在生长：既照见人的成长，也驱动 Agent 的演化。**
 
 ### 面向用户的定位（非技术版）
 
 > **MindOS 是你思考的地方，也是 AI Agent 行动的起点。**
 >
-> 你和 AI 共享同一个大脑——每次思考都在沉淀，AI 下次更懂你，你自己的思路也跟着变清晰。人和 AI 一起成长。
+> 每次思考都不是一次性消耗，而是可持续生长的认知资产：你更清晰地思考与判断，Agent 也在同一上下文里持续演化。
 >
 > 在 AI 焦虑蔓延的时代，MindOS 更关注人的成长——想清楚问题、做好判断、快速实践、攒下属于自己的认知。
 
-**定位边界：** 不是"给 AI 加记忆"（人看不见），也不是"给笔记加 AI"（AI 执行不了）。MindOS 把两者打通。
+**品类定义：** 面向多 Agent 用户的个人 Context OS（Personal Context OS）。
+
+**定位边界：** 不是"给笔记加 AI"（AI 只辅助人写），也不是"给 Agent 加记忆"（记忆常驻平台黑箱）。MindOS 是人可治理的共享上下文层：所有 Agent 在同一套本地知识上执行，并持续接受人类审计、纠偏和演化。
 
 ---
 

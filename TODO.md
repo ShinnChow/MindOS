@@ -9,6 +9,8 @@ Agent as Workflow
 
 模版优化 - 中英文，勾选 空间
 
+MindOS Agent的时间感知问题
+
 Editer for skill & agent & file
 
 Agents 面板开发
