@@ -114,6 +114,7 @@
 
 ### 已完成 / 不做
 
+- [x] **`mindos mcp` stdio EADDRINUSE 修复** — `mindos mcp` 默认 `MCP_TRANSPORT=stdio`，所有 HTTP 场景显式声明 `MCP_TRANSPORT=http`。详见 `wiki/80-known-pitfalls.md`
 - [x] **I9：Onboarding 端口分离** — Setup wizard 用临时端口（9100+），完成后按配置端口重启 — v0.5.4
 - [x] **I10：目录视图卡片密度优化** — 文件夹 `p-3` + 22px 图标（紧凑），文件 `p-4` + 28px 图标（保持信息量）。Breadcrumb 增加 FileTypeIcon。FindInPage 阅读模式搜索
 - [x] **增加更多 Agent 支持** — 16 个 MCP Agent + `npx skills` 支持 40 个
