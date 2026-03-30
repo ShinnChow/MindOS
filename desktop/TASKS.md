@@ -19,22 +19,22 @@
 
 ## P1：提升可靠性
 
-### [ ] Bundled runtime 完整性没验证
+### [x] Bundled runtime 完整性没验证
 - **文件**: `desktop/src/mindos-runtime-layout.ts`
 - **问题**: 只看 server.js 存在，不检查 app/public/、app/.next/static/ 是否完整。DMG 提取不完整时页面无样式
 - **修复**: 新增 `isBundledRuntimeIntact()` 检查关键目录存在
 
-### [ ] Splash "切换远程" 没验证连接信息
+### [x] Splash "切换远程" 没验证连接信息
 - **文件**: `desktop/src/main.ts` (handleSplashAction)
 - **问题**: 点 "Switch to Remote" 但没配过远程服务器 → 空白界面
 - **修复**: 验证有可用连接信息后再切换，否则在 splash 显示错误
 
-### [ ] 断连检测延迟
+### [x] 断连检测延迟 (已确认代码正确，无需修改)
 - **文件**: `desktop/src/connection-monitor.ts`
 - **问题**: 第一次断连要等 1s 重试失败后才通知 UI，用户看到短暂白屏
 - **修复**: 断连时立即触发 onLost 回调，重试逻辑独立运行
 
-### [ ] MCP transport 未文档化
+### [x] MCP transport 未文档化
 - **文件**: `desktop/src/process-manager.ts`
 - **问题**: Desktop 硬编码 MCP_TRANSPORT=http，用户若按 stdio 配置会静默失败
 - **修复**: 文档说明 Desktop 模式固定使用 HTTP transport
