@@ -30,7 +30,7 @@ function resolvePath(root, filePath) {
 export const meta = {
   name: 'file',
   group: 'Knowledge',
-  summary: 'Knowledge base file operations (list, read, create, delete, mkdir, search)',
+  summary: 'File content operations (list, read, create, delete, rename, search)',
   usage: 'mindos file <subcommand>',
   flags: {
     '--space <name>': 'Filter by space name',
@@ -68,7 +68,9 @@ export async function run(args, flags) {
     case 'mv': return fileRename(root, args[1], args[2], flags);
     case 'move': return fileRename(root, args[1], args[2], flags);
     case 'search': return fileSearch(root, args.slice(1).join(' '), flags);
-    case 'mkdir': return fileMkdir(root, args[1], flags);
+    case 'mkdir':
+      console.log(dim('Moved to: mindos space mkdir <path>'));
+      process.exit(EXIT.ARGS);
     default:
       console.error(red(`Unknown subcommand: ${sub}`));
       console.error(dim('Available: list, read, create, delete, rename, move, mkdir, search'));
@@ -86,7 +88,6 @@ ${bold('Subcommands:')}
   ${cyan('create <path>'.padEnd(20))}${dim('Create a new file (--content "...")')}
   ${cyan('delete <path>'.padEnd(20))}${dim('Delete a file')}
   ${cyan('rename <old> <new>'.padEnd(20))}${dim('Rename or move a file')}
-  ${cyan('mkdir <path>'.padEnd(20))}${dim('Create a directory')}
   ${cyan('search <query>'.padEnd(20))}${dim('Search files by content')}
 
 ${bold('Aliases:')} ls=list, cat=read, rm=delete, mv=rename
