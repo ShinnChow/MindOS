@@ -58,7 +58,7 @@
 - [x] **P2: token 命令从 Agent 注册表自动生成** — 120+ 行手写 JSON → 50 行循环从 `MCP_AGENTS` 生成。自动显示已安装 Agent，每加新 Agent 无需改 token 命令
 - [x] **P2: file.js 复用 core 模块** — 保持现状（CLI 离线命令独立实现），因 core 是 TypeScript 需编译，CLI 是纯 JS 零依赖。标记为 won't fix
 - [x] **P2: 统一 exit code 规范** — `EXIT` 常量（OK=0, ERROR=1, ARGS=2, CONNECT=3, NOT_FOUND=4）定义在 `bin/lib/command.js`，所有 `commands/` 模块已迁移
-- [ ] **P3: --json 覆盖所有命令** — 目前只有新命令（file/space/agent/status）支持 `--json`，老命令（doctor/sync/config show/token）不支持。Agent 需要结构化输出时半数命令不可用
+- [x] **P3: --json 覆盖所有命令** — doctor/sync/config show/token 全部支持 `--json`，Agent 可对所有命令获取结构化输出
 
 ### 🔴 高优先（下一批做）
 
