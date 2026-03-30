@@ -21,7 +21,7 @@ function getMindRoot() {
 export const meta = {
   name: 'space',
   group: 'Knowledge',
-  summary: 'Mind Space management (list, create, delete, rename, info)',
+  summary: 'Mind Space management (list, create, delete, rename, convert, info)',
   usage: 'mindos space <subcommand>',
   examples: [
     'mindos space list',
@@ -42,10 +42,11 @@ export async function run(args, flags) {
 ${bold('mindos space')} — Mind Space management
 
 ${bold('Subcommands:')}
-  ${cyan('list'.padEnd(20))}${dim('List all spaces')}
+  ${cyan('list'.padEnd(20))}${dim('List all spaces and directories')}
   ${cyan('create <name>'.padEnd(20))}${dim('Create a new space')}
   ${cyan('delete <name>'.padEnd(20))}${dim('Delete a space and all its files')}
   ${cyan('rename <old> <new>'.padEnd(20))}${dim('Rename a space')}
+  ${cyan('convert <name>'.padEnd(20))}${dim('Upgrade a directory to a Space')}
   ${cyan('info <name>'.padEnd(20))}${dim('Show space details')}
 
 ${bold('Examples:')}
@@ -53,6 +54,7 @@ ${bold('Examples:')}
   ${dim('mindos space create "Research"')}
   ${dim('mindos space delete "Old Project"')}
   ${dim('mindos space rename "Old" "New"')}
+  ${dim('mindos space convert "exploration"')}
 `);
     return;
   }
@@ -61,12 +63,13 @@ ${bold('Examples:')}
     case 'list': return spaceList(root, flags);
     case 'ls': return spaceList(root, flags);
     case 'create': return spaceCreate(root, args[1], flags);
+    case 'convert': return spaceConvert(root, args[1], flags);
     case 'delete': case 'rm': return spaceDelete(root, args[1], flags);
     case 'rename': case 'mv': return spaceRename(root, args[1], args[2], flags);
     case 'info': return spaceInfo(root, args[1], flags);
     default:
       console.error(red(`Unknown subcommand: ${sub}`));
-      console.error(dim('Available: list, create, delete, rename, info'));
+      console.error(dim('Available: list, create, delete, rename, convert, info'));
       process.exit(EXIT.ERROR);
   }
 }
@@ -92,29 +95,40 @@ function countFiles(dir) {
 function spaceList(root, flags) {
   const entries = readdirSync(root, { withFileTypes: true });
   const spaces = [];
+  const dirs = [];
 
   for (const e of entries) {
     if (!e.isDirectory() || e.name.startsWith('.')) continue;
     const full = resolve(root, e.name);
-    if (isSpace(full)) {
-      const fileCount = countFiles(full);
-      spaces.push({ name: e.name, path: e.name, fileCount });
-    }
+    const fileCount = countFiles(full);
+    const entry = { name: e.name, path: e.name, fileCount, isSpace: isSpace(full) };
+    if (entry.isSpace) spaces.push(entry);
+    else dirs.push(entry);
   }
 
   if (isJsonMode(flags)) {
-    output({ count: spaces.length, spaces }, flags);
+    output({ spaces: spaces.length, dirs: dirs.length, entries: [...spaces, ...dirs] }, flags);
     return;
   }
 
-  if (spaces.length === 0) {
-    console.log(dim('No spaces found. Create one with: mindos space create "Name"'));
+  if (spaces.length === 0 && dirs.length === 0) {
+    console.log(dim('No spaces or directories found. Create one with: mindos space create "Name"'));
     return;
   }
 
-  console.log(`\n${bold(`Spaces (${spaces.length}):`)}\n`);
-  for (const s of spaces) {
-    console.log(`  ${cyan(s.name.padEnd(30))}${dim(`${s.fileCount} files`)}`);
+  if (spaces.length > 0) {
+    console.log(`\n${bold(`Spaces (${spaces.length}):`)}\n`);
+    for (const s of spaces) {
+      console.log(`  ${cyan(s.name.padEnd(30))}${dim(`${s.fileCount} files`)}`);
+    }
+  }
+
+  if (dirs.length > 0) {
+    console.log(`\n${bold(`Directories (${dirs.length}):`)}\n`);
+    for (const d of dirs) {
+      console.log(`  ${dim(d.name.padEnd(30))}${dim(`${d.fileCount} files`)}`);
+    }
+    console.log(dim(`\n  Tip: mindos space convert <name> to upgrade a directory to a Space`));
   }
   console.log();
 }
@@ -138,6 +152,33 @@ function spaceCreate(root, name, flags) {
     return;
   }
   console.log(`${green('✔')} Created space: ${cyan(name)}`);
+}
+
+function spaceConvert(root, name, flags) {
+  if (!name) {
+    console.error(red('Usage: mindos space convert <name>'));
+    process.exit(EXIT.ERROR);
+  }
+  const dir = resolve(root, name);
+  if (!existsSync(dir)) {
+    console.error(red(`Directory not found: ${name}`));
+    process.exit(EXIT.ERROR);
+  }
+  if (isSpace(dir)) {
+    console.error(red(`Already a Space: ${name}`));
+    process.exit(EXIT.ERROR);
+  }
+
+  writeFileSync(resolve(dir, 'INSTRUCTION.md'), `# ${name}\n\nSpace instructions go here.\n`, 'utf-8');
+  if (!existsSync(resolve(dir, 'README.md'))) {
+    writeFileSync(resolve(dir, 'README.md'), `# ${name}\n`, 'utf-8');
+  }
+
+  if (isJsonMode(flags)) {
+    output({ ok: true, name, converted: true }, flags);
+    return;
+  }
+  console.log(`${green('✔')} Converted to Space: ${cyan(name)}`);
 }
 
 function spaceDelete(root, name, flags) {
