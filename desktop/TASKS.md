@@ -2,17 +2,17 @@
 
 ## P0：影响用户日常使用
 
-### [ ] Node 检测启动慢
+### [x] Node 检测启动慢
 - **文件**: `desktop/src/node-detect.ts`
 - **问题**: Shell login 检测每个 shell 5s 超时，两个 shell 合计可能卡 10s
 - **修复**: 加总超时上限 3s，第一个成功立即停止
 
-### [ ] Overlay 注入静默失败
+### [x] Overlay 注入静默失败
 - **文件**: `desktop/src/main.ts` (injectOverlay / removeOverlay)
 - **问题**: `.catch(() => {})` 吞掉所有错误，模式切换注入失败时用户看到白屏无提示
 - **修复**: 记录错误到 console + crash.log，发送事件到 renderer 显示 toast
 
-### [ ] Respawn 后没做 health check
+### [x] Respawn 后没做 health check
 - **文件**: `desktop/src/process-manager.ts` (setupCrashHandler)
 - **问题**: crash 后 respawn 新进程，没验证 /api/health 就当作恢复成功
 - **修复**: respawn 后轮询 health check，不健康则继续计入 crash count
