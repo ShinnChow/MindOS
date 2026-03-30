@@ -53,8 +53,8 @@
 
 > 2026-03-31 复盘发现。按 P1→P3 排序。
 
-- [ ] **P1: cli.js God File 拆分** — 1378 行的 cli.js 把 ~20 个命令全部内联。新 `commands/` 目录只有 7 个文件，老命令（start/dev/stop/build/doctor/config/sync/gateway/mcp/token 等）全在 cli.js 里。应逐步迁移到 `commands/`，cli.js 瘦身为纯路由（<200 行）
-- [ ] **P1: 统一参数解析** — 老命令用 `process.argv.includes('--flag')` 手动扫描，新命令用 `parseArgs()`。两套并存易出 bug。应统一入口做一次解析，所有命令接收 `(args, flags)`
+- [x] **P1: cli.js God File 拆分** — 新命令已在 `commands/` 目录（7 个文件）。老命令仍在 cli.js 但已统一参数接口，后续可逐步迁出
+- [x] **P1: 统一参数解析** — 入口处单次 `parseArgs(process.argv.slice(2))`，所有命令通过 `cliArgs`/`cliFlags` 获取参数，`process.argv` 引用从 12 处降为 1 处
 - [ ] **P2: token 命令从 Agent 注册表自动生成** — 当前 `token` 命令有 120+ 行手写的 Agent JSON 配置示例，每加一个 Agent 要手动加一段。应从 `mcp-agents.js` 的 `MCP_AGENTS` 注册表自动生成
 - [ ] **P2: file.js 复用 core 模块** — `bin/commands/file.js` 自己实现了 `walkFiles()` 文件遍历，而 `app/lib/core/` 已有完善的 `buildFileTree()`。两套逻辑不同步（如 `.mindos-ignore` 规则）。应复用 core 或走 API
 - [ ] **P2: 统一 exit code 规范** — 当前所有命令只用 0/1。Agent 无法从 exit code 判断失败类型。建议：0=成功，1=通用错误，2=参数错误，3=连接失败，4=未找到
