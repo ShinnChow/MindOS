@@ -126,12 +126,12 @@
 
 ### 🟡 中优先
 
-- [ ] **减少 `as any` 类型断言** — `app/api/ask/route.ts` 有 15+ 处 `as any`，绕过 TypeScript 严格模式。应定义 pi-agent-core 事件类型
-- [ ] **API 路由统一输入校验** — 部分路由直接信任 query 参数（如 `/api/files`），应使用 Zod schema 校验
-- [ ] **CI 增加 lint 步骤** — 当前 CI 只跑 test，格式和 lint 问题可能溜进去
-- [ ] **添加 CONTRIBUTING.md** — 开源项目标配，描述代码风格、PR 流程、测试要求、commit 规范
-- [ ] **公共 API 函数补 JSDoc** — `lib/fs.ts`、`lib/agent/` 等核心模块导出函数缺少 `@param`/`@returns`/`@throws` 文档
-- [ ] **SyncStatusBar i18n 类型** — `(t as any).sidebar?.sync` 需定义 sync namespace 类型
+- [x] **减少 `as any` 类型断言** — ask/route.ts 定义 5 个 AgentEvent 子类型接口（消除 14 处 as any）；context.ts 提取 `asMsg()` 辅助函数（消除 12 处）
+- [x] **API 路由统一输入校验** — bootstrap 路径遍历防护、recent-files/git parseInt 安全校验、export format 枚举白名单
+- [x] **CI 增加 lint 步骤** — ci.yml 新增 eslint step（continue-on-error，不阻塞 CI）
+- [x] **添加 CONTRIBUTING.md** — 包含开发环境、代码风格、测试要求、PR 流程
+- [x] **公共 API 函数补 JSDoc** — lib/fs.ts 26 个导出函数补齐 JSDoc（@param/@returns/@throws）
+- [x] **SyncStatusBar i18n 类型** — 移除 3 处不必要的 `(t as any)`，直接使用已有类型 `t.sidebar.sync`
 
 - [x] **MCP `mindos_create_space` + `mindos_rename_space`** — App：`createSpaceFilesystem`、`renameSpaceDirectory`、`/api/file` op；MCP 仅转发。见 `wiki/specs/spec-mcp-space-tools.md`
 - [x] **I4：CLI per-command `--help`** — 6 个知识库命令（agent/api/ask/file/search/space）已全部支持 `--help` / `-h` 标志；`bin/lib/command.js` 统一 `printCommandHelp` 框架；命令元数据（name/group/summary/usage/examples/flags）完整。CLI 专业度提升。

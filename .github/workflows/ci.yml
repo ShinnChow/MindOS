@@ -37,6 +37,11 @@ jobs:
         run: npx vitest run
         working-directory: app
 
+      - name: Lint
+        run: npx eslint . --max-warnings=999
+        working-directory: app
+        continue-on-error: true
+
   integration:
     name: Integration Tests
     runs-on: ubuntu-latest
