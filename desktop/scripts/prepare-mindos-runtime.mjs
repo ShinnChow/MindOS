@@ -10,7 +10,7 @@
  * @see wiki/specs/spec-desktop-standalone-runtime.md
  */
 import { spawnSync } from 'child_process';
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { copyAppForBundledRuntime, materializeStandaloneAssets } from './prepare-mindos-bundle.mjs';
@@ -59,6 +59,24 @@ function copyTree(rel) {
 copyTree('package.json');
 copyTree('LICENSE');
 copyAppForBundledRuntime(appDir, path.join(dest, 'app'));
+
+// Write build version stamp so Desktop's isNextBuildCurrent() recognizes the bundled build.
+// Without this, Desktop would trigger a full rebuild on every launch.
+const BUILD_VERSION_FILE = '.mindos-build-version';
+try {
+  const pkg = JSON.parse(readFileSync(rootPkg, 'utf-8'));
+  const version = typeof pkg.version === 'string' ? pkg.version.trim() : '';
+  if (version) {
+    const stampPath = path.join(dest, 'app', '.next', BUILD_VERSION_FILE);
+    writeFileSync(stampPath, version, 'utf-8');
+    console.log(`[prepare-mindos-runtime] Build version stamp: ${version} → ${stampPath}`);
+  } else {
+    console.warn('[prepare-mindos-runtime] No version in package.json — skipping build stamp');
+  }
+} catch (e) {
+  console.warn('[prepare-mindos-runtime] Failed to write build version stamp:', e.message);
+}
+
 copyTree('mcp');
 
 // MCP: only need dist/index.cjs (pre-bundled). Remove node_modules and source if copied.

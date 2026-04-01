@@ -52,12 +52,18 @@ export class ProcessManager extends EventEmitter {
 
   /** Spawn MCP on a new port (called from main.ts when user accepts suggested port) */
   startMcpOnPort(port: number): void {
+    // Kill old MCP process to avoid orphan
+    if (this.mcpProcess && !this.mcpProcess.killed) {
+      try { this.mcpProcess.kill('SIGTERM'); } catch { /* already dead */ }
+      this.mcpProcess = null;
+    }
     this.opts.mcpPort = port;
     this.externalMcp = false;
     const proc = this.spawnMcp();
     this.mcpProcess = proc;
     this.guardSpawnError(proc, 'mcp');
     this.setupCrashHandler(proc, 'mcp');
+    this.writeChildPids();
   }
 
   /** Start MCP + Next.js, then wait for health check */
@@ -525,7 +531,10 @@ export class ProcessManager extends EventEmitter {
             } else {
               this.webProcess = newProc;
             }
+            this.guardSpawnError(newProc, which);
+            if (which === 'web') this.captureStderr(newProc);
             this.setupCrashHandler(newProc, which);
+            this.writeChildPids();
             // Verify respawned process becomes healthy (web only, MCP has its own check above)
             if (which === 'web') {
               const port = this.opts.webPort;

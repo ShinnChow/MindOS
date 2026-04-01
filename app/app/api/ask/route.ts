@@ -1,5 +1,7 @@
 export const dynamic = 'force-dynamic';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
+import { isTransientError } from '@/lib/agent/retry';
+import { detectLoop } from '@/lib/agent/loop-detection';
 import {
   type AgentSessionEvent as AgentEvent,
   AuthStorage,
@@ -45,7 +47,8 @@ type MindOSSSEvent =
   | { type: 'tool_start'; toolCallId: string; toolName: string; args: unknown }
   | { type: 'tool_end'; toolCallId: string; output: string; isError: boolean }
   | { type: 'done'; usage?: { input: number; output: number } }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  | { type: 'status'; message: string };
 
 // ---------------------------------------------------------------------------
 // Type Guards for AgentEvent variants (safe event handling)
@@ -335,16 +338,40 @@ export async function POST(req: NextRequest) {
     const targetDir = dirnameOf(currentFile);
     const bootstrap = {
       instruction: readKnowledgeFile('INSTRUCTION.md'),
-      index: readKnowledgeFile('README.md'),
       config_json: readKnowledgeFile('CONFIG.json'),
-      config_md: readKnowledgeFile('CONFIG.md'),
-      target_readme: targetDir ? readKnowledgeFile(`${targetDir}/README.md`) : null,
-      target_instruction: targetDir ? readKnowledgeFile(`${targetDir}/INSTRUCTION.md`) : null,
-      target_config_json: targetDir ? readKnowledgeFile(`${targetDir}/CONFIG.json`) : null,
-      target_config_md: targetDir ? readKnowledgeFile(`${targetDir}/CONFIG.md`) : null,
+      // Lazy-loaded: only read if the file exists and has content.
+      // README.md and CONFIG.md are often empty/boilerplate and waste tokens.
+      index: null as ReturnType<typeof readKnowledgeFile> | null,
+      config_md: null as ReturnType<typeof readKnowledgeFile> | null,
+      target_readme: null as ReturnType<typeof readKnowledgeFile> | null,
+      target_instruction: null as ReturnType<typeof readKnowledgeFile> | null,
+      target_config_json: null as ReturnType<typeof readKnowledgeFile> | null,
+      target_config_md: null as ReturnType<typeof readKnowledgeFile> | null,
     };
 
-    // Only report failures + truncation warnings
+    // Only load secondary bootstrap files if they have meaningful content.
+    // Files with ≤10 chars are typically empty or just a heading — not worth
+    // injecting into the prompt (saves ~200-500 tokens per empty file).
+    const MIN_USEFUL_CONTENT_LENGTH = 10;
+
+    const indexResult = readKnowledgeFile('README.md');
+    if (indexResult.ok && indexResult.content.trim().length > MIN_USEFUL_CONTENT_LENGTH) bootstrap.index = indexResult;
+
+    const configMdResult = readKnowledgeFile('CONFIG.md');
+    if (configMdResult.ok && configMdResult.content.trim().length > MIN_USEFUL_CONTENT_LENGTH) bootstrap.config_md = configMdResult;
+
+    if (targetDir) {
+      const tr = readKnowledgeFile(`${targetDir}/README.md`);
+      if (tr.ok && tr.content.trim().length > MIN_USEFUL_CONTENT_LENGTH) bootstrap.target_readme = tr;
+      const ti = readKnowledgeFile(`${targetDir}/INSTRUCTION.md`);
+      if (ti.ok && ti.content.trim().length > MIN_USEFUL_CONTENT_LENGTH) bootstrap.target_instruction = ti;
+      const tc = readKnowledgeFile(`${targetDir}/CONFIG.json`);
+      if (tc.ok && tc.content.trim().length > MIN_USEFUL_CONTENT_LENGTH) bootstrap.target_config_json = tc;
+      const tm = readKnowledgeFile(`${targetDir}/CONFIG.md`);
+      if (tm.ok && tm.content.trim().length > MIN_USEFUL_CONTENT_LENGTH) bootstrap.target_config_md = tm;
+    }
+
+    // Only report failures + truncation warnings for loaded files
     const initFailures: string[] = [];
     const truncationWarnings: string[] = [];
     if (!skill.ok) initFailures.push(`skill.mindos: failed (${skill.error})`);
@@ -352,19 +379,13 @@ export async function POST(req: NextRequest) {
     if (userSkillRules.ok && userSkillRules.truncated) truncationWarnings.push('user-skill-rules.md was truncated');
     if (!bootstrap.instruction.ok) initFailures.push(`bootstrap.instruction: failed (${bootstrap.instruction.error})`);
     if (bootstrap.instruction.ok && bootstrap.instruction.truncated) truncationWarnings.push('bootstrap.instruction was truncated');
-    if (!bootstrap.index.ok) initFailures.push(`bootstrap.index: failed (${bootstrap.index.error})`);
-    if (bootstrap.index.ok && bootstrap.index.truncated) truncationWarnings.push('bootstrap.index was truncated');
+    if (bootstrap.index?.ok && bootstrap.index.truncated) truncationWarnings.push('bootstrap.index was truncated');
     if (!bootstrap.config_json.ok) initFailures.push(`bootstrap.config_json: failed (${bootstrap.config_json.error})`);
     if (bootstrap.config_json.ok && bootstrap.config_json.truncated) truncationWarnings.push('bootstrap.config_json was truncated');
-    if (!bootstrap.config_md.ok) initFailures.push(`bootstrap.config_md: failed (${bootstrap.config_md.error})`);
-    if (bootstrap.config_md.ok && bootstrap.config_md.truncated) truncationWarnings.push('bootstrap.config_md was truncated');
-    if (bootstrap.target_readme && !bootstrap.target_readme.ok) initFailures.push(`bootstrap.target_readme: failed (${bootstrap.target_readme.error})`);
+    if (bootstrap.config_md?.ok && bootstrap.config_md.truncated) truncationWarnings.push('bootstrap.config_md was truncated');
     if (bootstrap.target_readme?.ok && bootstrap.target_readme.truncated) truncationWarnings.push('bootstrap.target_readme was truncated');
-    if (bootstrap.target_instruction && !bootstrap.target_instruction.ok) initFailures.push(`bootstrap.target_instruction: failed (${bootstrap.target_instruction.error})`);
     if (bootstrap.target_instruction?.ok && bootstrap.target_instruction.truncated) truncationWarnings.push('bootstrap.target_instruction was truncated');
-    if (bootstrap.target_config_json && !bootstrap.target_config_json.ok) initFailures.push(`bootstrap.target_config_json: failed (${bootstrap.target_config_json.error})`);
     if (bootstrap.target_config_json?.ok && bootstrap.target_config_json.truncated) truncationWarnings.push('bootstrap.target_config_json was truncated');
-    if (bootstrap.target_config_md && !bootstrap.target_config_md.ok) initFailures.push(`bootstrap.target_config_md: failed (${bootstrap.target_config_md.error})`);
     if (bootstrap.target_config_md?.ok && bootstrap.target_config_md.truncated) truncationWarnings.push('bootstrap.target_config_md was truncated');
 
     const initStatus = initFailures.length === 0
@@ -377,9 +398,9 @@ export async function POST(req: NextRequest) {
       initContextBlocks.push(`## user_skill_rules\n\nUser personalization rules (user-skill-rules.md):\n\n${userSkillRules.content}`);
     }
     if (bootstrap.instruction.ok) initContextBlocks.push(`## bootstrap_instruction\n\n${bootstrap.instruction.content}`);
-    if (bootstrap.index.ok) initContextBlocks.push(`## bootstrap_index\n\n${bootstrap.index.content}`);
+    if (bootstrap.index?.ok) initContextBlocks.push(`## bootstrap_index\n\n${bootstrap.index.content}`);
     if (bootstrap.config_json.ok) initContextBlocks.push(`## bootstrap_config_json\n\n${bootstrap.config_json.content}`);
-    if (bootstrap.config_md.ok) initContextBlocks.push(`## bootstrap_config_md\n\n${bootstrap.config_md.content}`);
+    if (bootstrap.config_md?.ok) initContextBlocks.push(`## bootstrap_config_md\n\n${bootstrap.config_md.content}`);
     if (bootstrap.target_readme?.ok) initContextBlocks.push(`## bootstrap_target_readme\n\n${bootstrap.target_readme.content}`);
     if (bootstrap.target_instruction?.ok) initContextBlocks.push(`## bootstrap_target_instruction\n\n${bootstrap.target_instruction.content}`);
     if (bootstrap.target_config_json?.ok) initContextBlocks.push(`## bootstrap_target_config_json\n\n${bootstrap.target_config_json.content}`);
@@ -584,18 +605,12 @@ export async function POST(req: NextRequest) {
               stepHistory.push(...newEntries);
             }
 
-            // Loop detection: same tool + same args 3 times in a row.
-            // Only trigger if we have 3+ history entries (prevent false positives on first turn).
-            const LOOP_DETECTION_THRESHOLD = 3;
+            // Loop detection: (1) same tool+args 3x in a row, (2) repeating pattern cycle
             if (loopCooldown > 0) {
               loopCooldown--;
-            } else if (stepHistory.length >= LOOP_DETECTION_THRESHOLD) {
-              const lastN = stepHistory.slice(-LOOP_DETECTION_THRESHOLD);
-              if (lastN.every(s => s.tool === lastN[0].tool && s.input === lastN[0].input)) {
-                loopCooldown = 3;
-                // TODO (metrics): Track loop detection rate — metrics.increment('agent.loop_detected', { model: modelName })
-                void session.steer('[SYSTEM WARNING] You have called the same tool with identical arguments 3 times in a row. This appears to be a loop. Try a completely different approach or ask the user for clarification.');
-              }
+            } else if (detectLoop(stepHistory)) {
+              loopCooldown = 3;
+              void session.steer('[SYSTEM WARNING] You appear to be in a loop — repeating the same tool calls in a cycle. Try a completely different approach or ask the user for clarification.');
             }
 
             // Step limit enforcement
@@ -708,7 +723,32 @@ export async function POST(req: NextRequest) {
             safeClose();
           } else {
             // Route to MindOS agent (existing logic)
-            await session.prompt(lastUserContent, lastUserImages ? { images: lastUserImages } : undefined);
+            // Retry with exponential backoff for transient failures (timeout, rate limit, 5xx).
+            // Only retry if no content has been streamed yet — once the user sees partial
+            // output, retrying would produce duplicate/garbled content.
+            const MAX_RETRIES = 3;
+            let lastPromptError: Error | null = null;
+
+            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+              try {
+                await session.prompt(lastUserContent, lastUserImages ? { images: lastUserImages } : undefined);
+                lastPromptError = null;
+                break; // success
+              } catch (err) {
+                lastPromptError = err instanceof Error ? err : new Error(String(err));
+
+                // Only retry if: (1) no content streamed yet, (2) retries remaining, (3) transient error
+                const canRetry = !hasContent && attempt < MAX_RETRIES && isTransientError(lastPromptError);
+                if (!canRetry) break;
+
+                const delayMs = 1000 * Math.pow(2, attempt - 1); // 1s, 2s
+                send({ type: 'status', message: `Request failed, retrying (${attempt}/${MAX_RETRIES})...` });
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+              }
+            }
+
+            if (lastPromptError) throw lastPromptError;
+
             metrics.recordRequest(Date.now() - requestStartTime);
             if (!hasContent && lastModelError) {
               send({ type: 'error', message: lastModelError });

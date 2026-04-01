@@ -462,6 +462,12 @@ async function startLocalMode(): Promise<string | null> {
     env: getEnrichedEnv(nodePath),
   });
 
+  // Clean up any previous processManager (e.g. from retry or mode switch)
+  if (processManager) {
+    processManager.removeAllListeners();
+    processManager.stop().catch(() => {});
+  }
+
   processManager = createProcessManager(webPort, mcpPort);
 
   try {
@@ -581,8 +587,15 @@ async function startLocalMode(): Promise<string | null> {
             }
           } catch { /* still down */ }
         }, 3000);
-        // Timeout after 5 minutes
-        setTimeout(() => { if (activeRecoveryPoll) { clearInterval(activeRecoveryPoll); activeRecoveryPoll = null; } }, 300_000);
+        // Timeout after 5 minutes — clean up overlay and show error
+        setTimeout(() => {
+          if (activeRecoveryPoll) {
+            clearInterval(activeRecoveryPoll);
+            activeRecoveryPoll = null;
+            removeOverlay('mindos-update-overlay');
+            refreshTray('error');
+          }
+        }, 300_000);
       } else {
         crashDialogShown = true;
         const zh = navigator_lang() === 'zh';
@@ -624,23 +637,9 @@ async function startLocalMode(): Promise<string | null> {
     refreshTray(status as 'starting' | 'running' | 'error');
   });
 
-  try {
-    await processManager.start();
-    startupComplete = true;
-    splashStatus({ status: 'ready', done: true });
-    return `http://127.0.0.1:${webPort}`;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    splashStatus({
-      error: msg,
-      actions: [
-        { id: 'retry', label: 'retry', primary: true },
-        { id: 'switch-remote', label: 'switchRemote' },
-        { id: 'quit', label: 'quit' },
-      ],
-    });
-    return null;
-  }
+  startupComplete = true;
+  splashStatus({ status: 'ready', done: true });
+  return `http://127.0.0.1:${webPort}`;
 }
 
 // ── Remote Mode ──
@@ -923,6 +922,9 @@ async function switchToMode(targetMode: 'local' | 'remote'): Promise<void> {
   // 2. Preheat: keep old alive, start new
   const oldPM = processManager;
   const oldCM = connectionMonitor;
+  const oldWebPort = currentWebPort;
+  const oldMcpPort = currentMcpPort;
+  const oldRemoteAddress = currentRemoteAddress;
   processManager = null;
   connectionMonitor = null;
   if (targetMode === 'local') { clearActiveTunnel(); currentRemoteAddress = undefined; }
@@ -949,10 +951,13 @@ async function switchToMode(targetMode: 'local' | 'remote'): Promise<void> {
     if (oldPM) oldPM.stop().catch(() => {});
     if (oldCM) oldCM.stop();
   } else {
-    // Revert silently
+    // Revert silently — restore all state
     currentMode = oldMode;
     processManager = oldPM;
     connectionMonitor = oldCM;
+    currentWebPort = oldWebPort;
+    currentMcpPort = oldMcpPort;
+    currentRemoteAddress = oldRemoteAddress;
     await removeOverlay('mindos-switch-overlay');
     refreshTray(processManager ? 'running' : 'error');
   }
@@ -1166,20 +1171,6 @@ async function handleSplashAction(actionId: string): Promise<void> {
       shell.openExternal('https://nodejs.org/');
       break;
     case 'switch-remote': {
-      // Validate that remote connection info exists before switching
-      const cfg = loadConfig();
-      const hasRemote = (cfg as any).remoteUrl || (cfg as any).connections?.length;
-      if (!hasRemote) {
-        const zh = navigator_lang() === 'zh';
-        splashStatus({
-          error: zh ? '未配置远程连接。请先在设置中添加远程服务器。' : 'No remote connection configured. Add a remote server in Settings first.',
-          actions: [
-            { id: 'retry', label: 'retry', primary: true },
-            { id: 'quit', label: 'quit' },
-          ],
-        });
-        break;
-      }
       currentMode = 'remote';
       saveDesktopMode('remote');
       closeSplash();
@@ -1201,10 +1192,11 @@ async function handleSplashAction(actionId: string): Promise<void> {
       if (mode) {
         currentMode = mode;
         saveDesktopMode(mode, { allowSeedWebSetup: true });
+        // Create new splash for boot
+        splashWindow = createSplash();
+        await bootApp();
       }
-      // Create new splash for boot
-      splashWindow = createSplash();
-      await bootApp();
+      // User cancelled — do nothing (app stays with splash closed, tray keeps it alive)
       break;
     }
   }
@@ -1250,17 +1242,23 @@ async function bootApp(): Promise<void> {
   const loadUrl = currentMode === 'local' ? resolveLocalMindOsBrowseUrl(url) : url;
   mainWindow.loadURL(loadUrl);
 
+  // Remove stale listeners from previous bootApp() calls to prevent stacking
+  mainWindow.webContents.removeAllListeners('did-fail-load');
+  mainWindow.webContents.removeAllListeners('did-finish-load');
+
   mainWindow.webContents.on('did-fail-load', (_event, code, desc, failedUrl) => {
     console.error('[MindOS] main window did-fail-load', code, desc, failedUrl);
     closeSplash();
     const zh = navigator_lang() === 'zh';
-    void dialog.showMessageBox(mainWindow!, {
-      type: 'error',
-      title: zh ? '页面加载失败' : 'Page failed to load',
-      message: zh ? `无法加载：${failedUrl}` : `Could not load: ${failedUrl}`,
-      detail: `${desc} (code ${code})\n\n${zh ? '若使用本地模式，请在终端执行 MINDOS_OPEN_DEVTOOLS=1 启动应用以打开开发者工具，或在浏览器访问同一地址对比。' : 'Tip: launch with MINDOS_OPEN_DEVTOOLS=1 to open DevTools, or open the same URL in a browser.'}`,
-    });
-    mainWindow?.show();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      void dialog.showMessageBox(mainWindow, {
+        type: 'error',
+        title: zh ? '页面加载失败' : 'Page failed to load',
+        message: zh ? `无法加载：${failedUrl}` : `Could not load: ${failedUrl}`,
+        detail: `${desc} (code ${code})\n\n${zh ? '若使用本地模式，请在终端执行 MINDOS_OPEN_DEVTOOLS=1 启动应用以打开开发者工具，或在浏览器访问同一地址对比。' : 'Tip: launch with MINDOS_OPEN_DEVTOOLS=1 to open DevTools, or open the same URL in a browser.'}`,
+      });
+      mainWindow.show();
+    }
   });
 
   // Show main + hide splash on each navigation (not just the first)
@@ -1369,7 +1367,13 @@ app.on('before-quit', (e) => {
     if (mainWindow && !mainWindow.isDestroyed()) saveWindowState(mainWindow);
     const cleanup = async () => {
       try {
-        if (processManager) await processManager.stop();
+        if (processManager) {
+          // Timeout: force exit if stop() hangs (child process not responding)
+          await Promise.race([
+            processManager.stop(),
+            new Promise<void>((_, reject) => setTimeout(() => reject(new Error('stop timeout')), 8000)),
+          ]);
+        }
       } catch { /* best-effort */ }
       if (connectionMonitor) connectionMonitor.stop();
       if (activeRecoveryPoll) { clearInterval(activeRecoveryPoll); activeRecoveryPoll = null; }

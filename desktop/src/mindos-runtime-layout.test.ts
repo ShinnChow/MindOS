@@ -4,13 +4,13 @@ import path from 'path';
 import { analyzeMindOsLayout, isNextBuildValid, isNextBuildCurrent, BUILD_VERSION_FILE } from './mindos-runtime-layout';
 
 describe('analyzeMindOsLayout', () => {
-  it('returns version and runnable when app/.next has BUILD_ID and mcp exist', () => {
+  it('returns version and runnable when app/.next has BUILD_ID and mcp has source', () => {
     const root = path.join(process.cwd(), 'tmp-mindos-layout-test');
     try {
       rmSync(root, { recursive: true, force: true });
       mkdirSync(path.join(root, 'app', '.next'), { recursive: true });
       writeFileSync(path.join(root, 'app', '.next', 'BUILD_ID'), 'test-build-id', 'utf-8');
-      mkdirSync(path.join(root, 'mcp'), { recursive: true });
+      mkdirSync(path.join(root, 'mcp', 'src'), { recursive: true });
       writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '9.9.9-test' }), 'utf-8');
       const r = analyzeMindOsLayout(root);
       expect(r.version).toBe('9.9.9-test');
@@ -20,13 +20,14 @@ describe('analyzeMindOsLayout', () => {
     }
   });
 
-  it('runnable with standalone server.js', () => {
+  it('runnable with standalone server.js and mcp dist', () => {
     const root = path.join(process.cwd(), 'tmp-mindos-layout-standalone');
     try {
       rmSync(root, { recursive: true, force: true });
       mkdirSync(path.join(root, 'app', '.next', 'standalone'), { recursive: true });
       writeFileSync(path.join(root, 'app', '.next', 'standalone', 'server.js'), '// server', 'utf-8');
-      mkdirSync(path.join(root, 'mcp'), { recursive: true });
+      mkdirSync(path.join(root, 'mcp', 'dist'), { recursive: true });
+      writeFileSync(path.join(root, 'mcp', 'dist', 'index.cjs'), '// mcp', 'utf-8');
       writeFileSync(path.join(root, 'package.json'), '{}', 'utf-8');
       const r = analyzeMindOsLayout(root);
       expect(r.runnable).toBe(true);
@@ -41,6 +42,21 @@ describe('analyzeMindOsLayout', () => {
       rmSync(root, { recursive: true, force: true });
       mkdirSync(path.join(root, 'app', '.next'), { recursive: true });
       mkdirSync(path.join(root, 'mcp'), { recursive: true });
+      writeFileSync(path.join(root, 'package.json'), '{}', 'utf-8');
+      const r = analyzeMindOsLayout(root);
+      expect(r.runnable).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('not runnable when mcp dir exists but has no dist or src', () => {
+    const root = path.join(process.cwd(), 'tmp-mindos-layout-mcp-empty');
+    try {
+      rmSync(root, { recursive: true, force: true });
+      mkdirSync(path.join(root, 'app', '.next'), { recursive: true });
+      writeFileSync(path.join(root, 'app', '.next', 'BUILD_ID'), 'test-id', 'utf-8');
+      mkdirSync(path.join(root, 'mcp'), { recursive: true }); // empty mcp dir
       writeFileSync(path.join(root, 'package.json'), '{}', 'utf-8');
       const r = analyzeMindOsLayout(root);
       expect(r.runnable).toBe(false);
@@ -129,10 +145,11 @@ describe('isNextBuildCurrent', () => {
     expect(isNextBuildCurrent('/tmp/nonexistent-xyz', '/tmp/nonexistent-xyz')).toBe(false);
   });
 
-  it('returns false when build exists but no version stamp', () => {
+  it('returns true when build exists but no version stamp (external build)', () => {
     try {
       const { root, appDir } = setup({ buildId: true, pkgVersion: '1.0.0' });
-      expect(isNextBuildCurrent(appDir, root)).toBe(false);
+      // No stamp = external build (CLI, npm run build, bundled runtime) — trust it
+      expect(isNextBuildCurrent(appDir, root)).toBe(true);
     } finally { cleanup(); }
   });
 
@@ -157,10 +174,11 @@ describe('isNextBuildCurrent', () => {
     } finally { cleanup(); }
   });
 
-  it('returns false when stamp is empty string', () => {
+  it('returns true when stamp is empty string (treat as missing)', () => {
     try {
       const { root, appDir } = setup({ buildId: true, stampVersion: '', pkgVersion: '1.0.0' });
-      expect(isNextBuildCurrent(appDir, root)).toBe(false);
+      // Empty stamp = interrupted write, treat as missing → trust the valid build
+      expect(isNextBuildCurrent(appDir, root)).toBe(true);
     } finally { cleanup(); }
   });
 

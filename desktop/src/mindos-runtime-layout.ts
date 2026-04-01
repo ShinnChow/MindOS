@@ -32,8 +32,18 @@ export function isNextBuildValid(appDir: string): boolean {
  *
  * Returns false (= trigger rebuild) when:
  *   - No build at all (.next missing or incomplete)
- *   - Build version stamp missing (old build or interrupted build)
- *   - Build version doesn't match package.json version (upgrade/reinstall)
+ *   - Build version stamp exists but doesn't match package.json version (upgrade/reinstall)
+ *   - Build version stamp is empty string (interrupted stamp write)
+ *
+ * Returns true (= skip rebuild) when:
+ *   - Stamp exists and matches package.json version
+ *   - Stamp is missing but build is valid (external build from CLI / npm run build / bundled runtime)
+ *   - Stamp exists but package.json is missing or unreadable
+ *
+ * Rationale: a valid build (BUILD_ID or standalone/server.js) created by CLI, npm run build,
+ * or the packaging script should not be discarded just because the Desktop-specific stamp file
+ * is absent. Only an explicit version mismatch (stamp present but != package version) triggers
+ * a rebuild, which covers the upgrade/reinstall scenario.
  *
  * @see wiki/80-known-pitfalls.md
  */
@@ -43,16 +53,19 @@ export function isNextBuildCurrent(appDir: string, projectRoot: string): boolean
   const nextDir = path.join(appDir, '.next');
   const stampPath = path.join(nextDir, BUILD_VERSION_FILE);
 
-  // No version stamp = old or interrupted build, don't trust it
-  let buildVersion: string;
+  // Read stamp — may not exist (external build, old build, bundled runtime)
+  let buildVersion: string | null;
   try {
-    buildVersion = readFileSync(stampPath, 'utf-8').trim();
-    if (!buildVersion) return false;
+    const raw = readFileSync(stampPath, 'utf-8').trim();
+    buildVersion = raw || null; // empty string → treat as missing
   } catch {
-    return false;
+    buildVersion = null;
   }
 
-  // Compare against package.json version
+  // No stamp but build is valid → trust it (external build / bundled runtime)
+  if (buildVersion === null) return true;
+
+  // Stamp exists — compare against package.json version
   let pkgVersion: string;
   try {
     const pkg = JSON.parse(readFileSync(path.join(projectRoot, 'package.json'), 'utf-8'));
@@ -96,7 +109,10 @@ export function analyzeMindOsLayout(root: string): MindOsLayoutAnalysis {
 
   const appDir = path.join(root, 'app');
   const mcpDir = path.join(root, 'mcp');
-  const runnable = isNextBuildValid(appDir) && existsSync(mcpDir);
+  // MCP must have either pre-built bundle (dist/index.cjs) or source (src/) to be runnable
+  const mcpRunnable = existsSync(path.join(mcpDir, 'dist', 'index.cjs'))
+    || existsSync(path.join(mcpDir, 'src'));
+  const runnable = isNextBuildValid(appDir) && mcpRunnable;
 
   return { version, runnable };
 }

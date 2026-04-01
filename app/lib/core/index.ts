@@ -39,7 +39,10 @@ export {
 export type { TreeOptions } from './tree';
 
 // Search
-export { searchFiles, invalidateSearchIndex } from './search';
+export { searchFiles, invalidateSearchIndex, updateSearchIndexFile, addSearchIndexFile, removeSearchIndexFile } from './search';
+
+// Link index (graph + backlinks)
+export { LinkIndex } from './link-index';
 
 // Line-level operations
 export {

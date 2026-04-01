@@ -69,6 +69,25 @@ describe('SearchIndex', () => {
       expect(candidates).toContain('Notes/chinese.md');
     });
 
+    it('getCandidatesUnion prunes low-overlap CJK files', () => {
+      // "知识管理系统" produces many bigrams: 知识, 识管, 管理, 理系, 系统
+      // File A has "知识管理系统" (all bigrams match)
+      // File B has only "知识" (1 bigram matches)
+      // File C has "管理" (1 bigram matches)
+      seedFile(mindRoot, 'Notes/full-match.md', '知识管理系统是核心');
+      seedFile(mindRoot, 'Notes/partial-a.md', '这是知识的来源');
+      seedFile(mindRoot, 'Notes/partial-b.md', '我们要管理好时间');
+      index.rebuild(mindRoot);
+
+      const candidates = index.getCandidatesUnion('知识管理系统');
+      expect(candidates).not.toBeNull();
+      // Full match file should always be included
+      expect(candidates).toContain('Notes/full-match.md');
+      // Partial matches (only 1 bigram) should be pruned when threshold >= 2
+      expect(candidates).not.toContain('Notes/partial-a.md');
+      expect(candidates).not.toContain('Notes/partial-b.md');
+    });
+
     it('handles mixed CJK and Latin query', () => {
       seedFile(mindRoot, 'Notes/mixed.md', '这是一个MindOS知识库文件');
       index.rebuild(mindRoot);
@@ -145,6 +164,76 @@ describe('SearchIndex', () => {
       index.rebuild(mindRoot);
       const candidates = index.getCandidates('uniquetoken');
       expect(candidates).toContain('Notes/large.md');
+    });
+  });
+
+  describe('incremental updates', () => {
+    it('updateFile re-indexes a modified file without full rebuild', () => {
+      index.rebuild(mindRoot);
+      expect(index.getCandidates('quantum')).toHaveLength(0);
+
+      // Modify file to contain new term
+      seedFile(mindRoot, 'Profile/Identity.md', '# My Identity\n\nI study quantum computing.');
+      index.updateFile(mindRoot, 'Profile/Identity.md');
+
+      const candidates = index.getCandidates('quantum');
+      expect(candidates).toContain('Profile/Identity.md');
+      // Old term should still be findable in other files
+      expect(index.getCandidates('search')).toContain('Projects/TODO.md');
+    });
+
+    it('updateFile removes old tokens that no longer exist in file', () => {
+      index.rebuild(mindRoot);
+      expect(index.getCandidates('developer')).toContain('Profile/Identity.md');
+
+      // Rewrite file without "developer"
+      seedFile(mindRoot, 'Profile/Identity.md', '# My Identity\n\nI am a designer.');
+      index.updateFile(mindRoot, 'Profile/Identity.md');
+
+      expect(index.getCandidates('developer')).toHaveLength(0);
+      expect(index.getCandidates('designer')).toContain('Profile/Identity.md');
+    });
+
+    it('updateFile maintains correct fileCount', () => {
+      index.rebuild(mindRoot);
+      expect(index.getFileCount()).toBe(4);
+
+      seedFile(mindRoot, 'Profile/Identity.md', 'updated content');
+      index.updateFile(mindRoot, 'Profile/Identity.md');
+
+      expect(index.getFileCount()).toBe(4); // same file, count unchanged
+    });
+
+    it('removeFile removes a file from the index', () => {
+      index.rebuild(mindRoot);
+      expect(index.getCandidates('archived')).toContain('Archive/old.md');
+
+      index.removeFile('Archive/old.md');
+
+      expect(index.getCandidates('archived')).toHaveLength(0);
+      expect(index.getFileCount()).toBe(3);
+    });
+
+    it('addFile indexes a new file without full rebuild', () => {
+      index.rebuild(mindRoot);
+      expect(index.getFileCount()).toBe(4);
+
+      seedFile(mindRoot, 'Notes/fresh.md', 'brand new blockchain content');
+      index.addFile(mindRoot, 'Notes/fresh.md');
+
+      expect(index.getFileCount()).toBe(5);
+      expect(index.getCandidates('blockchain')).toContain('Notes/fresh.md');
+    });
+
+    it('updateFile updates BM25 docLength stats', () => {
+      index.rebuild(mindRoot);
+      const oldLen = index.getDocLength('Profile/Identity.md');
+
+      seedFile(mindRoot, 'Profile/Identity.md', 'short');
+      index.updateFile(mindRoot, 'Profile/Identity.md');
+
+      expect(index.getDocLength('Profile/Identity.md')).toBe(5);
+      expect(index.getDocLength('Profile/Identity.md')).not.toBe(oldLen);
     });
   });
 });

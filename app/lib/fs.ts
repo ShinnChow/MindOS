@@ -24,6 +24,10 @@ import {
   gitLog as coreGitLog,
   gitShowFile as coreGitShowFile,
   invalidateSearchIndex,
+  updateSearchIndexFile,
+  addSearchIndexFile,
+  removeSearchIndexFile,
+  LinkIndex,
   summarizeTopLevelSpaces,
   appendContentChange as coreAppendContentChange,
   listContentChanges as coreListContentChanges,
@@ -96,12 +100,62 @@ function isCacheValid(): boolean {
   return _cache !== null && (Date.now() - _cache.timestamp) < CACHE_TTL_MS;
 }
 
+/** Module-level link index singleton. Lazily built on first graph/backlink access. */
+const _linkIndex = new LinkIndex();
+
+/** Get the link index, ensuring it's built for the current mindRoot. */
+export function getLinkIndex(): LinkIndex {
+  const root = getMindRoot();
+  if (!_linkIndex.isBuiltFor(root)) {
+    _linkIndex.rebuild(root);
+  }
+  return _linkIndex;
+}
+
 /** Invalidate cache — call after any write/create/delete/rename operation */
 export function invalidateCache(): void {
   _cache = null;
   _searchIndex = null;
   _treeVersion++;
   invalidateSearchIndex();
+  _linkIndex.invalidate();
+}
+
+/**
+ * Invalidate cache after a single file was modified (content write, line edit, append).
+ * Tree cache is cleared (file list/mtime changed), but search index is updated
+ * incrementally for just this file — O(tokens) instead of O(all-files).
+ */
+function invalidateCacheForFile(filePath: string): void {
+  _cache = null;
+  _searchIndex = null;
+  _treeVersion++;
+  updateSearchIndexFile(getMindRoot(), filePath);
+  if (_linkIndex.isBuilt()) _linkIndex.updateFile(getMindRoot(), filePath);
+}
+
+/**
+ * Invalidate cache after a new file was created.
+ * Tree cache is cleared, search index gets incremental addFile.
+ */
+function invalidateCacheForNewFile(filePath: string): void {
+  _cache = null;
+  _searchIndex = null;
+  _treeVersion++;
+  addSearchIndexFile(getMindRoot(), filePath);
+  if (_linkIndex.isBuilt()) _linkIndex.updateFile(getMindRoot(), filePath);
+}
+
+/**
+ * Invalidate cache after a file was deleted.
+ * Tree cache is cleared, search index gets incremental removeFile.
+ */
+function invalidateCacheForDeletedFile(filePath: string): void {
+  _cache = null;
+  _searchIndex = null;
+  _treeVersion++;
+  removeSearchIndexFile(filePath);
+  if (_linkIndex.isBuilt()) _linkIndex.removeFile(filePath);
 }
 
 function ensureCache(): FileTreeCache {
@@ -336,18 +390,18 @@ export function getFileContent(filePath: string): string {
 /** Atomically writes content to a file given a relative path from MIND_ROOT. */
 export function saveFileContent(filePath: string, content: string): void {
   coreWriteFile(getMindRoot(), filePath, content);
-  invalidateCache();
+  invalidateCacheForFile(filePath);
 }
 
 /** Creates a new file at the given relative path. Creates parent dirs as needed. */
 export function createFile(filePath: string, initialContent = ''): void {
   coreCreateFile(getMindRoot(), filePath, initialContent);
-  invalidateCache();
+  invalidateCacheForNewFile(filePath);
 }
 
 export function deleteFile(filePath: string): void {
   coreDeleteFile(getMindRoot(), filePath);
-  invalidateCache();
+  invalidateCacheForDeletedFile(filePath);
 }
 
 /** Renames a file. newName must be a plain filename (no path separators). */
@@ -384,12 +438,12 @@ export function readLines(filePath: string): string[] {
 
 export function insertLines(filePath: string, afterIndex: number, lines: string[]): void {
   coreInsertLines(getMindRoot(), filePath, afterIndex, lines);
-  invalidateCache();
+  invalidateCacheForFile(filePath);
 }
 
 export function updateLines(filePath: string, startIndex: number, endIndex: number, newLines: string[]): void {
   coreUpdateLines(getMindRoot(), filePath, startIndex, endIndex, newLines);
-  invalidateCache();
+  invalidateCacheForFile(filePath);
 }
 
 export function deleteLines(filePath: string, startIndex: number, endIndex: number): void {
@@ -405,17 +459,17 @@ export function deleteLines(filePath: string, startIndex: number, endIndex: numb
 
 export function appendToFile(filePath: string, content: string): void {
   coreAppendToFile(getMindRoot(), filePath, content);
-  invalidateCache();
+  invalidateCacheForFile(filePath);
 }
 
 export function insertAfterHeading(filePath: string, heading: string, content: string): void {
   coreInsertAfterHeading(getMindRoot(), filePath, heading, content);
-  invalidateCache();
+  invalidateCacheForFile(filePath);
 }
 
 export function updateSection(filePath: string, heading: string, newContent: string): void {
   coreUpdateSection(getMindRoot(), filePath, heading, newContent);
-  invalidateCache();
+  invalidateCacheForFile(filePath);
 }
 
 /** App-level search result (extends core SearchResult with Fuse.js match details) */
@@ -649,7 +703,10 @@ export function purgeExpiredTrash() {
 }
 
 export function findBacklinks(targetPath: string): BacklinkEntry[] {
-  const { allFiles } = ensureCache();
-  return coreFindBacklinks(getMindRoot(), targetPath, allFiles);
+  const mindRoot = getMindRoot();
+  // Use LinkIndex for O(1) source lookup, then only scan matching files
+  const linkIndex = getLinkIndex();
+  const linkingSources = linkIndex.getBacklinks(targetPath);
+  return coreFindBacklinks(mindRoot, targetPath, linkingSources);
 }
 
