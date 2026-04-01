@@ -37,11 +37,11 @@
   - 方案：按查询相关性提取 Top-K 段落（chunk + 余弦相似度排序）
 
 ### P1 — Bootstrap 优化
-- [ ] **按需懒加载 Bootstrap** — 每次 agent 请求加载 8-10 个配置文件（INSTRUCTION.md, README.md, CONFIG 等，`route.ts:323-386`），多数请求不需要全部
+- [x] **按需懒加载 Bootstrap** — ✅ 已实现。次要文件（README.md, CONFIG.md, target_*）仅在内容 >10 字符时加载，跳过空/样板文件节省 token
   - 方案：首次请求只加载 INSTRUCTION.md + CONFIG.json，其余按需
 
 ### P2 — SKILL.md 缓存
-- [ ] **SKILL.md 内存缓存** — 每次请求从磁盘重读，应加 mtime 校验的内存缓存
+- [x] **SKILL.md 内存缓存** — ✅ 已实现。`readAbsoluteFile` 加 mtime 校验内存缓存，文件未修改时跳过磁盘 IO
   - 文件：`route.ts:325-331`
 
 ---
