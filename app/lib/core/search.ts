@@ -45,12 +45,27 @@ export function removeSearchIndexFile(filePath: string): void {
 
 /** Debounced persist — writes index to disk 5s after last write operation. */
 let _persistTimer: ReturnType<typeof setTimeout> | null = null;
+let _persistDirty = false;
+
 function schedulePersist(): void {
+  _persistDirty = true;
   if (_persistTimer) clearTimeout(_persistTimer);
-  _persistTimer = setTimeout(() => {
-    _persistTimer = null;
-    try { searchIndex.persist(getMindosDir()); } catch { /* non-critical */ }
-  }, 5000);
+  _persistTimer = setTimeout(flushPersist, 5000);
+}
+
+/** Immediately flush pending index to disk (used by exit hooks). */
+function flushPersist(): void {
+  if (_persistTimer) { clearTimeout(_persistTimer); _persistTimer = null; }
+  if (!_persistDirty) return;
+  _persistDirty = false;
+  try { searchIndex.persist(getMindosDir()); } catch { /* non-critical */ }
+}
+
+// Ensure index is persisted before process exits
+if (typeof process !== 'undefined') {
+  process.on('beforeExit', flushPersist);
+  process.on('SIGTERM', () => { flushPersist(); process.exit(0); });
+  process.on('SIGINT', () => { flushPersist(); process.exit(0); });
 }
 
 /* ── BM25 Parameters ── */

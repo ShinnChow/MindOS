@@ -358,8 +358,10 @@ export class SearchIndex {
    * Load a previously persisted index from disk.
    * Returns true if loaded successfully, false if stale/missing/corrupt.
    *
-   * Staleness check: if any indexed file's mtime is newer than the persisted
-   * timestamp, the index is considered stale and not loaded.
+   * Staleness checks (all must pass):
+   * 1. Version and mindRoot match
+   * 2. Actual file count on disk matches indexed file count (detects adds/deletes)
+   * 3. Sampled files' mtime are older than the persisted timestamp
    */
   load(mindosDir: string, mindRoot: string): boolean {
     const filePath = path.join(mindosDir, 'search-index.json');
@@ -372,17 +374,40 @@ export class SearchIndex {
 
     if (data.version !== 1 || data.builtForRoot !== mindRoot) return false;
 
-    // Staleness check: sample up to 20 files for mtime
+    // Check 1: file count on disk must match indexed count
+    // This catches new files created or files deleted while process was down
+    const currentFiles = collectAllFiles(mindRoot);
+    if (currentFiles.length !== data.fileCount) return false;
+
+    // Check 2: mtime sampling — check every file if ≤50, otherwise sample 50
     const docPaths = Object.keys(data.docLengths);
-    const sampleSize = Math.min(20, docPaths.length);
-    const step = Math.max(1, Math.floor(docPaths.length / sampleSize));
-    for (let i = 0; i < docPaths.length; i += step) {
-      try {
-        const abs = path.join(mindRoot, docPaths[i]);
-        const stat = fs.statSync(abs);
-        if (stat.mtimeMs > data.timestamp) return false; // stale
-      } catch {
-        return false; // file deleted since index was built
+    const sampleSize = Math.min(50, docPaths.length);
+    if (sampleSize === docPaths.length) {
+      // Small index: check all files
+      for (const dp of docPaths) {
+        try {
+          const stat = fs.statSync(path.join(mindRoot, dp));
+          if (stat.mtimeMs > data.timestamp) return false;
+        } catch {
+          return false; // file deleted
+        }
+      }
+    } else {
+      // Large index: sample evenly + always check the last few (most likely to be recent)
+      const step = Math.max(1, Math.floor(docPaths.length / 40));
+      const sampled = new Set<number>();
+      // Evenly spaced samples
+      for (let i = 0; i < docPaths.length; i += step) sampled.add(i);
+      // Always check the last 10 files (most recently added to the index)
+      for (let i = Math.max(0, docPaths.length - 10); i < docPaths.length; i++) sampled.add(i);
+
+      for (const idx of sampled) {
+        try {
+          const stat = fs.statSync(path.join(mindRoot, docPaths[idx]));
+          if (stat.mtimeMs > data.timestamp) return false;
+        } catch {
+          return false;
+        }
       }
     }
 
