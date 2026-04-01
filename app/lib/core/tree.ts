@@ -1,4 +1,5 @@
 import fs from 'fs';
+import fsp from 'fs/promises';
 import path from 'path';
 import type { FileNode } from './types';
 
@@ -110,4 +111,51 @@ export function renderTree(nodes: FileNode[], indent = ''): string {
     }
   }
   return lines.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Async variants — non-blocking for use in API routes / hot paths
+// ---------------------------------------------------------------------------
+
+/**
+ * Async version of collectAllFiles. Uses fs.promises.readdir to avoid
+ * blocking the event loop on large directories (1000+ files).
+ */
+export async function collectAllFilesAsync(
+  mindRoot: string,
+  dirPath?: string,
+  opts: TreeOptions = {}
+): Promise<string[]> {
+  const root = path.resolve(mindRoot);
+  const dir = dirPath ?? root;
+  const ignoredDirs = opts.ignoredDirs ?? DEFAULT_IGNORED_DIRS;
+  const allowedExtensions = opts.allowedExtensions ?? DEFAULT_ALLOWED_EXTENSIONS;
+
+  let entries: fs.Dirent[];
+  try {
+    entries = await fsp.readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+
+  const files: string[] = [];
+  // Process subdirectories in parallel
+  const subdirPromises: Promise<string[]>[] = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (ignoredDirs.has(entry.name)) continue;
+      subdirPromises.push(collectAllFilesAsync(mindRoot, fullPath, opts));
+    } else if (entry.isFile()) {
+      const ext = path.extname(entry.name).toLowerCase();
+      if (allowedExtensions.has(ext)) {
+        files.push(path.relative(root, fullPath));
+      }
+    }
+  }
+  const subdirResults = await Promise.all(subdirPromises);
+  for (const subFiles of subdirResults) {
+    files.push(...subFiles);
+  }
+  return files;
 }

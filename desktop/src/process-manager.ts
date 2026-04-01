@@ -503,9 +503,11 @@ export class ProcessManager extends EventEmitter {
                 // MCP: NEVER switch ports — external clients (Claude Code, Cursor) have static configs.
                 // Wait for original port to free up; if still occupied, check for existing MCP.
                 const portFree = await this.waitForPortOrFallback(currentPort).then(p => p === currentPort).catch(() => false);
+                if (this.stopped) return;
                 if (!portFree) {
                   // Port still occupied — check if it's a MindOS MCP we can reuse
                   const externalOk = await this.checkMcpHealth(currentPort);
+                  if (this.stopped) return;
                   if (externalOk) {
                     console.info(`[MindOS] External MCP now available on port ${currentPort} — reusing`);
                     this.externalMcp = true;
@@ -520,6 +522,7 @@ export class ProcessManager extends EventEmitter {
               } else {
                 // Web: can switch ports (Desktop controls loadURL, user doesn't hardcode web port)
                 const resolvedPort = await this.waitForPortOrFallback(currentPort);
+                if (this.stopped) return;
                 if (resolvedPort !== currentPort) {
                   console.info(`[MindOS:${which}] port ${currentPort} still occupied, switching to ${resolvedPort}`);
                   this.opts.webPort = resolvedPort;
@@ -531,6 +534,7 @@ export class ProcessManager extends EventEmitter {
             // For MCP: check if someone else started one while we were down
             if (which === 'mcp') {
               const externalOk = await this.checkMcpHealth(this.opts.mcpPort);
+              if (this.stopped) return;
               if (externalOk) {
                 console.info(`[MindOS] External MCP now available on port ${this.opts.mcpPort} — reusing`);
                 this.externalMcp = true;
@@ -538,6 +542,7 @@ export class ProcessManager extends EventEmitter {
                 return;
               }
             }
+            if (this.stopped) return;
             const newProc = which === 'mcp' ? this.spawnMcp() : this.spawnWeb();
             if (which === 'mcp') {
               this.mcpProcess = newProc;
@@ -552,6 +557,7 @@ export class ProcessManager extends EventEmitter {
             if (which === 'web') {
               const port = this.opts.webPort;
               setTimeout(async () => {
+                if (this.stopped) return;
                 try {
                   const res = await new Promise<boolean>((resolve) => {
                     const req = require('http').get(

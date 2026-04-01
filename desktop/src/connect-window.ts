@@ -173,6 +173,12 @@ function registerSshHandlers(
     if (!url) return { ok: false, error: 'Invalid address' };
 
     if (password) {
+      // Warn if sending password over unencrypted HTTP to a non-local server
+      const isLocal = url.includes('://localhost') || url.includes('://127.0.0.1') || url.includes('://[::1]');
+      const isHttps = url.startsWith('https://');
+      if (!isLocal && !isHttps) {
+        return { ok: false, error: 'Security warning: password would be sent in plaintext over HTTP. Use SSH tunnel or HTTPS for remote servers.' };
+      }
       try {
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 8000);

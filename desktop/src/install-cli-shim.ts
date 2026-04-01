@@ -88,11 +88,11 @@ function writeWindowsShim(cliJs: string): void {
   const privEsc = nodePrivate.replace(/"/g, '""');
   const lines = [
     '@echo off',
-    'setlocal',
+    'setlocal enabledelayedexpansion',
     `set "CLI=${cliEsc}"`,
-    'if not exist "%CLI%" (',
+    'if not exist "!CLI!" (',
     '  for /f "delims=" %%i in (\'npm root -g 2^>nul\') do set "NPM_CLI=%%i\\@geminilight\\mindos\\bin\\cli.js"',
-    '  if exist "%NPM_CLI%" ( set "CLI=%NPM_CLI%" ) else (',
+    '  if exist "!NPM_CLI!" ( set "CLI=!NPM_CLI!" ) else (',
     '    echo mindos: MindOS Desktop has been removed. Reinstall: npm install -g @geminilight/mindos >&2',
     '    exit /b 127',
     '  )',

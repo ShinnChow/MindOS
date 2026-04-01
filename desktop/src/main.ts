@@ -13,7 +13,7 @@
  */
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import path from 'path';
-import { mkdirSync, readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
+import { mkdirSync, readFileSync, writeFileSync, existsSync, unlinkSync, renameSync } from 'fs';
 import { randomBytes } from 'crypto';
 import { spawn as spawnChild } from 'child_process';
 import { ProcessManager } from './process-manager';
@@ -90,6 +90,14 @@ interface MindOSConfig {
   [key: string]: unknown;
 }
 
+/** Atomic write: write to temp file then rename (prevents corruption on crash/concurrent write). */
+function atomicWriteConfig(data: string): void {
+  mkdirSync(CONFIG_DIR, { recursive: true });
+  const tmp = CONFIG_PATH + '.tmp';
+  writeFileSync(tmp, data, 'utf-8');
+  renameSync(tmp, CONFIG_PATH);
+}
+
 /** Read config.json from disk without touching `cachedConfig` (for merge / URL resolution). */
 function readMindOsConfigFileUncached(): MindOSConfig {
   try {
@@ -116,8 +124,7 @@ function ensureAuthToken(config: MindOSConfig): void {
   const token = randomBytes(24).toString('hex').slice(0, 24);
   config.authToken = token;
   try {
-    mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
-    writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+    atomicWriteConfig(JSON.stringify(config, null, 2));
     console.info('[MindOS] Auto-generated authToken (no onboard config found)');
   } catch (err) {
     console.warn('[MindOS] Failed to save auto-generated authToken:', err instanceof Error ? err.message : err);
@@ -161,7 +168,7 @@ function saveDesktopMode(mode: 'local' | 'remote', opts?: { allowSeedWebSetup?: 
   if (opts?.allowSeedWebSetup && shouldSeedWebSetupPendingForLocal(mode, existing)) {
     merged.setupPending = true;
   }
-  writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2));
+  atomicWriteConfig(JSON.stringify(merged, null, 2));
   cachedConfig = merged;
 }
 
