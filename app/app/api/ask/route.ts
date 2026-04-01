@@ -128,8 +128,8 @@ function isToolExecutionEndEvent(e: AgentEvent): e is ToolExecEndEvent {
 function getToolExecutionEnd(e: AgentEvent): { toolCallId: string; output: string; isError: boolean } {
   const evt = e as ToolExecEndEvent;
   const outputText = evt.result?.content
-    ?.filter((p) => p.type === 'text')
-    .map((p) => p.text ?? '')
+    ?.filter((p: { type: string; text?: string }) => p.type === 'text')
+    .map((p: { type: string; text?: string }) => p.text ?? '')
     .join('') ?? '';
   return {
     toolCallId: evt.toolCallId ?? '',
