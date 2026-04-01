@@ -1,4 +1,4 @@
-<!-- Last verified: 2026-03-22 | Current stage: P1 -->
+<!-- Last verified: 2026-04-01 | Current stage: P1 -->
 
 # Backlog
 
@@ -108,7 +108,14 @@
 - [x] **I29：跨 Agent MCP/Skill 全量聚合与视觉升级（P2.4）** — 全局 MCP 页新增"全部已配置 MCP servers（跨 Agent）"chip 矩阵；Skills 页新增"全部已安装 skills（跨 Agent）"chip 矩阵；配置可见性/注册表/原生安装列表从纯文本升级为 dot indicator + chip 视觉；Agent Detail 的 native scan 从 bullet list 升级为可扫 chip 布局。
 - [x] **Ask 输入不中断（执行中可草拟）** — 修复 Agent 执行期间输入框被禁用：允许边执行边输入，提交仍串行；新增“可先输入下一步”提示与 jsdom 回归测试。测试：`app/__tests__/ask/ask-content-input-during-run.test.tsx`
 - [x] **Ask AI 自动重连** — 连接断开时自动重试（指数退避 1s/2s/4s...），可配置最大重试次数（Settings → AI → Agent Behavior → Auto Reconnect，默认 3 次）。非重试型错误（401/403/429/API Key 无效）直接显示不重试。重连中显示 WifiOff 图标 + 进度文案。21 个新测试。
+- [x] **Multimodal 图片输入** — 粘贴/拖拽/上传图片到聊天，支持 Anthropic/OpenAI vision 模型自动选择，消息历史渲染图片。5 层实现：消息类型扩展 → 前端输入 → API 转换 → 模型选择 → 历史渲染。
+- [x] **文件内容 Diff 可视化** — AI 修改文件后工具调用块内嵌 inline diff；`/changes` 页面支持展开 line diff；ViewPageClient 变更高亮。Core: `.mindos/change-log.json` + `/api/changes`。
+- [x] **CI 公开仓同步安全加固** — `.syncinclude` 声明式白名单（SSOT）+ `parse-syncinclude.sh` 解析器 + pre-push hook 拦截 public branch push + CI workflow 从 .syncinclude 读取配置。默认私有，忘记白名单 = 安全。
 - [x] **Ask AI 聊天框 UI/UX 修复** — Modal 输入框 textarea 化（多行+自适应高度）；Popover 改为 absolute 定位（消除布局跳动）；重连状态 Stop→Cancel 语义统一；移动端 footer hints 始终显示；空 assistant 占位消息不再被持久化。
+- [x] **Tier 1：Favorites / 收藏夹** — Star 图标固定常用文件，首页 Pinned Files 区 + 文件树右键菜单 + 文件视图顶栏 Star。localStorage 存储，支持排序。Hook: `usePinnedFiles`。
+- [x] **Tier 1：Trash / 回收站** — 删除走 `.mindos/.trash/`，30 天自动清理。`/trash` 页面含恢复/永久删除/冲突处理（覆盖/副本）。`listTrash` 自动 purge 过期项。Core: `lib/core/trash.ts`。
+- [x] **Tier 1：Export / 导出** — 单文件 MD/HTML + 目录 ZIP 导出。`/api/export` 路由 + `ExportModal` 组件（格式选择/进度/完成/错误状态）。Core: `lib/core/export.ts`。
+- [x] **Tier 1：Undo Toast + i18n 全面治理** — toast.ts 扩展 action button 支持（`toast.undo` API）；删除文件/目录/空间后 5s undo toast → `restoreFromTrash`；修复 22 处 hardcoded 英文字符串（TrashPageClient/ExportModal/FileTree/ViewPageClient/Toaster）；新增 `trash.cancel`/`justNow`/`minutesAgo` 等 14 个 i18n 键（EN+ZH）；focus-visible ring 合规。
 
 ### 🟡 中优先
 
@@ -141,7 +148,7 @@
 
 ### 🟢 低优先（等需求驱动）
 
-- [ ] **Toast/Snackbar 系统** — Copy 反馈各组件自管 `setCopied`（5+ 处重复）。引入 Sonner 或自建全局 Toast provider，统一操作反馈出口。**触发条件**：需要 undo 操作（如删除文件撤销）或批量操作结果反馈时。工作量 ~1-2h
+- [x] **Toast/Snackbar 系统** — 自建 `lib/toast.ts`（module-level store + useSyncExternalStore）+ `Toaster.tsx`。支持 success/error/info/copy + undo action button。已用于删除撤销、导出、收藏等反馈。
 - [ ] **⌘K Command Palette 扩展** — 当前只搜文件。可扩展为：快捷操作（Toggle dark mode / Restart walkthrough / Go to /explore）+ Skill 开关 + 最近 AI 对话。**触发条件**：用户反馈"操作路径长"或"找不到功能"时。工作量 ~3-4h
 - [ ] **Zustand/Jotai 替代 Context 嵌套** — 当前 4 层 Provider（Locale → Walkthrough → Mcp → SidebarLayout），Context 变化导致子树 re-render。已用 `useMemo` 缓解，当前无感知性能问题。**触发条件**：profiler 显示 Context re-render 是瓶颈，或 Provider 层数超过 6 层时。工作量 ~4-6h
 - [ ] **i18n 按模块拆分** — `i18n-en.ts` 712 行 / `i18n-zh.ts` 737 行，全部翻译在单一 `as const` 对象中。类型系统保证 key 一致性。**触发条件**：加第 3 种语言，或单文件超过 1000 行时。工作量 ~2-3h
