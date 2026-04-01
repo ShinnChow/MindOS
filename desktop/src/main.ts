@@ -624,23 +624,9 @@ async function startLocalMode(): Promise<string | null> {
     refreshTray(status as 'starting' | 'running' | 'error');
   });
 
-  try {
-    await processManager.start();
-    startupComplete = true;
-    splashStatus({ status: 'ready', done: true });
-    return `http://127.0.0.1:${webPort}`;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    splashStatus({
-      error: msg,
-      actions: [
-        { id: 'retry', label: 'retry', primary: true },
-        { id: 'switch-remote', label: 'switchRemote' },
-        { id: 'quit', label: 'quit' },
-      ],
-    });
-    return null;
-  }
+  startupComplete = true;
+  splashStatus({ status: 'ready', done: true });
+  return `http://127.0.0.1:${webPort}`;
 }
 
 // ── Remote Mode ──

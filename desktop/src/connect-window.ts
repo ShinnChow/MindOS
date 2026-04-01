@@ -141,8 +141,17 @@ function safeHandle(channel: string, handler: (...args: any[]) => any): void {
 function registerSshHandlers(
   resolvedRef: { value: boolean },
   resolve: (url: string | null) => void,
-  win: { close: () => void },
+  win: { close: () => void; isDestroyed?: () => boolean },
+  /** When set, resolve with this fixed value instead of the URL (used by mode-select window) */
+  resolveOverride?: string,
 ): void {
+  /** Safely close the window — no-op if already destroyed */
+  const safeClose = () => {
+    try {
+      if (win.isDestroyed?.()) return;
+      win.close();
+    } catch { /* window already gone */ }
+  };
   safeHandle('connect:get-recent', () => {
     const connections = getConnections();
     return connections.map(c => ({
@@ -192,8 +201,8 @@ function registerSshHandlers(
     setActiveRemoteConnection(url);
 
     resolvedRef.value = true;
-    resolve(url);
-    win.close();
+    resolve(resolveOverride ?? url);
+    safeClose();
     return { ok: true };
   });
 
@@ -205,7 +214,7 @@ function registerSshHandlers(
   safeHandle('connect:switch-local', () => {
     resolvedRef.value = true;
     resolve(null);
-    win.close();
+    safeClose();
   });
 
   safeHandle('connect:ssh-hosts', async () => {
@@ -240,8 +249,8 @@ function registerSshHandlers(
             });
             setActiveRemoteConnection(url);
             resolvedRef.value = true;
-            resolve(url);
-            win.close();
+            resolve(resolveOverride ?? url);
+            safeClose();
             return { ok: true, url, authRequired: result.authRequired };
           }
 
@@ -494,7 +503,7 @@ export function showModeSelectWindow(parentWindow?: BrowserWindow): Promise<'loc
     });
 
     // ── SSH handlers (needed when user switches to remote screen within mode selection) ──
-    registerSshHandlers(resolvedRef, resolve as (v: string | null) => void, { close: () => modeWin.close() });
+    registerSshHandlers(resolvedRef, resolve as (v: string | null) => void, { close: () => modeWin.close(), isDestroyed: () => modeWin.isDestroyed() }, 'remote');
 
     // Cleanup
     modeWin.on('closed', () => {
@@ -566,7 +575,7 @@ export function showConnectWindow(parentWindow?: BrowserWindow): Promise<string 
     const resolvedRef = { value: false };
 
     // Register all remote connection handlers (shared with mode select window)
-    registerSshHandlers(resolvedRef, resolve, { close: () => connectWin.close() });
+    registerSshHandlers(resolvedRef, resolve, { close: () => connectWin.close(), isDestroyed: () => connectWin.isDestroyed() });
 
     // Cleanup on close
     connectWin.on('closed', () => {

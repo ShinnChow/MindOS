@@ -45,7 +45,8 @@ type MindOSSSEvent =
   | { type: 'tool_start'; toolCallId: string; toolName: string; args: unknown }
   | { type: 'tool_end'; toolCallId: string; output: string; isError: boolean }
   | { type: 'done'; usage?: { input: number; output: number } }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  | { type: 'status'; message: string };
 
 // ---------------------------------------------------------------------------
 // Type Guards for AgentEvent variants (safe event handling)
@@ -110,6 +111,27 @@ function getTurnEndData(e: AgentEvent): { toolResults: Array<{ toolName: string;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Detect transient errors that are safe to retry: timeouts, rate limits (429),
+ * and server errors (5xx). Auth errors (401/403), bad requests (400), and
+ * content policy violations should NOT be retried.
+ */
+/** @internal Exported for testing only. */
+export function isTransientError(err: Error): boolean {
+  const msg = err.message.toLowerCase();
+  // Timeout patterns
+  if (msg.includes('timeout') || msg.includes('timed out') || msg.includes('etimedout')) return true;
+  // Rate limiting
+  if (msg.includes('429') || msg.includes('rate limit') || msg.includes('too many requests')) return true;
+  // Server errors (5xx)
+  if (/\b5\d{2}\b/.test(msg) || msg.includes('internal server error') || msg.includes('service unavailable')) return true;
+  // Connection errors
+  if (msg.includes('econnreset') || msg.includes('econnrefused') || msg.includes('socket hang up')) return true;
+  // Overloaded
+  if (msg.includes('overloaded') || msg.includes('capacity')) return true;
+  return false;
+}
 
 /**
  * Strip large fields (file content) from tool args before SSE serialization.
@@ -708,7 +730,32 @@ export async function POST(req: NextRequest) {
             safeClose();
           } else {
             // Route to MindOS agent (existing logic)
-            await session.prompt(lastUserContent, lastUserImages ? { images: lastUserImages } : undefined);
+            // Retry with exponential backoff for transient failures (timeout, rate limit, 5xx).
+            // Only retry if no content has been streamed yet — once the user sees partial
+            // output, retrying would produce duplicate/garbled content.
+            const MAX_RETRIES = 3;
+            let lastPromptError: Error | null = null;
+
+            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+              try {
+                await session.prompt(lastUserContent, lastUserImages ? { images: lastUserImages } : undefined);
+                lastPromptError = null;
+                break; // success
+              } catch (err) {
+                lastPromptError = err instanceof Error ? err : new Error(String(err));
+
+                // Only retry if: (1) no content streamed yet, (2) retries remaining, (3) transient error
+                const canRetry = !hasContent && attempt < MAX_RETRIES && isTransientError(lastPromptError);
+                if (!canRetry) break;
+
+                const delayMs = 1000 * Math.pow(2, attempt - 1); // 1s, 2s
+                send({ type: 'status', message: `Request failed, retrying (${attempt}/${MAX_RETRIES})...` });
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+              }
+            }
+
+            if (lastPromptError) throw lastPromptError;
+
             metrics.recordRequest(Date.now() - requestStartTime);
             if (!hasContent && lastModelError) {
               send({ type: 'error', message: lastModelError });
