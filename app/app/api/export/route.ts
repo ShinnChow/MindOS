@@ -15,6 +15,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Missing path parameter' }, { status: 400 });
   }
 
+  // Path traversal defense-in-depth
+  if (filePath.includes('..') || filePath.startsWith('/')) {
+    return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+  }
+
   const mindRoot = getMindRoot();
 
   try {
@@ -77,6 +82,8 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // Pipe archive errors to the passthrough stream
+      archive.on('error', (err) => passThrough.destroy(err));
       void archive.finalize();
 
       // Convert Node stream to Web ReadableStream

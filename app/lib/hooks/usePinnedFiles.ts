@@ -19,9 +19,19 @@ function getServerSnapshot(): string[] {
   return [];
 }
 
-let cachedPins: string[] = getSnapshot();
+// Lazy init — avoid calling getSnapshot() at module load time during SSR
+let cachedPins: string[] = [];
+let initialized = false;
+
+function ensureInit(): void {
+  if (!initialized && typeof window !== 'undefined') {
+    cachedPins = getSnapshot();
+    initialized = true;
+  }
+}
 
 function subscribe(callback: () => void): () => void {
+  ensureInit();
   const onStorage = (e: StorageEvent) => {
     if (e.key === STORAGE_KEY) {
       cachedPins = getSnapshot();
@@ -42,11 +52,16 @@ function subscribe(callback: () => void): () => void {
 
 function writePins(pins: string[]): void {
   cachedPins = pins;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
+  } catch {
+    // localStorage unavailable (private browsing, quota exceeded) — memory only
+  }
   window.dispatchEvent(new Event(EVENT_KEY));
 }
 
 export function usePinnedFiles() {
+  ensureInit();
   const pins = useSyncExternalStore(subscribe, () => cachedPins, getServerSnapshot);
 
   const isPinned = useCallback((path: string) => pins.includes(path), [pins]);
