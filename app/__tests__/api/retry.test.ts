@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isTransientError } from '@/app/api/ask/route';
+import { isTransientError } from '@/lib/agent/retry';
 
 describe('isTransientError', () => {
   it('returns true for timeout errors', () => {

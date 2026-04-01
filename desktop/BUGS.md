@@ -305,3 +305,33 @@
   1. `mindos-runtime-layout.ts`: stamp 不存在时信任 valid build（降级策略）
   2. `prepare-mindos-runtime.mjs`: 打包时写入 stamp
   3. `scripts/write-build-stamp.js` + `app/package.json` postbuild: next build 后自动写 stamp
+
+### ✅ P0 #1: `processManager.start()` 被调用两次
+
+- **日期**: 2026-04-01
+- **根因**: L467-482 的 EADDRINUSE 重试逻辑已调用 start()，L627 又调了一次
+- **修复**: 删除 L627-643 的重复 start 块，startupComplete/splashStatus 合并到 L482 后
+
+### ✅ P0 #2: respawn 没调 `guardSpawnError`
+
+- **日期**: 2026-04-01
+- **根因**: 崩溃重启路径 L522-528 只调 setupCrashHandler，不调 guardSpawnError
+- **修复**: respawn 后对新进程调用 `guardSpawnError()` + `captureStderr()`（web）+ `writeChildPids()`
+
+### ✅ P0 #3: `startMcpOnPort()` 不杀旧 MCP 进程
+
+- **日期**: 2026-04-01
+- **根因**: 直接 spawn 新 MCP 并覆盖引用，旧进程变孤儿
+- **修复**: spawn 前检查并 SIGTERM 旧 mcpProcess + writeChildPids()
+
+### ✅ P0 #4: SSH retry 中关闭窗口 → crash
+
+- **日期**: 2026-04-01
+- **根因**: retry loop 期间 win.close() 对 destroyed window 调用抛异常
+- **修复**: 引入 safeClose() 辅助函数，所有 win.close() 改为 safeClose()；win 对象增加 isDestroyed 方法
+
+### ✅ P0 #5: `showModeSelectWindow` resolve 类型不安全
+
+- **日期**: 2026-04-01
+- **根因**: registerSshHandlers 的 resolve(url) 返回完整 URL，但 showModeSelectWindow 期望 'local'|'remote'|null
+- **修复**: registerSshHandlers 增加 resolveOverride 参数，mode-select 窗口传 'remote'，connect 窗口不传（用 URL）

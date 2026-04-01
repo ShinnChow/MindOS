@@ -75,9 +75,7 @@
 ## 🤖 Agent Pipeline
 
 ### P0 — 可靠性
-- [ ] **API 重试机制** — 当前 API 超时/限流直接失败，无重试。应加指数退避重试（最多 3 次）
-  - 文件：`app/app/api/ask/route.ts`
-  - 方案：`callWithRetry(fn, maxRetries=3, baseDelay=1000)`
+- [x] **API 重试机制** — ✅ 已实现。`session.prompt()` 包裹指数退避重试（最多 3 次，1s/2s），仅对瞬态错误重试（timeout/429/5xx/ECONNRESET），已发送内容后不重试。`isTransientError` 抽取到 `lib/agent/retry.ts`
 
 ### P1 — 循环检测增强
 - [ ] **语义循环检测** — 当前只检测完全相同的 tool + args（`route.ts:589-599`）。应检测模式循环（read A → read B → read A → read B）
@@ -92,11 +90,10 @@
 ## ⚡ 性能热点
 
 ### P0 — Graph API
-- [ ] **增量预计算链接图** — 当前 O(n*m)：遍历所有文件 × 每个文件的正则提取（`api/graph/route.ts:89-106`）。1000 文件 × 50 链接 = 50,000 次正则
-  - 方案：维护 `linkIndex: Map<source, Set<target>>`，文件写入时增量更新
+- [x] **增量预计算链接图** — ✅ 已实现。新建 `LinkIndex` 维护双向链接索引（forwardLinks + backwardLinks），缓存 fileSet/basenameMap，增量更新。Graph API 从 O(n*m) 降为 O(1) 查表
 
 ### P0 — Backlinks
-- [ ] **反向索引** — 当前 O(n * lines * patterns)（`core/backlinks.ts:25-47`），每个文件每行测试 5 个正则
+- [x] **反向索引** — ✅ 已实现。复用 LinkIndex 的 backwardLinks，`findBacklinks()` 从 O(n*L*5) 降为 O(linking-files * L * 5)。通过 `getLinkIndex().getBacklinks()` O(1) 获取源文件列表，仅扫描这些文件取上下文
   - 方案：写入时构建 `backlinkIndex: Map<target, Set<source>>`，查询 O(1)
 
 ### P1 — UI 虚拟化

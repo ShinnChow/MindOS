@@ -27,6 +27,7 @@ import {
   updateSearchIndexFile,
   addSearchIndexFile,
   removeSearchIndexFile,
+  LinkIndex,
   summarizeTopLevelSpaces,
   appendContentChange as coreAppendContentChange,
   listContentChanges as coreListContentChanges,
@@ -99,12 +100,25 @@ function isCacheValid(): boolean {
   return _cache !== null && (Date.now() - _cache.timestamp) < CACHE_TTL_MS;
 }
 
+/** Module-level link index singleton. Lazily built on first graph/backlink access. */
+const _linkIndex = new LinkIndex();
+
+/** Get the link index, ensuring it's built for the current mindRoot. */
+export function getLinkIndex(): LinkIndex {
+  const root = getMindRoot();
+  if (!_linkIndex.isBuiltFor(root)) {
+    _linkIndex.rebuild(root);
+  }
+  return _linkIndex;
+}
+
 /** Invalidate cache — call after any write/create/delete/rename operation */
 export function invalidateCache(): void {
   _cache = null;
   _searchIndex = null;
   _treeVersion++;
   invalidateSearchIndex();
+  _linkIndex.invalidate();
 }
 
 /**
@@ -117,6 +131,7 @@ function invalidateCacheForFile(filePath: string): void {
   _searchIndex = null;
   _treeVersion++;
   updateSearchIndexFile(getMindRoot(), filePath);
+  if (_linkIndex.isBuilt()) _linkIndex.updateFile(getMindRoot(), filePath);
 }
 
 /**
@@ -128,6 +143,7 @@ function invalidateCacheForNewFile(filePath: string): void {
   _searchIndex = null;
   _treeVersion++;
   addSearchIndexFile(getMindRoot(), filePath);
+  if (_linkIndex.isBuilt()) _linkIndex.updateFile(getMindRoot(), filePath);
 }
 
 /**
@@ -139,6 +155,7 @@ function invalidateCacheForDeletedFile(filePath: string): void {
   _searchIndex = null;
   _treeVersion++;
   removeSearchIndexFile(filePath);
+  if (_linkIndex.isBuilt()) _linkIndex.removeFile(filePath);
 }
 
 function ensureCache(): FileTreeCache {
@@ -686,7 +703,10 @@ export function purgeExpiredTrash() {
 }
 
 export function findBacklinks(targetPath: string): BacklinkEntry[] {
-  const { allFiles } = ensureCache();
-  return coreFindBacklinks(getMindRoot(), targetPath, allFiles);
+  const mindRoot = getMindRoot();
+  // Use LinkIndex for O(1) source lookup, then only scan matching files
+  const linkIndex = getLinkIndex();
+  const linkingSources = linkIndex.getBacklinks(targetPath);
+  return coreFindBacklinks(mindRoot, targetPath, linkingSources);
 }
 
