@@ -55,13 +55,20 @@ jobs:
 
           # === 2. Sync to mindos main branch ===
           #
-          # ARCHITECTURE: WHITELIST-ONLY sync.
+          # ARCHITECTURE: .syncinclude-driven whitelist sync.
           #
-          # Only EXPLICITLY listed directories and files are copied to the public repo.
-          # Everything else in mindos-dev is PRIVATE by default.
-          # This is the opposite of a blacklist — if you forget to add something,
-          # it stays private (safe), not public (dangerous).
+          # .syncinclude is the Single Source of Truth for what goes public.
+          # scripts/parse-syncinclude.sh parses it into shell variables.
+          # Default = PRIVATE. Only explicitly listed paths are synced.
           #
+          if [ ! -f .syncinclude ]; then
+            echo "::error::.syncinclude not found — aborting sync for safety."
+            exit 1
+          fi
+
+          # Parse .syncinclude into shell variables
+          eval "$(bash scripts/parse-syncinclude.sh)"
+
           git clone --depth 1 "https://x-access-token:${PAT}@github.com/GeminiLight/mindos.git" /tmp/mindos || {
             echo "Target repo not found or token has no access: GeminiLight/mindos"
             exit 1
@@ -70,63 +77,42 @@ jobs:
           # Clean slate: remove everything except .git
           find /tmp/mindos -mindepth 1 -maxdepth 1 ! -name '.git' -exec rm -rf {} +
 
-          # ─── WHITELIST: directories ─────────────────────────────────────
-          # Only these directories are synced. Add new ones explicitly here.
-          SYNC_DIRS="app mcp desktop shared skills templates assets bin scripts tests docs"
+          # ─── Sync whitelisted directories ───────────────────────────────
           for dir in $SYNC_DIRS; do
+            [ "$dir" = "wiki" ] && continue  # wiki handled separately below
             if [ -d "$dir" ]; then
-              rsync -a --delete \
-                --exclude='node_modules' \
-                --exclude='.next' \
-                --exclude='.claude' \
-                --exclude='dist' \
-                --exclude='dist-electron' \
-                --exclude='dist-renderer' \
-                --exclude='TASKS.md' \
-                "$dir/" "/tmp/mindos/$dir/"
+              eval rsync -a --delete $GLOBAL_EXCLUDES "\"$dir/\"" "\"/tmp/mindos/$dir/\""
             fi
           done
 
-          # ─── WHITELIST: wiki (with exclusions for private content) ──────
-          if [ -d wiki/ ]; then
-            rsync -a --delete \
-              --exclude='0*.md' \
-              --exclude='specs/' \
-              --exclude='discussions/' \
-              --exclude='85-backlog.md' \
-              --exclude='project-status-report.md' \
-              --exclude='implementation-roadmap.md' \
-              --exclude='architecture-review-summary.md' \
-              --exclude='ui-audit-*.md' \
-              wiki/ /tmp/mindos/wiki/
+          # ─── Sync wiki with sub-exclusions ──────────────────────────────
+          if [ -d wiki/ ] && echo "$SYNC_DIRS" | grep -qw wiki; then
+            eval rsync -a --delete $WIKI_EXCLUDES $GLOBAL_EXCLUDES "wiki/" "/tmp/mindos/wiki/"
           fi
 
-          # ─── WHITELIST: CI workflows (only publish + build) ─────────────
+          # ─── Sync CI workflows (only non-private ones) ─────────────────
           mkdir -p /tmp/mindos/.github/workflows
           for wf in .github/workflows/*.yml; do
             wf_name=$(basename "$wf")
             case "$wf_name" in
-              # PRIVATE workflows — never sync
               sync-to-mindos.yml|ci.yml) continue ;;
             esac
             cp "$wf" /tmp/mindos/.github/workflows/
           done
 
-          # ─── WHITELIST: root files (explicit list only) ─────────────────
-          # ONLY these root files are synced. Everything else stays private.
-          ROOT_FILES="package.json package-lock.json README.md README_zh.md LICENSE AGENTS.md .env.local.example TROUBLESHOOTING.md .gitignore"
+          # ─── Sync whitelisted root files ────────────────────────────────
           for f in $ROOT_FILES; do
-            [ -f "$f" ] && cp "$f" /tmp/mindos/
+            if [ -L "$f" ]; then
+              cp -P "$f" /tmp/mindos/
+            elif [ -f "$f" ]; then
+              cp "$f" /tmp/mindos/
+            fi
           done
-
-          # Preserve CLAUDE.md symlink
-          [ -L "CLAUDE.md" ] && cp -P CLAUDE.md /tmp/mindos/
 
           # Get the latest commit message from mindos-dev
           DEV_MSG=$(git -C "$GITHUB_WORKSPACE" log -1 --format='%s')
 
-          # If commit message is a bare version number (e.g. "0.1.8"),
-          # append changelog from previous version tag.
+          # If commit message is a bare version number, append changelog
           if echo "$DEV_MSG" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+'; then
             cd "$GITHUB_WORKSPACE"
             CUR_TAG=$(git tag --points-at HEAD | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)
@@ -144,72 +130,30 @@ jobs:
           fi
 
           cd /tmp/mindos
-          # landing/ is deployed to gh-pages only — remove from main if it leaked
+          # landing/ is deployed to gh-pages only
           rm -rf /tmp/mindos/landing
           git add -A
 
-          # ─── SAFETY GUARD: fail if private files leaked ─────────────────
-          # Even with whitelist, double-check with a blocklist scan.
-          # This catches cases where rsync --exclude missed something.
-          BLOCKED_PATTERNS=(
-            "startup/"
-            "wiki/0[0-9]"
-            "wiki/specs/"
-            "wiki/discussions/"
-            "wiki/85-backlog"
-            ".claude-internal/"
-            ".claude/"
-            "0_TASKS"
-            "0_BUGS"
-            "0_DONE"
-            "0_NOTE"
-            "0_TEST"
-            "0_TODO"
-            "TASKS.md"
-            ".npmrc"
-            ".dockerignore"
-            ".gitignore.prod"
-            "sync-to-mindos.yml"
-            "ci.yml"
-            "activities/"
-            "collect-session-ids"
-            "human-insights/"
-            "marketing/"
-            "my-skills/"
-            "Dockerfile"
-            "docker-compose"
-            "SKILL_BAD_CASES"
-            "AUTONOMOUS-WORKFLOW"
-            "HUMAN-INSIGHTS.md"
-            "MULTI_AGENT_WORKFLOW"
-            "cli-note.md"
-            "experience.md"
-            "knowledge.md"
-            "npm_experience"
-            "GIT_UPDATE"
-            "SERVER_DEV"
-            "DOCKER.md"
-            ".vscode/"
-            "最佳实践"
-            "NOTE.md"
-            "note.md"
-            "todo.md"
-            "TODO.md"
-          )
-
+          # ─── SAFETY GUARD: blocked patterns scan ────────────────────────
+          # Defense-in-depth: even if whitelist is misconfigured, these
+          # patterns ALWAYS abort the sync.
           LEAKED=""
-          for pat in "${BLOCKED_PATTERNS[@]}"; do
+          while IFS= read -r pat; do
+            [ -z "$pat" ] && continue
             matches=$(git ls-files | grep -F "$pat" || true)
             if [ -n "$matches" ]; then
               for f in $matches; do
                 [ -f "$f" ] && LEAKED="${LEAKED}${f}"$'\n'
               done
             fi
-          done
+          done <<< "$BLOCKED_PATTERNS"
+
           if [ -n "$LEAKED" ]; then
             echo "::error::PRIVATE FILE LEAK DETECTED — aborting sync!"
             echo "::error::The following private files were about to be pushed to the PUBLIC repo:"
             echo "$LEAKED" | sort -u | while read -r f; do [ -n "$f" ] && echo "  ❌ $f"; done
+            echo ""
+            echo "::error::Fix: remove these from the rsync output, or add exclusions to .syncinclude"
             exit 1
           fi
 
