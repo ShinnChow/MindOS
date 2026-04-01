@@ -109,7 +109,7 @@
 ## 🔄 Sync 与协作
 
 ### P1 — 自动同步
-- [ ] **防抖自动提交** — 当前手动触发 `sync now`。应在文件变动 30s 后自动 commit + push
+- [x] **防抖自动提交** — ✅ 已实现。chokidar 文件监听 + 30s debounce 自动 `autoCommitAndPush()`。启动时拉取，每 5min 定期拉取。优雅关闭时冲刷待提交更改（bin/lib/sync.js:340-370）
   - 文件：`app/api/sync/route.ts`
 
 ### P2 — Webhook 集成
