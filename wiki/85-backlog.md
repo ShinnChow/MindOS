@@ -62,6 +62,11 @@
 
 ### 🔴 高优先（下一批做）
 
+- [x] **清理生产代码 console.log** — `app/api/ask/route.ts`、`lib/agent/context.ts`、`lib/acp/subprocess.ts` 残留 `[ask]`/`[ACP]` debug 日志。已改为 `NODE_ENV === 'development'` 条件输出
+- [x] **package.json 补齐 npm 元数据** — 已添加 `homepage`、`bugs` 字段
+- [x] **根目录 CHANGELOG.md** — 已创建 symlink `CHANGELOG.md -> wiki/90-changelog.md`
+- [x] **`.env.local.example` 默认端口过时** — 已从 3000 改为 3456
+
 - [x] **Agent 重试/重连机制完善** — 修复后端 retry 两大缺陷：(1) ACP agent 路径零重试保护 → 补全 3 次指数退避循环 + session cleanup; (2) sleep() 未传 req.signal → 客户端断开时不再浪费 LLM 配额。3 个测试文件 (64 cases) 覆盖 isTransientError / isRetryableError / retryDelay / sleep / stream-consumer status 事件
 
 - [x] **Inline AI Organize** — 上传文件选择「AI Organize」后不再弹出 ChatBot，改为在 ImportModal 内原地展示处理进度和结果，支持 review 和撤销。[spec](./specs/spec-inline-ai-organize.md)
@@ -120,6 +125,13 @@
 - [x] **Tier 1：Undo Toast + i18n 全面治理** — toast.ts 扩展 action button 支持（`toast.undo` API）；删除文件/目录/空间后 5s undo toast → `restoreFromTrash`；修复 22 处 hardcoded 英文字符串（TrashPageClient/ExportModal/FileTree/ViewPageClient/Toaster）；新增 `trash.cancel`/`justNow`/`minutesAgo` 等 14 个 i18n 键（EN+ZH）；focus-visible ring 合规。
 
 ### 🟡 中优先
+
+- [ ] **减少 `as any` 类型断言** — `app/api/ask/route.ts` 有 15+ 处 `as any`，绕过 TypeScript 严格模式。应定义 pi-agent-core 事件类型
+- [ ] **API 路由统一输入校验** — 部分路由直接信任 query 参数（如 `/api/files`），应使用 Zod schema 校验
+- [ ] **CI 增加 lint 步骤** — 当前 CI 只跑 test，格式和 lint 问题可能溜进去
+- [ ] **添加 CONTRIBUTING.md** — 开源项目标配，描述代码风格、PR 流程、测试要求、commit 规范
+- [ ] **公共 API 函数补 JSDoc** — `lib/fs.ts`、`lib/agent/` 等核心模块导出函数缺少 `@param`/`@returns`/`@throws` 文档
+- [ ] **SyncStatusBar i18n 类型** — `(t as any).sidebar?.sync` 需定义 sync namespace 类型
 
 - [x] **MCP `mindos_create_space` + `mindos_rename_space`** — App：`createSpaceFilesystem`、`renameSpaceDirectory`、`/api/file` op；MCP 仅转发。见 `wiki/specs/spec-mcp-space-tools.md`
 - [x] **I4：CLI per-command `--help`** — 6 个知识库命令（agent/api/ask/file/search/space）已全部支持 `--help` / `-h` 标志；`bin/lib/command.js` 统一 `printCommandHelp` 框架；命令元数据（name/group/summary/usage/examples/flags）完整。CLI 专业度提升。
