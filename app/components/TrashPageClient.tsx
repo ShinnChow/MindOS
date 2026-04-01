@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useTransition } from 'react';
-import { Trash2, RotateCcw, X, Folder, FileText, Table, AlertTriangle } from 'lucide-react';
+import { Trash2, RotateCcw, X, Folder, FileText, Table, AlertTriangle, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useLocale } from '@/lib/LocaleContext';
 import { restoreFromTrashAction, permanentlyDeleteAction, emptyTrashAction } from '@/lib/actions';
@@ -32,17 +32,23 @@ export default function TrashPageClient({ initialItems }: { initialItems: TrashM
   const [confirmEmpty, setConfirmEmpty] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<TrashMeta | null>(null);
   const [conflictItem, setConflictItem] = useState<TrashMeta | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const handleRestore = useCallback(async (item: TrashMeta) => {
-    const result = await restoreFromTrashAction(item.id, 'restore');
-    if (result.success) {
-      setItems(prev => prev.filter(i => i.id !== item.id));
-      toast.success(t.trash.restored);
-      router.refresh();
-    } else if (result.conflict) {
-      setConflictItem(item);
-    } else {
-      toast.error(result.error ?? 'Failed to restore');
+    setBusyId(item.id);
+    try {
+      const result = await restoreFromTrashAction(item.id, 'restore');
+      if (result.success) {
+        setItems(prev => prev.filter(i => i.id !== item.id));
+        toast.success(t.trash.restored);
+        router.refresh();
+      } else if (result.conflict) {
+        setConflictItem(item);
+      } else {
+        toast.error(result.error ?? 'Failed to restore');
+      }
+    } finally {
+      setBusyId(null);
     }
   }, [t, router]);
 
@@ -167,9 +173,10 @@ export default function TrashPageClient({ initialItems }: { initialItems: TrashM
                         <button
                           type="button"
                           onClick={() => handleRestore(item)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition-colors"
+                          disabled={busyId === item.id}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition-colors disabled:opacity-50"
                         >
-                          <RotateCcw size={11} />
+                          {busyId === item.id ? <Loader2 size={11} className="animate-spin" /> : <RotateCcw size={11} />}
                           {t.trash.restore}
                         </button>
                         <button

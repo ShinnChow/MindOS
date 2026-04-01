@@ -18,15 +18,16 @@ const EXPIRY_DAYS = 30;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+function siblingDir(mindRoot: string, name: string): string {
+  return path.join(path.dirname(mindRoot), name);
+}
+
 function trashRoot(mindRoot: string): string {
-  // .mindos/.trash — sibling to .mindos/mind
-  const base = path.dirname(mindRoot);
-  return path.join(base, TRASH_DIR);
+  return siblingDir(mindRoot, TRASH_DIR);
 }
 
 function metaRoot(mindRoot: string): string {
-  const base = path.dirname(mindRoot);
-  return path.join(base, META_DIR);
+  return siblingDir(mindRoot, META_DIR);
 }
 
 function ensureDirs(mindRoot: string): void {
@@ -34,8 +35,10 @@ function ensureDirs(mindRoot: string): void {
   fs.mkdirSync(metaRoot(mindRoot), { recursive: true });
 }
 
+/** Sanitize filename for use as trash ID — strip all unsafe characters */
 function generateId(fileName: string): string {
-  return `${Date.now()}_${fileName.replace(/[/\\]/g, '_')}`;
+  const safe = fileName.replace(/[^a-zA-Z0-9._\-\u4e00-\u9fff]/g, '_');
+  return `${Date.now()}_${safe}`;
 }
 
 function writeMeta(mindRoot: string, meta: TrashMeta): void {
@@ -55,7 +58,32 @@ function readMeta(mindRoot: string, id: string): TrashMeta | null {
 
 function deleteMeta(mindRoot: string, id: string): void {
   const metaPath = path.join(metaRoot(mindRoot), `${id}.json`);
-  if (fs.existsSync(metaPath)) fs.unlinkSync(metaPath);
+  try { fs.unlinkSync(metaPath); } catch { /* already gone */ }
+}
+
+/**
+ * Move a file or directory safely, handling cross-filesystem (EXDEV) errors.
+ * Tries atomic rename first, falls back to copy+delete.
+ */
+function safeMove(src: string, dest: string, isDir: boolean): void {
+  if (isDir) {
+    // Directories always use copy+delete (rename doesn't work for dirs across fs)
+    fs.cpSync(src, dest, { recursive: true });
+    fs.rmSync(src, { recursive: true, force: true });
+  } else {
+    try {
+      fs.renameSync(src, dest);
+    } catch (err: unknown) {
+      const e = err as NodeJS.ErrnoException;
+      if (e.code === 'EXDEV') {
+        // Cross-device: fallback to copy+delete
+        fs.copyFileSync(src, dest);
+        fs.unlinkSync(src);
+      } else {
+        throw err;
+      }
+    }
+  }
 }
 
 // ─── Core Operations ─────────────────────────────────────────────────────────
@@ -70,13 +98,8 @@ export function moveToTrash(mindRoot: string, filePath: string): TrashMeta {
   const id = generateId(fileName);
   const dest = path.join(trashRoot(mindRoot), id);
 
-  if (isDir) {
-    fs.cpSync(src, dest, { recursive: true });
-    fs.rmSync(src, { recursive: true, force: true });
-  } else {
-    fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.renameSync(src, dest);
-  }
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  safeMove(src, dest, isDir);
 
   const now = new Date();
   const meta: TrashMeta = {
@@ -112,15 +135,13 @@ export function restoreFromTrash(mindRoot: string, trashId: string, overwrite = 
     if (overwrite && fs.existsSync(dest)) {
       fs.rmSync(dest, { recursive: true, force: true });
     }
-    fs.cpSync(trashPath, dest, { recursive: true });
-    fs.rmSync(trashPath, { recursive: true, force: true });
   } else {
     if (overwrite && fs.existsSync(dest)) {
       fs.unlinkSync(dest);
     }
-    fs.renameSync(trashPath, dest);
   }
 
+  safeMove(trashPath, dest, meta.isDirectory);
   deleteMeta(mindRoot, trashId);
   return { restoredPath: meta.originalPath };
 }
@@ -145,13 +166,7 @@ export function restoreAsCopy(mindRoot: string, trashId: string): { restoredPath
 
   const dest = path.join(mindRoot, copyPath);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
-
-  if (meta.isDirectory) {
-    fs.cpSync(trashPath, dest, { recursive: true });
-    fs.rmSync(trashPath, { recursive: true, force: true });
-  } else {
-    fs.renameSync(trashPath, dest);
-  }
+  safeMove(trashPath, dest, meta.isDirectory);
 
   deleteMeta(mindRoot, trashId);
   return { restoredPath: copyPath };
@@ -159,21 +174,28 @@ export function restoreAsCopy(mindRoot: string, trashId: string): { restoredPath
 
 export function permanentlyDelete(mindRoot: string, trashId: string): void {
   const trashPath = path.join(trashRoot(mindRoot), trashId);
-  if (fs.existsSync(trashPath)) {
-    const stat = fs.statSync(trashPath);
-    if (stat.isDirectory()) {
-      fs.rmSync(trashPath, { recursive: true, force: true });
-    } else {
-      fs.unlinkSync(trashPath);
+  try {
+    if (fs.existsSync(trashPath)) {
+      const stat = fs.statSync(trashPath);
+      if (stat.isDirectory()) {
+        fs.rmSync(trashPath, { recursive: true, force: true });
+      } else {
+        fs.unlinkSync(trashPath);
+      }
     }
-  }
+  } catch { /* file already gone */ }
   deleteMeta(mindRoot, trashId);
 }
 
 export function listTrash(mindRoot: string): TrashMeta[] {
   ensureDirs(mindRoot);
   const metaDir = metaRoot(mindRoot);
-  const files = fs.readdirSync(metaDir).filter(f => f.endsWith('.json'));
+  let files: string[];
+  try {
+    files = fs.readdirSync(metaDir).filter(f => f.endsWith('.json'));
+  } catch {
+    return [];
+  }
   const items: TrashMeta[] = [];
 
   for (const file of files) {
@@ -185,7 +207,7 @@ export function listTrash(mindRoot: string): TrashMeta[] {
         items.push(meta);
       } else {
         // Clean up orphaned metadata
-        fs.unlinkSync(path.join(metaDir, file));
+        try { fs.unlinkSync(path.join(metaDir, file)); } catch { /* race ok */ }
       }
     } catch {
       // Skip corrupt metadata files

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { X, Download, FileText, Globe, Archive, Check, Loader2 } from 'lucide-react';
 import { useLocale } from '@/lib/LocaleContext';
 import { toast } from '@/lib/toast';
@@ -20,24 +20,29 @@ export default function ExportModal({ open, onClose, filePath, isDirectory, file
   const [format, setFormat] = useState<ExportFormat>(isDirectory ? 'zip' : 'md');
   const [state, setState] = useState<'idle' | 'exporting' | 'done' | 'error'>('idle');
   const [error, setError] = useState('');
+  const abortRef = useRef<AbortController | null>(null);
 
   const handleExport = useCallback(() => {
     setState('exporting');
     setError('');
 
-    // Trigger download via hidden link
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     const url = `/api/export?path=${encodeURIComponent(filePath)}&format=${format}`;
 
-    // Use fetch to check for errors before downloading
-    fetch(url)
+    fetch(url, { signal: controller.signal })
       .then(res => {
         if (!res.ok) {
-          return res.json().then(data => { throw new Error(data.error || 'Export failed'); });
+          const ct = res.headers.get('content-type') ?? '';
+          if (ct.includes('json')) {
+            return res.json().then((data: { error?: string }) => { throw new Error(data.error || 'Export failed'); });
+          }
+          throw new Error(`Export failed (${res.status})`);
         }
         return res.blob().then(blob => ({ blob, res }));
       })
       .then(({ blob, res }) => {
-        // Extract filename from Content-Disposition header
         const disposition = res.headers.get('Content-Disposition') ?? '';
         const match = disposition.match(/filename="?([^"]+)"?/);
         const downloadName = match ? decodeURIComponent(match[1]) : fileName;
@@ -53,11 +58,22 @@ export default function ExportModal({ open, onClose, filePath, isDirectory, file
         setState('done');
         toast.success(t.export?.downloaded ?? 'Downloaded');
       })
-      .catch(err => {
+      .catch((err: Error) => {
+        if (err.name === 'AbortError') return; // user cancelled
         setState('error');
         setError(err.message ?? 'Export failed');
-      });
+      })
+      .finally(() => { abortRef.current = null; });
   }, [filePath, format, fileName, t]);
+
+  const handleCancel = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setState('idle');
+    setError('');
+  }, []);
 
   const handleRetry = useCallback(() => {
     setState('idle');
@@ -65,6 +81,8 @@ export default function ExportModal({ open, onClose, filePath, isDirectory, file
   }, []);
 
   const handleClose = useCallback(() => {
+    if (abortRef.current) abortRef.current.abort();
+    abortRef.current = null;
     setState('idle');
     setError('');
     onClose();
@@ -83,7 +101,7 @@ export default function ExportModal({ open, onClose, filePath, isDirectory, file
       ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={handleClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={state === 'exporting' ? undefined : handleClose}>
       <div
         className="bg-card border border-border rounded-xl shadow-xl max-w-md w-full mx-4 animate-in fade-in-0 zoom-in-95 duration-200"
         onClick={e => e.stopPropagation()}
@@ -173,6 +191,15 @@ export default function ExportModal({ open, onClose, filePath, isDirectory, file
                 {t.export?.retry ?? 'Retry'}
               </button>
             </>
+          ) : state === 'exporting' ? (
+            <>
+              <button onClick={handleCancel} className="px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                {t.export?.cancel ?? 'Cancel'}
+              </button>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-[var(--amber-text)] opacity-70">
+                <Loader2 size={12} className="animate-spin" /> {t.export?.exporting ?? 'Exporting...'}
+              </span>
+            </>
           ) : (
             <>
               <button onClick={handleClose} className="px-3 py-1.5 rounded-md text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
@@ -180,14 +207,9 @@ export default function ExportModal({ open, onClose, filePath, isDirectory, file
               </button>
               <button
                 onClick={handleExport}
-                disabled={state === 'exporting'}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--amber-dim)] text-[var(--amber-text)] hover:opacity-80 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--amber-dim)] text-[var(--amber-text)] hover:opacity-80 transition-colors"
               >
-                {state === 'exporting' ? (
-                  <><Loader2 size={12} className="animate-spin" /> {t.export?.exporting ?? 'Exporting...'}</>
-                ) : (
-                  <><Download size={12} /> {t.export?.exportButton ?? 'Export'}</>
-                )}
+                <Download size={12} /> {t.export?.exportButton ?? 'Export'}
               </button>
             </>
           )}

@@ -135,9 +135,15 @@ function SpaceContextMenu({ x, y, node, onClose, onRename, onImport, onDelete }:
 }) {
   const router = useRouter();
   const { t } = useLocale();
+  const { isPinned, togglePin } = usePinnedFiles();
+  const pinned = isPinned(node.path);
 
   return (
     <ContextMenuShell x={x} y={y} onClose={onClose}>
+      <button className={MENU_ITEM} onClick={() => { togglePin(node.path); onClose(); }}>
+        <Star size={14} className={`shrink-0 ${pinned ? 'fill-[var(--amber)] text-[var(--amber)]' : ''}`} />
+        {pinned ? t.fileTree.removeFromFavorites : t.fileTree.pinToFavorites}
+      </button>
       <button className={MENU_ITEM} onClick={() => { router.push(`/view/${encodePath(`${node.path}/INSTRUCTION.md`)}`); onClose(); }}>
         <ScrollText size={14} className="shrink-0" /> {t.fileTree.editRules}
       </button>
@@ -169,9 +175,15 @@ function FolderContextMenu({ x, y, node, onClose, onRename, onDelete }: {
   const router = useRouter();
   const { t } = useLocale();
   const [isPending, startTransition] = useTransition();
+  const { isPinned, togglePin } = usePinnedFiles();
+  const pinned = isPinned(node.path);
 
   return (
-    <ContextMenuShell x={x} y={y} onClose={onClose} menuHeight={140}>
+    <ContextMenuShell x={x} y={y} onClose={onClose} menuHeight={180}>
+      <button className={MENU_ITEM} onClick={() => { togglePin(node.path); onClose(); }}>
+        <Star size={14} className={`shrink-0 ${pinned ? 'fill-[var(--amber)] text-[var(--amber)]' : ''}`} />
+        {pinned ? t.fileTree.removeFromFavorites : t.fileTree.pinToFavorites}
+      </button>
       <button className={MENU_ITEM} disabled={isPending} onClick={() => {
         startTransition(async () => {
           const result = await convertToSpaceAction(node.path);
