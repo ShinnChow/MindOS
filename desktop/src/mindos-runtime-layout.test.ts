@@ -4,13 +4,13 @@ import path from 'path';
 import { analyzeMindOsLayout, isNextBuildValid, isNextBuildCurrent, BUILD_VERSION_FILE } from './mindos-runtime-layout';
 
 describe('analyzeMindOsLayout', () => {
-  it('returns version and runnable when app/.next has BUILD_ID and mcp exist', () => {
+  it('returns version and runnable when app/.next has BUILD_ID and mcp has source', () => {
     const root = path.join(process.cwd(), 'tmp-mindos-layout-test');
     try {
       rmSync(root, { recursive: true, force: true });
       mkdirSync(path.join(root, 'app', '.next'), { recursive: true });
       writeFileSync(path.join(root, 'app', '.next', 'BUILD_ID'), 'test-build-id', 'utf-8');
-      mkdirSync(path.join(root, 'mcp'), { recursive: true });
+      mkdirSync(path.join(root, 'mcp', 'src'), { recursive: true });
       writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '9.9.9-test' }), 'utf-8');
       const r = analyzeMindOsLayout(root);
       expect(r.version).toBe('9.9.9-test');
@@ -20,13 +20,14 @@ describe('analyzeMindOsLayout', () => {
     }
   });
 
-  it('runnable with standalone server.js', () => {
+  it('runnable with standalone server.js and mcp dist', () => {
     const root = path.join(process.cwd(), 'tmp-mindos-layout-standalone');
     try {
       rmSync(root, { recursive: true, force: true });
       mkdirSync(path.join(root, 'app', '.next', 'standalone'), { recursive: true });
       writeFileSync(path.join(root, 'app', '.next', 'standalone', 'server.js'), '// server', 'utf-8');
-      mkdirSync(path.join(root, 'mcp'), { recursive: true });
+      mkdirSync(path.join(root, 'mcp', 'dist'), { recursive: true });
+      writeFileSync(path.join(root, 'mcp', 'dist', 'index.cjs'), '// mcp', 'utf-8');
       writeFileSync(path.join(root, 'package.json'), '{}', 'utf-8');
       const r = analyzeMindOsLayout(root);
       expect(r.runnable).toBe(true);
@@ -41,6 +42,21 @@ describe('analyzeMindOsLayout', () => {
       rmSync(root, { recursive: true, force: true });
       mkdirSync(path.join(root, 'app', '.next'), { recursive: true });
       mkdirSync(path.join(root, 'mcp'), { recursive: true });
+      writeFileSync(path.join(root, 'package.json'), '{}', 'utf-8');
+      const r = analyzeMindOsLayout(root);
+      expect(r.runnable).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('not runnable when mcp dir exists but has no dist or src', () => {
+    const root = path.join(process.cwd(), 'tmp-mindos-layout-mcp-empty');
+    try {
+      rmSync(root, { recursive: true, force: true });
+      mkdirSync(path.join(root, 'app', '.next'), { recursive: true });
+      writeFileSync(path.join(root, 'app', '.next', 'BUILD_ID'), 'test-id', 'utf-8');
+      mkdirSync(path.join(root, 'mcp'), { recursive: true }); // empty mcp dir
       writeFileSync(path.join(root, 'package.json'), '{}', 'utf-8');
       const r = analyzeMindOsLayout(root);
       expect(r.runnable).toBe(false);

@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import type { AgentTool, AgentToolResult } from '@mariozechner/pi-agent-core';
 import { isTransientError } from '@/lib/agent/retry';
+import { detectLoop } from '@/lib/agent/loop-detection';
 import {
   type AgentSessionEvent as AgentEvent,
   AuthStorage,
@@ -586,18 +587,12 @@ export async function POST(req: NextRequest) {
               stepHistory.push(...newEntries);
             }
 
-            // Loop detection: same tool + same args 3 times in a row.
-            // Only trigger if we have 3+ history entries (prevent false positives on first turn).
-            const LOOP_DETECTION_THRESHOLD = 3;
+            // Loop detection: (1) same tool+args 3x in a row, (2) repeating pattern cycle
             if (loopCooldown > 0) {
               loopCooldown--;
-            } else if (stepHistory.length >= LOOP_DETECTION_THRESHOLD) {
-              const lastN = stepHistory.slice(-LOOP_DETECTION_THRESHOLD);
-              if (lastN.every(s => s.tool === lastN[0].tool && s.input === lastN[0].input)) {
-                loopCooldown = 3;
-                // TODO (metrics): Track loop detection rate — metrics.increment('agent.loop_detected', { model: modelName })
-                void session.steer('[SYSTEM WARNING] You have called the same tool with identical arguments 3 times in a row. This appears to be a loop. Try a completely different approach or ask the user for clarification.');
-              }
+            } else if (detectLoop(stepHistory)) {
+              loopCooldown = 3;
+              void session.steer('[SYSTEM WARNING] You appear to be in a loop — repeating the same tool calls in a cycle. Try a completely different approach or ask the user for clarification.');
             }
 
             // Step limit enforcement

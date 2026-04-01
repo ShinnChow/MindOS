@@ -587,8 +587,15 @@ async function startLocalMode(): Promise<string | null> {
             }
           } catch { /* still down */ }
         }, 3000);
-        // Timeout after 5 minutes
-        setTimeout(() => { if (activeRecoveryPoll) { clearInterval(activeRecoveryPoll); activeRecoveryPoll = null; } }, 300_000);
+        // Timeout after 5 minutes — clean up overlay and show error
+        setTimeout(() => {
+          if (activeRecoveryPoll) {
+            clearInterval(activeRecoveryPoll);
+            activeRecoveryPoll = null;
+            removeOverlay('mindos-update-overlay');
+            refreshTray('error');
+          }
+        }, 300_000);
       } else {
         crashDialogShown = true;
         const zh = navigator_lang() === 'zh';
