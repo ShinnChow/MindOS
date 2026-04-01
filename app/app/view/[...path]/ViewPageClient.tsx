@@ -46,6 +46,8 @@ export default function ViewPageClient({
   createDraftAction,
 }: ViewPageClientProps) {
   const { t } = useLocale();
+  const { isPinned, togglePin } = usePinnedFiles();
+  const pinned = isPinned(filePath);
   const hydrated = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -437,6 +439,14 @@ export default function ViewPageClient({
             {/* More menu (rename, copy path, delete) */}
             {!isDraft && (
               <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => togglePin(filePath)}
+                  className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  title={pinned ? t.fileTree.removeFromFavorites : t.fileTree.pinToFavorites}
+                >
+                  <Star size={16} className={pinned ? 'fill-[var(--amber)] text-[var(--amber)]' : ''} />
+                </button>
                 <button
                   ref={moreRef}
                   type="button"
