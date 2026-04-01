@@ -73,10 +73,16 @@ export class SearchIndex {
   private builtForRoot: string | null = null;
   private fileCount = 0;
 
+  /** BM25 statistics — populated during rebuild() */
+  private docLengths = new Map<string, number>();  // filePath → char count
+  private totalChars = 0;
+
   /** Full rebuild: read all files and build inverted index. */
   rebuild(mindRoot: string): void {
     const allFiles = collectAllFiles(mindRoot);
     const inverted = new Map<string, Set<string>>();
+    const docLengths = new Map<string, number>();
+    let totalChars = 0;
 
     for (const filePath of allFiles) {
       let content: string;
@@ -85,6 +91,10 @@ export class SearchIndex {
       } catch {
         continue;
       }
+
+      // Store original length for BM25 before truncation
+      docLengths.set(filePath, content.length);
+      totalChars += content.length;
 
       if (content.length > MAX_CONTENT_LENGTH) {
         content = content.slice(0, MAX_CONTENT_LENGTH);
@@ -107,6 +117,8 @@ export class SearchIndex {
     this.invertedIndex = inverted;
     this.builtForRoot = mindRoot;
     this.fileCount = allFiles.length;
+    this.docLengths = docLengths;
+    this.totalChars = totalChars;
   }
 
   /** Clear the index. Next search will trigger a lazy rebuild. */
@@ -114,6 +126,8 @@ export class SearchIndex {
     this.invertedIndex = null;
     this.builtForRoot = null;
     this.fileCount = 0;
+    this.docLengths.clear();
+    this.totalChars = 0;
   }
 
   /** Whether the index has been built for the given mindRoot. */
@@ -129,6 +143,43 @@ export class SearchIndex {
   /** Number of files in the index. */
   getFileCount(): number {
     return this.fileCount;
+  }
+
+  /** Average document length in chars. */
+  getAvgDocLength(): number {
+    return this.fileCount > 0 ? this.totalChars / this.fileCount : 0;
+  }
+
+  /** Character count of a specific document. Returns 0 if unknown. */
+  getDocLength(filePath: string): number {
+    return this.docLengths.get(filePath) ?? 0;
+  }
+
+  /** Number of documents containing a specific token (document frequency). */
+  getDocFrequency(token: string): number {
+    if (!this.invertedIndex) return 0;
+    return this.invertedIndex.get(token)?.size ?? 0;
+  }
+
+  /**
+   * Get candidates via UNION of token sets (for BM25 multi-term scoring).
+   * Unlike getCandidates (intersection), this returns any file matching any token.
+   */
+  getCandidatesUnion(query: string): string[] | null {
+    if (!query.trim()) return null;
+    if (!this.invertedIndex) return null;
+
+    const tokens = tokenize(query.toLowerCase().trim());
+    if (tokens.size === 0) return null;
+
+    const result = new Set<string>();
+    for (const token of tokens) {
+      const set = this.invertedIndex.get(token);
+      if (set) {
+        for (const path of set) result.add(path);
+      }
+    }
+    return Array.from(result);
   }
 
   /**

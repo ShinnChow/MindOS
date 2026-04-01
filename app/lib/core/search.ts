@@ -16,19 +16,66 @@ export function invalidateSearchIndex(): void {
   searchIndex.invalidate();
 }
 
+/* ── BM25 Parameters ── */
+const BM25_K1 = 1.2;  // Term frequency saturation
+const BM25_B = 0.75;  // Document length normalization
+
+/**
+ * Compute BM25 score for a single term in a single document.
+ *
+ * @param tf          - raw term frequency (occurrences of term in doc)
+ * @param df          - document frequency (number of docs containing term)
+ * @param docLength   - length of this document (chars)
+ * @param avgDocLength - average document length across corpus (chars)
+ * @param totalDocs   - total number of documents in corpus
+ */
+export function bm25Score(
+  tf: number,
+  df: number,
+  docLength: number,
+  avgDocLength: number,
+  totalDocs: number,
+): number {
+  if (tf === 0 || totalDocs === 0 || avgDocLength === 0) return 0;
+
+  // IDF: log((N - df + 0.5) / (df + 0.5) + 1) — the +1 prevents negative IDF
+  // when df > N/2 (common terms)
+  const idf = Math.log((totalDocs - df + 0.5) / (df + 0.5) + 1);
+
+  // Normalized TF with saturation and length normalization
+  const tfNorm = (tf * (BM25_K1 + 1)) / (tf + BM25_K1 * (1 - BM25_B + BM25_B * docLength / avgDocLength));
+
+  return idf * tfNorm;
+}
+
+/**
+ * Split a query into individual search terms for multi-term BM25 scoring.
+ * Each term is scored independently, then scores are summed per document.
+ */
+function splitQueryTerms(query: string): string[] {
+  const lower = query.toLowerCase().trim();
+  // Split on whitespace, filter empty
+  const terms = lower.split(/\s+/).filter(t => t.length > 0);
+  // Deduplicate
+  return [...new Set(terms)];
+}
+
 /**
  * Core literal search — used by MCP tools via REST API.
  *
- * This is a **case-insensitive literal string match** with occurrence-density scoring.
- * It supports scope, file_type, and modified_after filters that MCP tools expose.
+ * Scoring: **BM25** (Best Matching 25) — the standard information retrieval
+ * ranking function. For multi-term queries, each term is scored independently
+ * and scores are summed. This means:
+ * - Rare terms (low document frequency) contribute more to the score
+ * - Term frequency has diminishing returns (saturation at k1)
+ * - Shorter documents score higher when term frequency is equal
  *
- * Performance: uses an in-memory inverted index to narrow the candidate file set
- * before doing full-text scanning. The index is built lazily on the first query
- * and invalidated on any write operation.
+ * Candidate narrowing: uses an in-memory inverted index with UNION semantics
+ * for multi-term queries (a document matching ANY term is a candidate).
  *
  * NOTE: The App also has a separate Fuse.js fuzzy search in `lib/fs.ts` for the
  * browser `⌘K` search overlay. The two coexist intentionally:
- * - Core search (here): exact literal match, supports filters, used by MCP/API
+ * - Core search (here): exact literal match + BM25 ranking, used by MCP/API
  * - App search (lib/fs.ts): Fuse.js fuzzy match with CJK support, used by frontend
  */
 export function searchFiles(mindRoot: string, query: string, opts: SearchOptions = {}): SearchResult[] {
@@ -40,8 +87,12 @@ export function searchFiles(mindRoot: string, query: string, opts: SearchOptions
     searchIndex.rebuild(mindRoot);
   }
 
-  // Use index to get candidate files (or null if index unavailable → full scan)
-  const candidates = searchIndex.getCandidates(query);
+  const totalDocs = searchIndex.getFileCount();
+  const avgDocLength = searchIndex.getAvgDocLength();
+  const queryTerms = splitQueryTerms(query);
+
+  // Use UNION index to get candidate files (any file matching any term)
+  const candidates = searchIndex.getCandidatesUnion(query);
   const candidateSet = candidates ? new Set(candidates) : null;
 
   let allFiles = collectAllFiles(mindRoot);
@@ -72,10 +123,16 @@ export function searchFiles(mindRoot: string, query: string, opts: SearchOptions
 
   const results: SearchResult[] = [];
   const lowerQuery = query.toLowerCase();
-  const escapedQuery = lowerQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  // ── Pre-scan: compute document frequency for each query term ──
+  // We count how many candidate files contain each term via literal match.
+  // This is more accurate than using the inverted index token df, because
+  // the index tokenizes differently (CJK bigrams, min length 2) than our
+  // literal search terms.
+  const termDf = new Map<string, number>();
+  const fileContents = new Map<string, string>();
 
   for (const filePath of allFiles) {
-    // Check mtime filter before reading content
     if (mtimeThreshold > 0) {
       try {
         const abs = path.join(mindRoot, filePath);
@@ -87,34 +144,70 @@ export function searchFiles(mindRoot: string, query: string, opts: SearchOptions
     let content: string;
     try { content = readFile(mindRoot, filePath); } catch { continue; }
 
+    const lower = content.toLowerCase();
+    fileContents.set(filePath, content);
+
+    for (const term of queryTerms) {
+      if (lower.includes(term)) {
+        termDf.set(term, (termDf.get(term) ?? 0) + 1);
+      }
+    }
+  }
+
+  // ── Score each document with BM25 ──
+  for (const [filePath, content] of fileContents) {
     const lowerContent = content.toLowerCase();
-    const index = lowerContent.indexOf(lowerQuery);
-    if (index === -1) continue;
 
-    // Try to find natural boundaries (paragraphs) around the match
-    let snippetStart = content.lastIndexOf('\n\n', index);
-    if (snippetStart === -1) snippetStart = Math.max(0, index - 200);
-    else snippetStart += 2; // skip the newlines
+    // Check if document matches any term (full-text verification after index narrowing)
+    let matchedAnyTerm = false;
+    let firstMatchIndex = -1;
 
-    let snippetEnd = content.indexOf('\n\n', index);
-    if (snippetEnd === -1) snippetEnd = Math.min(content.length, index + query.length + 200);
+    // Compute BM25 score: sum of per-term scores
+    let totalScore = 0;
+    let totalOccurrences = 0;
+    const docLength = content.length;
 
-    // Prevent massive blocks (cap at ~400 chars total)
-    if (index - snippetStart > 200) snippetStart = index - 200;
-    if (snippetEnd - index > 200) snippetEnd = index + query.length + 200;
+    for (const term of queryTerms) {
+      const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const matches = lowerContent.match(new RegExp(escapedTerm, 'g'));
+      const tf = matches ? matches.length : 0;
+      if (tf === 0) continue;
+
+      matchedAnyTerm = true;
+      totalOccurrences += tf;
+
+      if (firstMatchIndex === -1) {
+        firstMatchIndex = lowerContent.indexOf(term);
+      }
+
+      // Get document frequency for this term (computed in pre-scan)
+      const df = termDf.get(term) ?? 0;
+
+      totalScore += bm25Score(tf, df, docLength, avgDocLength, totalDocs);
+    }
+
+    if (!matchedAnyTerm) continue;
+
+    // Build snippet around the first match
+    const index = firstMatchIndex >= 0 ? firstMatchIndex : lowerContent.indexOf(lowerQuery);
+    const snippetAnchor = index >= 0 ? index : 0;
+
+    let snippetStart = content.lastIndexOf('\n\n', snippetAnchor);
+    if (snippetStart === -1) snippetStart = Math.max(0, snippetAnchor - 200);
+    else snippetStart += 2;
+
+    let snippetEnd = content.indexOf('\n\n', snippetAnchor);
+    if (snippetEnd === -1) snippetEnd = Math.min(content.length, snippetAnchor + query.length + 200);
+
+    if (snippetAnchor - snippetStart > 200) snippetStart = snippetAnchor - 200;
+    if (snippetEnd - snippetAnchor > 200) snippetEnd = snippetAnchor + query.length + 200;
 
     let snippet = content.slice(snippetStart, snippetEnd).trim();
-    
-    // Collapse internal whitespace for cleaner search result presentation, but preserve some structure
     snippet = snippet.replace(/\n{3,}/g, '\n\n');
-    
     if (snippetStart > 0) snippet = '...' + snippet;
     if (snippetEnd < content.length) snippet += '...';
 
-    const occurrences = (lowerContent.match(new RegExp(escapedQuery, 'g')) ?? []).length;
-    const score = occurrences / content.length;
-
-    results.push({ path: filePath, snippet, score, occurrences });
+    results.push({ path: filePath, snippet, score: totalScore, occurrences: totalOccurrences });
   }
 
   results.sort((a, b) => b.score - a.score);

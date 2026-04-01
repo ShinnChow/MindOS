@@ -129,10 +129,11 @@ describe('isNextBuildCurrent', () => {
     expect(isNextBuildCurrent('/tmp/nonexistent-xyz', '/tmp/nonexistent-xyz')).toBe(false);
   });
 
-  it('returns false when build exists but no version stamp', () => {
+  it('returns true when build exists but no version stamp (external build)', () => {
     try {
       const { root, appDir } = setup({ buildId: true, pkgVersion: '1.0.0' });
-      expect(isNextBuildCurrent(appDir, root)).toBe(false);
+      // No stamp = external build (CLI, npm run build, bundled runtime) — trust it
+      expect(isNextBuildCurrent(appDir, root)).toBe(true);
     } finally { cleanup(); }
   });
 
@@ -157,10 +158,11 @@ describe('isNextBuildCurrent', () => {
     } finally { cleanup(); }
   });
 
-  it('returns false when stamp is empty string', () => {
+  it('returns true when stamp is empty string (treat as missing)', () => {
     try {
       const { root, appDir } = setup({ buildId: true, stampVersion: '', pkgVersion: '1.0.0' });
-      expect(isNextBuildCurrent(appDir, root)).toBe(false);
+      // Empty stamp = interrupted write, treat as missing → trust the valid build
+      expect(isNextBuildCurrent(appDir, root)).toBe(true);
     } finally { cleanup(); }
   });
 

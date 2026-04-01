@@ -136,7 +136,7 @@
 
 > 来源：`wiki/reviews/ui-audit-2026-03-27.md`。[spec](./specs/spec-ui-audit-fixes-2026-03-27.md)
 
-- [ ] **P1：技能列表未分页/虚拟化** — 144+ 技能平铺渲染，页面 2400KB+。需添加分类分组、搜索/筛选、分页或虚拟滚动。影响 `/agents?tab=skills` 和 `/agents/[agentKey]`。工作量大，建议作为独立 epic
+- [x] **P1：技能列表虚拟化** — `AgentsSkillsSection` BySkillView 已用 `react-virtuoso` 虚拟滚动（`<Virtuoso>` 组件 + flatItems + overscan=200 + viewport buffer）。仅渲染可见技能卡片 + 分组 headers，而非全量 DOM。搜索/筛选/分组/批量操作全部保留。AgentDetailContent 单 Agent 技能列表（通常 20-50 项）保持原生渲染。
 - [x] **P2：琥珀色文字对比度不足** — 新增 `--amber-text` token，28 文件小字号文字改用加深色值，满足 WCAG AA 4.5:1
 - [x] **P2：通知横幅持续显示** — 10s 后自动消失 + 新变更到达时重新显示
 - [x] **P2：浮动按钮无 tooltip** — i18n title + aria-label（EN/ZH）

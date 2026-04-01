@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import Link from 'next/link';
 import { ChevronDown, ChevronRight, Search, Trash2, Zap } from 'lucide-react';
 import { Toggle } from '@/components/settings/Primitives';
@@ -445,110 +446,23 @@ function BySkillView({
         </div>
       )}
 
-      {/* Grouped unified skill list */}
+      {/* Grouped unified skill list (virtualized) */}
       {sortedGrouped.length === 0 ? (
         <EmptyState message={copy.noSkillsMatchFilter} />
       ) : (
-        <div className="space-y-3">
-          {sortedGrouped.map(([groupKey, sortedSkills]) => (
-            <div key={groupKey}>
-              <div className="flex items-center gap-2 mb-2.5">
-                <span className="w-1 h-4 rounded-full bg-[var(--amber)]/40" aria-hidden="true" />
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {copy.groupLabels[groupKey as keyof typeof copy.groupLabels]}
-                </span>
-                <span className="text-2xs tabular-nums text-muted-foreground/50 font-medium">({sortedSkills.length})</span>
-              </div>
-              <div className="space-y-3">
-                {sortedSkills.map((skill) => {
-                  const availableAgents = allAgents
-                    .filter((a) => !skill.agents.includes(a.name))
-                    .map((a) => ({ key: a.key, name: a.name }));
-                  const isUserSkill = skill.kind === 'mindos' && skill.source === 'user';
-
-                  return (
-                    <div key={skill.name} className="rounded-xl border border-border bg-card p-4 hover:shadow-[0_2px_8px_rgba(0,0,0,0.04)] transition-all duration-200">
-                      {/* Skill header */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Zap size={14} className={`shrink-0 ${skill.enabled ? 'text-[var(--amber)]' : 'text-muted-foreground/50'}`} aria-hidden="true" />
-                          <button
-                            type="button"
-                            onClick={() => onOpenDetail(skill.name)}
-                            className="text-sm font-medium text-foreground truncate hover:text-[var(--amber)] cursor-pointer transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded text-left"
-                          >
-                            {skill.name}
-                          </button>
-                          <span className={`text-2xs shrink-0 px-1.5 py-0.5 rounded ${
-                            skill.kind === 'native'
-                              ? 'bg-muted text-muted-foreground'
-                              : skill.source === 'builtin'
-                                ? 'bg-muted text-muted-foreground'
-                                : 'bg-[var(--amber-dim)] text-[var(--amber-text)]'
-                          }`}>
-                            {skill.kind === 'native' ? copy.sourceNative : skill.source === 'builtin' ? copy.sourceBuiltin : copy.sourceUser}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {isUserSkill && (
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setConfirmSkillDelete(skill.name); }}
-                              disabled={deleteBusy === skill.name}
-                              className="text-muted-foreground hover:text-destructive cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded p-1 disabled:opacity-50 transition-colors duration-150"
-                              aria-label={`${copy.skillDeleteAction} ${skill.name}`}
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                          {skill.kind === 'mindos' ? (
-                            <Toggle size="sm" checked={skill.enabled} onChange={(v) => void onToggleSkill(skill.name, v)} />
-                          ) : (
-                            <span className="text-2xs text-muted-foreground/60 select-none" aria-label="read-only">—</span>
-                          )}
-                          <div className="relative">
-                            <AddAvatarButton
-                              onClick={() => setPickerSkill(pickerSkill === skill.name ? null : skill.name)}
-                              label={copy.addAgentToSkill}
-                              size="sm"
-                            />
-                            <AgentPickerPopover
-                              open={pickerSkill === skill.name}
-                              agents={availableAgents}
-                              emptyLabel={copy.noAvailableAgentsForSkill}
-                              onSelect={() => {
-                                setPickerSkill(null);
-                                setHintMessage(copy.manualSkillHint);
-                                setTimeout(() => setHintMessage(null), 4000);
-                              }}
-                              onClose={() => setPickerSkill(null)}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Agent count */}
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-muted-foreground mb-3">
-                        <span className="tabular-nums">{copy.skillAgentCount(skill.agents.length)}</span>
-                      </div>
-
-                      {/* Agent avatar grid */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        {skill.agents.map((name) => (
-                          <AgentAvatar
-                            key={name}
-                            name={name}
-                            onRemove={() => setConfirmAgentRemove({ agentName: name, skillName: skill.name })}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
+        <VirtualizedSkillList
+          sortedGrouped={sortedGrouped}
+          allAgents={allAgents}
+          copy={copy}
+          pickerSkill={pickerSkill}
+          deleteBusy={deleteBusy}
+          onOpenDetail={onOpenDetail}
+          onToggleSkill={onToggleSkill}
+          setPickerSkill={setPickerSkill}
+          setHintMessage={setHintMessage}
+          setConfirmSkillDelete={setConfirmSkillDelete}
+          setConfirmAgentRemove={setConfirmAgentRemove}
+        />
       )}
 
       {/* Confirm: remove agent from skill */}
