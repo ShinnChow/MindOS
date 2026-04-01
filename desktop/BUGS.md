@@ -335,3 +335,57 @@
 - **日期**: 2026-04-01
 - **根因**: registerSshHandlers 的 resolve(url) 返回完整 URL，但 showModeSelectWindow 期望 'local'|'remote'|null
 - **修复**: registerSshHandlers 增加 resolveOverride 参数，mode-select 窗口传 'remote'，connect 窗口不传（用 URL）
+
+### ✅ P1 #6: 事件监听器泄漏
+
+- **日期**: 2026-04-01
+- **根因**: startLocalMode() 创建新 processManager 前不清理旧实例的监听器
+- **修复**: 创建新 PM 前 removeAllListeners() + stop() 旧实例
+
+### ✅ P1 #7: switch-remote 验证逻辑错误
+
+- **日期**: 2026-04-01
+- **根因**: 检查不存在的 config 字段（remoteUrl/connections），阻止正常远程模式切换
+- **修复**: 删除无效验证，直接进入 remote mode
+
+### ✅ P1 #9: before-quit 没有超时保护
+
+- **日期**: 2026-04-01
+- **根因**: processManager.stop() 可能 hang，app 永远无法退出
+- **修复**: Promise.race 加 8s 超时，超时后强制 exit
+
+### ✅ P1 #13: analyzeMindOsLayout 不检查 mcp/dist/index.cjs
+
+- **日期**: 2026-04-01
+- **根因**: 只检查 mcp/ 目录存在，空目录也判为 runnable
+- **修复**: runnable 条件改为检查 mcp/dist/index.cjs 或 mcp/src/ 存在
+
+### ✅ P1 #14: activeRecoveryPoll 超时后不清理 UI 状态
+
+- **日期**: 2026-04-01
+- **根因**: 5 分钟后只清 interval，不清 overlay 和 tray 状态
+- **修复**: 超时后 removeOverlay + refreshTray('error')
+
+### ✅ P1 #15: did-fail-load / did-finish-load 监听器重复注册
+
+- **日期**: 2026-04-01
+- **根因**: bootApp() 每次调用都注册新监听器，mainWindow 复用时堆叠
+- **修复**: 注册前 removeAllListeners('did-fail-load') + removeAllListeners('did-finish-load')
+
+### ✅ P1 #17: switchToMode revert 路径不恢复端口/地址
+
+- **日期**: 2026-04-01
+- **根因**: 切换前清空了 currentWebPort/currentRemoteAddress，失败回滚时未恢复
+- **修复**: 切换前保存旧值，revert 时全部恢复
+
+### ✅ P1 #40: select-mode action 用户取消后仍 boot
+
+- **日期**: 2026-04-01
+- **根因**: showModeSelectWindow 返回 null 后无条件创建 splash 并 bootApp
+- **修复**: mode 为 null 时跳过 boot
+
+### ✅ P1 附加: dialog.showMessageBox mainWindow! 非空断言
+
+- **日期**: 2026-04-01
+- **根因**: did-fail-load 回调中 mainWindow! 在窗口销毁后 crash
+- **修复**: 加 mainWindow && !mainWindow.isDestroyed() 守卫

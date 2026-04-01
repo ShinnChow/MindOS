@@ -338,16 +338,36 @@ export async function POST(req: NextRequest) {
     const targetDir = dirnameOf(currentFile);
     const bootstrap = {
       instruction: readKnowledgeFile('INSTRUCTION.md'),
-      index: readKnowledgeFile('README.md'),
       config_json: readKnowledgeFile('CONFIG.json'),
-      config_md: readKnowledgeFile('CONFIG.md'),
-      target_readme: targetDir ? readKnowledgeFile(`${targetDir}/README.md`) : null,
-      target_instruction: targetDir ? readKnowledgeFile(`${targetDir}/INSTRUCTION.md`) : null,
-      target_config_json: targetDir ? readKnowledgeFile(`${targetDir}/CONFIG.json`) : null,
-      target_config_md: targetDir ? readKnowledgeFile(`${targetDir}/CONFIG.md`) : null,
+      // Lazy-loaded: only read if the file exists and has content.
+      // README.md and CONFIG.md are often empty/boilerplate and waste tokens.
+      index: null as ReturnType<typeof readKnowledgeFile> | null,
+      config_md: null as ReturnType<typeof readKnowledgeFile> | null,
+      target_readme: null as ReturnType<typeof readKnowledgeFile> | null,
+      target_instruction: null as ReturnType<typeof readKnowledgeFile> | null,
+      target_config_json: null as ReturnType<typeof readKnowledgeFile> | null,
+      target_config_md: null as ReturnType<typeof readKnowledgeFile> | null,
     };
 
-    // Only report failures + truncation warnings
+    // Only load secondary bootstrap files if they exist and have content
+    const indexResult = readKnowledgeFile('README.md');
+    if (indexResult.ok && indexResult.content.trim().length > 10) bootstrap.index = indexResult;
+
+    const configMdResult = readKnowledgeFile('CONFIG.md');
+    if (configMdResult.ok && configMdResult.content.trim().length > 10) bootstrap.config_md = configMdResult;
+
+    if (targetDir) {
+      const tr = readKnowledgeFile(`${targetDir}/README.md`);
+      if (tr.ok && tr.content.trim().length > 10) bootstrap.target_readme = tr;
+      const ti = readKnowledgeFile(`${targetDir}/INSTRUCTION.md`);
+      if (ti.ok && ti.content.trim().length > 10) bootstrap.target_instruction = ti;
+      const tc = readKnowledgeFile(`${targetDir}/CONFIG.json`);
+      if (tc.ok && tc.content.trim().length > 10) bootstrap.target_config_json = tc;
+      const tm = readKnowledgeFile(`${targetDir}/CONFIG.md`);
+      if (tm.ok && tm.content.trim().length > 10) bootstrap.target_config_md = tm;
+    }
+
+    // Only report failures + truncation warnings for loaded files
     const initFailures: string[] = [];
     const truncationWarnings: string[] = [];
     if (!skill.ok) initFailures.push(`skill.mindos: failed (${skill.error})`);
@@ -355,19 +375,13 @@ export async function POST(req: NextRequest) {
     if (userSkillRules.ok && userSkillRules.truncated) truncationWarnings.push('user-skill-rules.md was truncated');
     if (!bootstrap.instruction.ok) initFailures.push(`bootstrap.instruction: failed (${bootstrap.instruction.error})`);
     if (bootstrap.instruction.ok && bootstrap.instruction.truncated) truncationWarnings.push('bootstrap.instruction was truncated');
-    if (!bootstrap.index.ok) initFailures.push(`bootstrap.index: failed (${bootstrap.index.error})`);
-    if (bootstrap.index.ok && bootstrap.index.truncated) truncationWarnings.push('bootstrap.index was truncated');
+    if (bootstrap.index?.ok && bootstrap.index.truncated) truncationWarnings.push('bootstrap.index was truncated');
     if (!bootstrap.config_json.ok) initFailures.push(`bootstrap.config_json: failed (${bootstrap.config_json.error})`);
     if (bootstrap.config_json.ok && bootstrap.config_json.truncated) truncationWarnings.push('bootstrap.config_json was truncated');
-    if (!bootstrap.config_md.ok) initFailures.push(`bootstrap.config_md: failed (${bootstrap.config_md.error})`);
-    if (bootstrap.config_md.ok && bootstrap.config_md.truncated) truncationWarnings.push('bootstrap.config_md was truncated');
-    if (bootstrap.target_readme && !bootstrap.target_readme.ok) initFailures.push(`bootstrap.target_readme: failed (${bootstrap.target_readme.error})`);
+    if (bootstrap.config_md?.ok && bootstrap.config_md.truncated) truncationWarnings.push('bootstrap.config_md was truncated');
     if (bootstrap.target_readme?.ok && bootstrap.target_readme.truncated) truncationWarnings.push('bootstrap.target_readme was truncated');
-    if (bootstrap.target_instruction && !bootstrap.target_instruction.ok) initFailures.push(`bootstrap.target_instruction: failed (${bootstrap.target_instruction.error})`);
     if (bootstrap.target_instruction?.ok && bootstrap.target_instruction.truncated) truncationWarnings.push('bootstrap.target_instruction was truncated');
-    if (bootstrap.target_config_json && !bootstrap.target_config_json.ok) initFailures.push(`bootstrap.target_config_json: failed (${bootstrap.target_config_json.error})`);
     if (bootstrap.target_config_json?.ok && bootstrap.target_config_json.truncated) truncationWarnings.push('bootstrap.target_config_json was truncated');
-    if (bootstrap.target_config_md && !bootstrap.target_config_md.ok) initFailures.push(`bootstrap.target_config_md: failed (${bootstrap.target_config_md.error})`);
     if (bootstrap.target_config_md?.ok && bootstrap.target_config_md.truncated) truncationWarnings.push('bootstrap.target_config_md was truncated');
 
     const initStatus = initFailures.length === 0
@@ -380,9 +394,9 @@ export async function POST(req: NextRequest) {
       initContextBlocks.push(`## user_skill_rules\n\nUser personalization rules (user-skill-rules.md):\n\n${userSkillRules.content}`);
     }
     if (bootstrap.instruction.ok) initContextBlocks.push(`## bootstrap_instruction\n\n${bootstrap.instruction.content}`);
-    if (bootstrap.index.ok) initContextBlocks.push(`## bootstrap_index\n\n${bootstrap.index.content}`);
+    if (bootstrap.index?.ok) initContextBlocks.push(`## bootstrap_index\n\n${bootstrap.index.content}`);
     if (bootstrap.config_json.ok) initContextBlocks.push(`## bootstrap_config_json\n\n${bootstrap.config_json.content}`);
-    if (bootstrap.config_md.ok) initContextBlocks.push(`## bootstrap_config_md\n\n${bootstrap.config_md.content}`);
+    if (bootstrap.config_md?.ok) initContextBlocks.push(`## bootstrap_config_md\n\n${bootstrap.config_md.content}`);
     if (bootstrap.target_readme?.ok) initContextBlocks.push(`## bootstrap_target_readme\n\n${bootstrap.target_readme.content}`);
     if (bootstrap.target_instruction?.ok) initContextBlocks.push(`## bootstrap_target_instruction\n\n${bootstrap.target_instruction.content}`);
     if (bootstrap.target_config_json?.ok) initContextBlocks.push(`## bootstrap_target_config_json\n\n${bootstrap.target_config_json.content}`);

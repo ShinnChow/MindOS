@@ -951,10 +951,13 @@ async function switchToMode(targetMode: 'local' | 'remote'): Promise<void> {
     if (oldPM) oldPM.stop().catch(() => {});
     if (oldCM) oldCM.stop();
   } else {
-    // Revert silently
+    // Revert silently — restore all state
     currentMode = oldMode;
     processManager = oldPM;
     connectionMonitor = oldCM;
+    currentWebPort = oldWebPort;
+    currentMcpPort = oldMcpPort;
+    currentRemoteAddress = oldRemoteAddress;
     await removeOverlay('mindos-switch-overlay');
     refreshTray(processManager ? 'running' : 'error');
   }
@@ -1189,10 +1192,11 @@ async function handleSplashAction(actionId: string): Promise<void> {
       if (mode) {
         currentMode = mode;
         saveDesktopMode(mode, { allowSeedWebSetup: true });
+        // Create new splash for boot
+        splashWindow = createSplash();
+        await bootApp();
       }
-      // Create new splash for boot
-      splashWindow = createSplash();
-      await bootApp();
+      // User cancelled — do nothing (app stays with splash closed, tray keeps it alive)
       break;
     }
   }
