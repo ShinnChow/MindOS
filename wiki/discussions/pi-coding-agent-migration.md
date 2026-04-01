@@ -1,6 +1,8 @@
 # Discussion: 是否迁移到 pi-coding-agent
 
-> 日期：2026-03-21 | 状态：**决定不迁移** | 关联：AIP-001/002/003
+> 日期：2026-03-21 | 状态：**已迁移（部分采用）** | 关联：AIP-001/002/003
+>
+> **2026-04-02 更新**：实际已采用 pi-coding-agent 的 session 引擎（`createAgentSession`、`ModelRegistry`、`AuthStorage`、`convertToLlm`、`SessionManager`、`SettingsManager`），但未采用其 TUI、bash/edit/write 工具、目录约定。MindOS 保留了自己的 system prompt 组装、tool 注册、context 管理和安全沙盒。下方原始分析中的弊端 #3（控制权）和 #5（安全假设）通过选择性使用解决了。
 
 ## 背景
 
