@@ -790,8 +790,11 @@ async function handleSshConnect(): Promise<void> {
   const port = parseInt(portInput?.value || '3456', 10);
   if (!host) { hostInput?.focus(); return; }
 
-  btn.disabled = true;
-  btn.innerHTML = `<span class="spinner"></span> ${t('sshConnecting')}`;
+  // Switch to "connecting" state with cancel support
+  let cancelled = false;
+  btn.disabled = false;
+  btn.innerHTML = `<span class="spinner"></span> ${t('cancel') || 'Cancel'}`;
+  btn.onclick = () => { cancelled = true; };
   status.classList.remove('hidden');
   status.className = 'status-bar info';
   status.textContent = t('sshConnecting');
@@ -799,22 +802,33 @@ async function handleSshConnect(): Promise<void> {
   try {
     const result = await ipc.connectSsh(host, port);
 
+    if (cancelled) {
+      // User cancelled during the await — restore UI
+      status.className = 'status-bar';
+      status.textContent = '';
+      btn.textContent = t('sshConnect');
+      btn.onclick = () => handleSshConnect();
+      return;
+    }
+
     if (result.ok) {
       status.className = 'status-bar success';
       status.textContent = t('sshSuccess');
       btn.textContent = t('connected');
+      btn.disabled = true;
+      btn.onclick = null;
       // Window will close automatically (IPC handler calls resolve + close)
     } else {
       status.className = 'status-bar error';
       status.textContent = `${t('sshFailed')}: ${result.error}`;
-      btn.disabled = false;
       btn.textContent = t('sshConnect');
+      btn.onclick = () => handleSshConnect();
     }
   } catch (err) {
     status.className = 'status-bar error';
     status.textContent = `${t('sshFailed')}: ${err instanceof Error ? err.message : String(err)}`;
-    btn.disabled = false;
     btn.textContent = t('sshConnect');
+    btn.onclick = () => handleSshConnect();
   }
 }
 

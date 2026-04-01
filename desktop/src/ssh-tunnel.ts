@@ -77,41 +77,80 @@ export function parseSshConfig(): SshHost[] {
   if (!existsSync(configPath)) return [];
 
   try {
-    const content = readFileSync(configPath, 'utf-8');
-    const hosts: SshHost[] = [];
-    let current: SshHost | null = null;
-
-    for (const rawLine of content.split('\n')) {
-      const line = rawLine.trim();
-      if (!line || line.startsWith('#')) continue;
-
-      const match = line.match(/^(\w+)\s+(.+)$/i);
-      if (!match) continue;
-
-      const [, key, value] = match;
-      const k = key.toLowerCase();
-
-      if (k === 'host') {
-        // Skip wildcards and patterns
-        if (value.includes('*') || value.includes('?') || value.includes('!')) continue;
-        // A Host line can have multiple space-separated aliases; take the first
-        const name = value.split(/\s+/)[0];
-        current = { name };
-        hosts.push(current);
-      } else if (current) {
-        switch (k) {
-          case 'hostname': current.hostname = value; break;
-          case 'user': current.user = value; break;
-          case 'port': current.port = parseInt(value, 10) || 22; break;
-          case 'identityfile': current.identityFile = value.replace(/^~/, app.getPath('home')); break;
-        }
-      }
-    }
-
-    return hosts;
+    return parseSshConfigFile(configPath, new Set());
   } catch {
     return [];
   }
+}
+
+/** Parse a single SSH config file, recursively resolving Include directives. */
+function parseSshConfigFile(filePath: string, visited: Set<string>): SshHost[] {
+  // Prevent infinite Include loops
+  const resolved = path.resolve(filePath);
+  if (visited.has(resolved)) return [];
+  visited.add(resolved);
+
+  if (!existsSync(resolved)) return [];
+
+  const content = readFileSync(resolved, 'utf-8');
+  const hosts: SshHost[] = [];
+  let current: SshHost | null = null;
+  const home = app.getPath('home');
+
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    const match = line.match(/^(\w[\w-]*)\s+(.+)$/i);
+    if (!match) continue;
+
+    const [, key, value] = match;
+    const k = key.toLowerCase();
+
+    // Handle Include directive — resolve paths relative to ~/.ssh/
+    if (k === 'include') {
+      const pattern = value.replace(/^~\//, home + '/').replace(/^~(?=[/\\])/, home);
+      // If not absolute, resolve relative to the directory of the current config file
+      const absPattern = path.isAbsolute(pattern) ? pattern : path.join(path.dirname(resolved), pattern);
+      try {
+        // Simple glob: if pattern contains *, expand with readdirSync; otherwise treat as literal
+        if (absPattern.includes('*')) {
+          const dir = path.dirname(absPattern);
+          const base = path.basename(absPattern);
+          const regex = new RegExp('^' + base.replace(/\./g, '\\.').replace(/\*/g, '.*') + '$');
+          if (existsSync(dir)) {
+            const { readdirSync: rd } = require('fs');
+            for (const f of rd(dir) as string[]) {
+              if (regex.test(f)) {
+                hosts.push(...parseSshConfigFile(path.join(dir, f), visited));
+              }
+            }
+          }
+        } else {
+          hosts.push(...parseSshConfigFile(absPattern, visited));
+        }
+      } catch { /* ignore unresolvable includes */ }
+      continue;
+    }
+
+    if (k === 'host') {
+      // Skip wildcards and patterns
+      if (value.includes('*') || value.includes('?') || value.includes('!')) continue;
+      // A Host line can have multiple space-separated aliases; take the first
+      const name = value.split(/\s+/)[0];
+      current = { name };
+      hosts.push(current);
+    } else if (current) {
+      switch (k) {
+        case 'hostname': current.hostname = value; break;
+        case 'user': current.user = value; break;
+        case 'port': current.port = parseInt(value, 10) || 22; break;
+        case 'identityfile': current.identityFile = value.replace(/^~/, home); break;
+      }
+    }
+  }
+
+  return hosts;
 }
 
 /** Check if the `ssh` command is available on this system */
@@ -140,6 +179,8 @@ export class SshTunnel {
   private _localPort: number;
   private _remotePort: number;
   private stopped = false;
+  /** Called when the tunnel process dies after a successful start. Not called if start() rejects. */
+  onDeath?: () => void;
 
   constructor(host: string, localPort: number, remotePort: number) {
     this._host = host;
@@ -186,23 +227,56 @@ export class SshTunnel {
       });
 
       // SSH with -N doesn't produce stdout on success.
-      // If it doesn't exit within 5s, the tunnel is up.
-      const successTimer = setTimeout(() => {
-        if (!settled && !this.stopped) {
-          settled = true;
-          resolve();
+      // If it doesn't exit within 5s, probe the local port to confirm the tunnel is working.
+      const successTimer = setTimeout(async () => {
+        if (settled || this.stopped) return;
+        // TCP probe: try to connect to the forwarded local port
+        try {
+          const net = require('net');
+          const probeOk = await new Promise<boolean>((probeResolve) => {
+            const sock = net.createConnection({ host: '127.0.0.1', port: this.localPort, timeout: 3000 });
+            sock.on('connect', () => { sock.destroy(); probeResolve(true); });
+            sock.on('error', () => probeResolve(false));
+            sock.on('timeout', () => { sock.destroy(); probeResolve(false); });
+          });
+          if (settled || this.stopped) return;
+          if (probeOk) {
+            settled = true;
+            resolve();
+          } else {
+            // Port not responding yet — give it 3 more seconds then accept anyway
+            // (some servers take time to start accepting after tunnel is up)
+            setTimeout(() => {
+              if (!settled && !this.stopped) {
+                settled = true;
+                resolve();
+              }
+            }, 3000);
+          }
+        } catch {
+          // Probe failed — fall back to original behavior (trust the tunnel)
+          if (!settled && !this.stopped) {
+            settled = true;
+            resolve();
+          }
         }
       }, 5000);
 
       this.process.on('exit', (code) => {
         clearTimeout(successTimer);
         clearTunnelPid();
+        const wasRunning = settled; // tunnel had been successfully started
         if (!settled) {
           settled = true;
           const msg = stderr.trim() || `SSH exited with code ${code}`;
           reject(new Error(msg));
         }
         this.process = null;
+        // Notify if tunnel died after successful start (not during startup or explicit stop)
+        if (wasRunning && !this.stopped) {
+          console.warn(`[MindOS:ssh] tunnel to ${this._host} died (code=${code})`);
+          this.onDeath?.();
+        }
       });
 
       this.process.on('error', (err) => {
