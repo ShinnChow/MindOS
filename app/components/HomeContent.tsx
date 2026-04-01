@@ -10,6 +10,7 @@ import { usePinnedFiles } from '@/lib/hooks/usePinnedFiles';
 import { getAllRenderers, getPluginRenderers } from '@/lib/renderers/registry';
 import OnboardingView from './OnboardingView';
 import GuideCard from './GuideCard';
+import SystemPulse from './SystemPulse';
 import { scanExampleFilesAction, cleanupExamplesAction } from '@/lib/actions';
 import type { SpaceInfo } from '@/app/page';
 
@@ -331,6 +332,9 @@ export default function HomeContent({ recent, existingFiles, spaces }: { recent:
           </Link>
         </div>
       </div>
+
+      {/* ── System Pulse: Agent status + stats ── */}
+      <SystemPulse />
 
       {/* ── Section: Pinned Files ── */}
       <PinnedFilesSection formatTime={formatTime} />

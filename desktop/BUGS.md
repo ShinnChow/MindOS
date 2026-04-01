@@ -389,3 +389,19 @@
 - **日期**: 2026-04-01
 - **根因**: did-fail-load 回调中 mainWindow! 在窗口销毁后 crash
 - **修复**: 加 mainWindow && !mainWindow.isDestroyed() 守卫
+
+### ✅ P1 #12: Node.js 检测不验证版本
+
+- **日期**: 2026-04-01
+- **根因**: getNodePath() 找到任何 node binary 就返回，不检查版本号
+- **修复**:
+  1. 加 `checkNodeVersion()` 辅助函数——执行 `node --version`，低于 18 跳过
+  2. NVM 版本目录排序时过滤掉 < v18 和含 `-` 的版本（nightly/rc/alpha）
+  3. 所有外部 node 发现点（env var / NVM / fnm / system / which / shell login）都过版本检查
+  4. bundled 和 private node 跳过检查（版本由我们控制）
+
+### ✅ P1 #8: SSH 连接出现在 HTTP recent list 中不可用
+
+- **日期**: 2026-04-01
+- **根因**: SSH 连接保存为 `ssh://host:port`，点击后填入 HTTP 输入框，Test Connection 必定失败
+- **修复**: loadRecentConnections() 过滤掉 `ssh://` 开头的条目，HTTP panel 不再显示 SSH 连接
