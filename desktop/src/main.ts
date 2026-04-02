@@ -275,6 +275,7 @@ function checkCliConflict(): { running: boolean; webPort?: number; mcpPort?: num
 // ── Local Mode ──
 
 async function startLocalMode(): Promise<string | null> {
+  invalidateConfig(); // Always re-read config (may have changed via setup wizard or settings)
   const config = loadConfig();
   const zh = navigator_lang() === 'zh';
 
@@ -982,6 +983,7 @@ let isRestarting = false;
 async function handleRestartServices(): Promise<void> {
   if (currentMode !== 'local' || isRestarting) return;
   isRestarting = true;
+  invalidateConfig(); // Re-read config (setup wizard may have changed ports/paths)
   const zh = navigator_lang() === 'zh';
 
   if (mainWindow && !mainWindow.isDestroyed()) {
