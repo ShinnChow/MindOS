@@ -122,8 +122,8 @@ export default function SetupWizard() {
     openaiModel: 'gpt-5.4',
     openaiBaseUrl: '',
     openaiKeyMask: '',
-    webPort: 3000,
-    mcpPort: 8787,
+    webPort: 3456,
+    mcpPort: 8781,
     authToken: '',
     webPassword: '',
   });
