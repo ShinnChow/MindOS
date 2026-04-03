@@ -34,10 +34,8 @@ jobs:
           NODE_ENV: production
 
       - name: Materialize standalone assets
-        run: node scripts/prepare-standalone.mjs 2>/dev/null || node -e "
-          const { materializeStandaloneAssets } = require('./scripts/prepare-standalone.mjs');
-          materializeStandaloneAssets('./app');
-        " 2>/dev/null || echo 'Standalone assets already materialized'
+        run: |
+          node scripts/prepare-standalone.mjs 2>/dev/null || echo 'Standalone assets already materialized'
 
       - name: Build runtime archive
         id: archive
