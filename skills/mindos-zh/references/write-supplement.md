@@ -1,7 +1,17 @@
 # MindOS 写入与工作流补充
 
-<!-- 当任务涉及写入、整理、SOP、结构变更或复盘交接意图时读取此文件。 -->
-<!-- 只读查阅、问答、总结时跳过。 -->
+<!-- 随 SKILL.md 一起由 route.ts 注入到每次请求的上下文中。 -->
+<!-- 只读查阅、问答、总结时此上下文同样可用。 -->
+
+---
+
+## 绝对不要（写路径专属）
+
+- **绝不把 `mindos_write_file` 当第一步。** 没读过当前内容就覆写 = 在黑暗中操作。哪怕你"应该知道"文件里有什么，也先读——你的假设可能已过时。
+- **绝不用 `mindos_create_file` 创建心智空间。** 这只会建一个普通目录，缺少 README + INSTRUCTION 脚手架。缺少治理文件的空间从诞生起就是残缺的。必须用 `mindos_create_space`。
+- **绝不 bootstrap 后直接写入。** Bootstrap 告诉你顶层结构，不代表目标路径附近的局部 `INSTRUCTION.md` 没有覆盖全局规则。写入前必须读目标路径附近的治理文件。
+- **绝不在没有展示路由表的情况下执行多文件写入。** 即使目标看起来显而易见——用户的心智模型和你的判断不一致的概率远高于你的直觉。展示路由表，等确认。
+- **绝不把 `mindos_append_to_file` 用于有结构要求的文件。** 盲目追加会忽略章节顺序。如果文件有标题层级、必填字段或 schema 约束，用 `insert_after_heading` 或 `update_section` 把内容落在正确位置。
 
 ---
 
@@ -9,7 +19,7 @@
 
 | 意图 | 推荐工具 | 避免 |
 |------|----------|------|
-| 小范围文字修改 | `mindos_update_section` / `update_lines` / `insert_after_heading` | 小修改用 `write_file` |
+| 小范围文字修改 | `mindos_update_section` / `mindos_update_lines` / `mindos_insert_after_heading` | 小修改用 `mindos_write_file` |
 | 追加到末尾 | `mindos_append_to_file` | 为了加一行重写整文件 |
 | 整文件替换 | `mindos_write_file` | 用它做章节级编辑 |
 | 新建文件 | `mindos_create_file` | 自动创建父目录，但不会生成空间脚手架文件 |
@@ -29,7 +39,11 @@
 所有写入任务执行前运行：
 
 1. **Bootstrap** — `mindos_bootstrap`（首选），或手动读根 `INSTRUCTION.md` + `README.md`。
-2. **发现结构** — `mindos_list_spaces`（顶层分区与 README 摘要）和/或 `mindos_list_files` + 按需 `mindos_search_notes`。不假设一级目录名。
+2. **发现结构**
+   - 只需确认顶层分区 → `mindos_list_spaces`（更轻量，含 README 摘要）
+   - 需要找具体文件路径 → 先用 `mindos_list_spaces` 确认目标分区，再在该分区下 `mindos_list_files`
+   - 已知关键词 → 并行 2-4 条 `mindos_search_notes`，覆盖中英文和缩写变体
+   - **绝不假设顶层目录名**——用户可能用中文、拼音或自定义层级
 3. **加载局部治理** — 读取目标路径附近的 `README.md` / `INSTRUCTION.md`。局部约定覆盖全局假设。
 4. **匹配已有 SOP** — 任务偏流程时：从树中识别存放流程的目录（`Workflows/`、`SOPs/`、`流程/` 等仅为常见名，不假设一定存在）。用关键词 + `<!-- keywords: -->` 元数据搜索。找到则读取并执行；偏差则任务后提议更新。
 5. **写前检查** — 确认：路径存在或应创建；位置在子目录下（非根）；现有内容已读；修改范围最小；路径变更的反链影响已评估。
@@ -68,10 +82,38 @@
 
 ### SOP 执行
 开始前完整读 SOP（不要略读）→ 逐步执行，完成一步确认一步 → 遇到过时或与当前 KB 状态不符的步骤，记录下来 → 完成后，针对偏差步骤提议定向 SOP 更新。
-**创建新 SOP** → 先读 [sop-template.md](./sop-template.md) 了解必需结构。
+**创建新 SOP** → 先读 [references/sop-template.md](./references/sop-template.md) 了解必需结构。
 
 ### 结构变更
 对要变更的路径执行 `get_backlinks` → 展示影响报告（N 个文件需要更新）→ 等确认 → 执行重命名/移动/删除 → 更新每一条反链 → 同步受影响的 `README.md`。
 
 ### 交接 / 跨 Agent 接力
 读交接文档或上一个 Agent 的进度记录 → 识别：当前状态、已做决策、待处理事项 → 从该状态直接接续，不重复已完成的探索 → 完成后将进度回写到同一份交接文档。
+
+---
+
+## 任务后 Hooks
+
+**写入任务**完成后（简单单文件修改或只读查阅跳过），扫描下表。命中则发起一句话提议，最多 1 条，选优先级最高项。先查 `user-skill-rules.md` 的抑制区；用户要求安静模式时全部跳过。
+
+| Hook | 优先级 | 触发条件 |
+|------|--------|---------|
+| 经验沉淀 | 高 | 调试、排错、踩坑，或多轮才解决 |
+| 一致性同步 | 高 | 编辑了有反链的文件（查 `get_backlinks`） |
+| SOP 偏差 | 中 | 按 SOP 执行但实际步骤与文档不符 |
+| 联动更新 | 中 | 改了 CSV/TODO 状态且存在关联文档 |
+| 结构归类 | 中 | 在临时目录或收件箱新建了文件 |
+| 模式提炼 | 低 | 本会话 3+ 次结构相似操作 |
+| 对话复盘 | 低 | 会话 >10 轮且涉及决策或权衡 |
+
+有 hook 命中 → 读 [references/post-task-hooks.md](./references/post-task-hooks.md) 获取提议措辞和用户自定义 hooks。都不命中则安静结束，不读此文件。
+
+## 偏好捕获
+
+用户表达要长期记住的偏好（「以后不要…」「这个该放在…」）时，读 [references/preference-capture.md](./references/preference-capture.md) 并按确认后写入流程存入 `user-skill-rules.md`。
+**不要读** preference-capture 除非用户真的表达了要持久化的偏好。
+
+## SOP 编写
+
+创建或改写工作流 SOP 时，**必须 — 读 [references/sop-template.md](./references/sop-template.md)**（前置条件、分支步骤、退出条件、踩坑记录）。
+**不要读** sop-template 用于 SOP 执行（仅用于 SOP 创建/编辑）。
