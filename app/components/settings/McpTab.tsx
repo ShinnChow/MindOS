@@ -1,5 +1,5 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { Loader2, Copy, Monitor, Globe, AlertCircle, RotateCcw, RefreshCw } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { Loader2, Copy, Check, Monitor, Globe, AlertCircle, RotateCcw, RefreshCw, Eye, EyeOff, ChevronDown, ChevronRight, Link2, Shield } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { useMcpDataOptional } from '@/hooks/useMcpData';
 import { generateSnippet } from '@/lib/mcp-snippets';
@@ -84,6 +84,9 @@ export function McpTab({ t }: McpTabProps) {
         onRefresh={mcp.refresh}
         m={m}
       />
+
+      {/* Connection Info — token + URL */}
+      <McpConnectionCard status={mcp.status} m={m} />
 
       {/* MCP Config Viewer */}
       {mcp.agents.length > 0 && (
@@ -300,6 +303,144 @@ function AgentConfigViewer({ connectedAgents, detectedAgents, notFoundAgents, cu
           )}
         </>
       )}
+    </div>
+  );
+}
+
+/* ── MCP Connection Card (Token + URL + How-to) ── */
+
+function McpConnectionCard({ status, m }: {
+  status: McpStatus | null;
+  m: Record<string, any> | undefined;
+}) {
+  const [revealed, setRevealed] = useState(false);
+  const [howToOpen, setHowToOpen] = useState(false);
+  const [copiedField, setCopiedField] = useState<'token' | 'url' | null>(null);
+
+  // Auto-hide token when component unmounts (tab switch)
+  useEffect(() => () => setRevealed(false), []);
+
+  // Clear "copied" feedback after 2s
+  useEffect(() => {
+    if (!copiedField) return;
+    const t = setTimeout(() => setCopiedField(null), 2000);
+    return () => clearTimeout(t);
+  }, [copiedField]);
+
+  const handleCopy = useCallback(async (text: string, field: 'token' | 'url') => {
+    if (!text) return;
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopiedField(field);
+      toast.copy();
+    }
+  }, []);
+
+  if (!status) return null;
+
+  const hasToken = status.authConfigured && !!status.authToken;
+  const displayToken = revealed ? (status.authToken ?? '') : (status.maskedToken ?? '');
+  const serverUrl = status.endpoint || `http://127.0.0.1:${status.port}/mcp`;
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-2.5 px-4 pt-4 pb-1">
+        <div className="w-7 h-7 rounded-lg bg-[var(--amber-subtle)] flex items-center justify-center shrink-0">
+          <Link2 size={14} className="text-[var(--amber)]" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold text-foreground">{m?.connectionTitle ?? 'Connection'}</h3>
+          <p className="text-xs text-muted-foreground">{m?.connectionHint ?? 'Use these credentials to connect AI agents.'}</p>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-3">
+        {/* Auth Token */}
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <Shield size={11} />
+            {m?.tokenLabel ?? 'Auth Token'}
+          </label>
+          {hasToken ? (
+            <div className="flex items-center gap-2">
+              <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-muted/50 border border-border rounded-lg min-h-[38px]">
+                <code className="flex-1 text-xs font-mono text-foreground break-all select-all leading-relaxed">
+                  {displayToken}
+                </code>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRevealed(v => !v)}
+                className="shrink-0 p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                title={revealed ? (m?.tokenHide ?? 'Hide') : (m?.tokenShow ?? 'Show')}
+              >
+                {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCopy(status.authToken ?? '', 'token')}
+                className={`shrink-0 p-2 rounded-lg border transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${
+                  copiedField === 'token'
+                    ? 'border-success/50 bg-success/10 text-success'
+                    : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+                title={m?.tokenCopy ?? 'Copy'}
+              >
+                {copiedField === 'token' ? <Check size={14} /> : <Copy size={14} />}
+              </button>
+            </div>
+          ) : (
+            <div className="px-3 py-2.5 bg-[var(--amber-subtle)] border border-[var(--amber)]/20 rounded-lg">
+              <p className="text-xs text-[var(--amber-text)]">{m?.tokenNone ?? 'No token set.'}</p>
+              <p className="text-xs text-muted-foreground mt-1">{m?.tokenNoneAction ?? 'Generate one in Settings \u2192 General \u2192 Security.'}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Server URL */}
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <Globe size={11} />
+            {m?.serverUrl ?? 'MCP Server URL'}
+          </label>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 flex items-center px-3 py-2 bg-muted/50 border border-border rounded-lg min-h-[38px]">
+              <code className="flex-1 text-xs font-mono text-foreground select-all">{serverUrl}</code>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleCopy(serverUrl, 'url')}
+              className={`shrink-0 p-2 rounded-lg border transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${
+                copiedField === 'url'
+                  ? 'border-success/50 bg-success/10 text-success'
+                  : 'border-border text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+              title={m?.serverUrlCopy ?? 'Copy URL'}
+            >
+              {copiedField === 'url' ? <Check size={14} /> : <Copy size={14} />}
+            </button>
+          </div>
+        </div>
+
+        {/* How to connect (collapsible) */}
+        <button
+          type="button"
+          onClick={() => setHowToOpen(v => !v)}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors py-1 focus-visible:ring-2 focus-visible:ring-ring rounded"
+        >
+          {howToOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          {m?.howToConnect ?? 'How to connect an AI agent'}
+        </button>
+        {howToOpen && (
+          <ol className="ml-1 pl-3 border-l-2 border-border space-y-1.5 text-xs text-muted-foreground list-decimal list-inside">
+            <li>{m?.howToStep1 ?? 'Open your agent\'s MCP settings'}</li>
+            <li>{m?.howToStep2 ?? 'Add MCP server with the URL above'}</li>
+            <li>{m?.howToStep3 ?? 'Set Auth Token as bearer token'}</li>
+            <li>{m?.howToStep4 ?? 'Save and verify the connection'}</li>
+          </ol>
+        )}
+      </div>
     </div>
   );
 }
