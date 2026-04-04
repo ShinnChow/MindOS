@@ -75,12 +75,12 @@ describe('GET /api/setup', () => {
     expect(body.mcpPort).toBe(8781);
   });
 
-  it('masks API keys', async () => {
+  it('masks API keys in providerConfigs', async () => {
     mockSettings.ai.providers.anthropic.apiKey = 'sk-ant-1234567890abcdef';
     const { GET } = await importSetupRoute();
     const res = await GET();
     const body = await res.json();
-    expect(body.anthropicApiKey).toBe('sk-ant***');
+    expect(body.providerConfigs.anthropic.apiKeyMask).toBe('sk-ant***');
     mockSettings.ai.providers.anthropic.apiKey = '';
   });
 });

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { FolderTree, Search, Settings, RefreshCw, Bot, Compass, ChevronLeft, ChevronRight, Radio, Zap } from 'lucide-react';
 import { useLocale } from '@/lib/LocaleContext';
 import { DOT_COLORS, getStatusLevel } from './SyncStatusBar';
-import type { SyncStatus } from './settings/SyncTab';
+import type { SyncStatus } from './settings/types';
 import Logo from './Logo';
 
 export type PanelId = 'files' | 'search' | 'echo' | 'agents' | 'discover' | 'workflows';
@@ -144,6 +144,22 @@ export default function ActivityBar({
     };
   }, []);
 
+  // Labs feature flags (Echo, Workflows) — read from localStorage, react to settings changes
+  const [labsEcho, setLabsEcho] = useState(() =>
+    typeof window !== 'undefined' ? localStorage.getItem('mindos:labs-echo') === '1' : false
+  );
+  const [labsWorkflows, setLabsWorkflows] = useState(() =>
+    typeof window !== 'undefined' ? localStorage.getItem('mindos:labs-workflows') === '1' : false
+  );
+  useEffect(() => {
+    const sync = () => {
+      setLabsEcho(localStorage.getItem('mindos:labs-echo') === '1');
+      setLabsWorkflows(localStorage.getItem('mindos:labs-workflows') === '1');
+    };
+    window.addEventListener('mindos:labs-changed', sync);
+    return () => window.removeEventListener('mindos:labs-changed', sync);
+  }, []);
+
   /** Debounce rapid clicks (300ms) — shared across all Rail buttons */
   const debounced = useCallback((fn: () => void) => {
     const now = Date.now();
@@ -191,7 +207,7 @@ export default function ActivityBar({
         {/* ── Middle: Core panel toggles ── */}
         <div className={`flex flex-col ${expanded ? 'px-1.5' : 'items-center'} gap-1 py-2`}>
           <RailButton icon={<FolderTree size={18} />} label={t.sidebar.files} active={activePanel === 'files'} expanded={expanded} onClick={() => toggle('files')} walkthroughId="files-panel" />
-          <RailButton icon={<Radio size={18} />} label={t.sidebar.echo} active={activePanel === 'echo'} expanded={expanded} onClick={() => onEchoClick ? debounced(onEchoClick) : toggle('echo')} walkthroughId="echo-panel" />
+          {labsEcho && <RailButton icon={<Radio size={18} />} label={t.sidebar.echo} active={activePanel === 'echo'} expanded={expanded} onClick={() => onEchoClick ? debounced(onEchoClick) : toggle('echo')} walkthroughId="echo-panel" />}
           <RailButton icon={<Search size={18} />} label={t.sidebar.searchTitle} shortcut="⌘K" active={activePanel === 'search'} expanded={expanded} onClick={() => toggle('search')} />
           <RailButton
             icon={<Bot size={18} />}
@@ -201,7 +217,7 @@ export default function ActivityBar({
             onClick={() => onAgentsClick ? debounced(onAgentsClick) : toggle('agents')}
             walkthroughId="agents-panel"
           />
-          <RailButton icon={<Zap size={18} />} label={t.sidebar.workflows ?? 'Flows'} active={activePanel === 'workflows'} expanded={expanded} onClick={() => onWorkflowsClick ? debounced(onWorkflowsClick) : toggle('workflows')} />
+          {labsWorkflows && <RailButton icon={<Zap size={18} />} label={t.sidebar.workflows ?? 'Flows'} active={activePanel === 'workflows'} expanded={expanded} onClick={() => onWorkflowsClick ? debounced(onWorkflowsClick) : toggle('workflows')} />}
         </div>
 
         {/* ── Spacer ── */}

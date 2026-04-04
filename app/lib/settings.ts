@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { parseAcpAgentOverrides } from './acp/agent-descriptors';
-import { type ProviderId, PROVIDER_PRESETS, isProviderId } from './agent/providers';
+import { type ProviderId, PROVIDER_PRESETS, isProviderId, getApiKeyFromEnv } from './agent/providers';
 
 const SETTINGS_PATH = path.join(os.homedir(), '.mindos', 'config.json');
 
@@ -170,7 +170,7 @@ export function readSettings(): ServerSettings {
       ai: migrateAi(parsed),
       agent: parseAgent(parsed.agent),
       acpAgents: parseAcpAgentsField(parsed.acpAgents),
-      mindRoot: (parsed.mindRoot ?? parsed.sopRoot ?? DEFAULTS.mindRoot) as string,
+      mindRoot: (parsed.mindRoot ?? DEFAULTS.mindRoot) as string,
       webPassword: typeof parsed.webPassword === 'string' ? parsed.webPassword : undefined,
       authToken:   typeof parsed.authToken   === 'string' ? parsed.authToken   : undefined,
       mcpPort:     typeof parsed.mcpPort     === 'number' ? parsed.mcpPort     : undefined,
@@ -215,8 +215,9 @@ export function writeSettings(settings: ServerSettings): void {
 }
 
 /** Effective AI config — unified interface for all providers.
- *  Resolves: saved config → env var → preset default, in that priority order. */
-export function effectiveAiConfig(): {
+ *  Resolves: saved config → env var → preset default, in that priority order.
+ *  When `providerOverride` is given, resolves that provider's config instead. */
+export function effectiveAiConfig(providerOverride?: ProviderId): {
   provider: ProviderId;
   apiKey: string;
   model: string;
@@ -224,22 +225,20 @@ export function effectiveAiConfig(): {
 } {
   const s = readSettings();
   const envProvider = process.env.AI_PROVIDER;
-  const provider: ProviderId = isProviderId(s.ai.provider)
-    ? s.ai.provider
-    : (envProvider && isProviderId(envProvider) ? envProvider : 'anthropic');
+  const provider: ProviderId = providerOverride
+    ?? (isProviderId(s.ai.provider) ? s.ai.provider
+      : (envProvider && isProviderId(envProvider) ? envProvider : 'anthropic'));
 
   const preset = PROVIDER_PRESETS[provider] ?? PROVIDER_PRESETS.anthropic;
-  const provCfg = s.ai.providers[provider] ?? {};
+  const provCfg = s.ai.providers[provider] ?? { apiKey: '', model: '' };
 
   const apiKey = provCfg.apiKey
-    || (preset.apiKeyEnvVar ? process.env[preset.apiKeyEnvVar] : '')
+    || getApiKeyFromEnv(provider)
     || '';
   const model = provCfg.model
-    || (preset.modelEnvVar ? process.env[preset.modelEnvVar] : '')
     || preset.defaultModel;
   const baseUrl = provCfg.baseUrl
-    || (preset.baseUrlEnvVar ? process.env[preset.baseUrlEnvVar] : '')
-    || preset.defaultBaseUrl
+    || preset.fixedBaseUrl
     || '';
 
   return { provider, apiKey, model, baseUrl };

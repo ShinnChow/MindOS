@@ -19,6 +19,7 @@ import fs from 'fs';
 import path from 'path';
 import { getFileContent, getMindRoot } from '@/lib/fs';
 import { getModelConfig, hasImages } from '@/lib/agent/model';
+import { isProviderId, type ProviderId } from '@/lib/agent/providers';
 import { getRequestScopedTools, getOrganizeTools, getChatTools, WRITE_TOOLS, truncate } from '@/lib/agent/tools';
 import { AGENT_SYSTEM_PROMPT, ORGANIZE_SYSTEM_PROMPT, CHAT_SYSTEM_PROMPT } from '@/lib/agent/prompt';
 import type { AskModeApi } from '@/lib/types';
@@ -321,6 +322,8 @@ export async function POST(req: NextRequest) {
     mode?: AskModeApi;
     /** ACP agent selection: if present, route to ACP instead of MindOS */
     selectedAcpAgent?: { id: string; name: string } | null;
+    /** Per-request provider override from the chat panel capsule */
+    providerOverride?: string;
   };
   try {
     body = await req.json();
@@ -449,13 +452,11 @@ export async function POST(req: NextRequest) {
       instruction: readKnowledgeFile('INSTRUCTION.md'),
       config_json: readKnowledgeFile('CONFIG.json'),
       // Lazy-loaded: only read if the file exists and has content.
-      // README.md and CONFIG.md are often empty/boilerplate and waste tokens.
+      // README.md is often empty/boilerplate and wastes tokens.
       index: null as ReturnType<typeof readKnowledgeFile> | null,
-      config_md: null as ReturnType<typeof readKnowledgeFile> | null,
       target_readme: null as ReturnType<typeof readKnowledgeFile> | null,
       target_instruction: null as ReturnType<typeof readKnowledgeFile> | null,
       target_config_json: null as ReturnType<typeof readKnowledgeFile> | null,
-      target_config_md: null as ReturnType<typeof readKnowledgeFile> | null,
     };
 
     // Only load secondary bootstrap files if they have meaningful content.
@@ -466,9 +467,6 @@ export async function POST(req: NextRequest) {
     const indexResult = readKnowledgeFile('README.md');
     if (indexResult.ok && indexResult.content.trim().length > MIN_USEFUL_CONTENT_LENGTH) bootstrap.index = indexResult;
 
-    const configMdResult = readKnowledgeFile('CONFIG.md');
-    if (configMdResult.ok && configMdResult.content.trim().length > MIN_USEFUL_CONTENT_LENGTH) bootstrap.config_md = configMdResult;
-
     if (targetDir) {
       const tr = readKnowledgeFile(`${targetDir}/README.md`);
       if (tr.ok && tr.content.trim().length > MIN_USEFUL_CONTENT_LENGTH) bootstrap.target_readme = tr;
@@ -476,8 +474,6 @@ export async function POST(req: NextRequest) {
       if (ti.ok && ti.content.trim().length > MIN_USEFUL_CONTENT_LENGTH) bootstrap.target_instruction = ti;
       const tc = readKnowledgeFile(`${targetDir}/CONFIG.json`);
       if (tc.ok && tc.content.trim().length > MIN_USEFUL_CONTENT_LENGTH) bootstrap.target_config_json = tc;
-      const tm = readKnowledgeFile(`${targetDir}/CONFIG.md`);
-      if (tm.ok && tm.content.trim().length > MIN_USEFUL_CONTENT_LENGTH) bootstrap.target_config_md = tm;
     }
 
     const initFailures: string[] = [];
@@ -492,11 +488,9 @@ export async function POST(req: NextRequest) {
     if (bootstrap.index?.ok && bootstrap.index.truncated) truncationWarnings.push('bootstrap.index was truncated');
     if (!bootstrap.config_json.ok) initFailures.push(`bootstrap.config_json: failed (${bootstrap.config_json.error})`);
     if (bootstrap.config_json.ok && bootstrap.config_json.truncated) truncationWarnings.push('bootstrap.config_json was truncated');
-    if (bootstrap.config_md?.ok && bootstrap.config_md.truncated) truncationWarnings.push('bootstrap.config_md was truncated');
     if (bootstrap.target_readme?.ok && bootstrap.target_readme.truncated) truncationWarnings.push('bootstrap.target_readme was truncated');
     if (bootstrap.target_instruction?.ok && bootstrap.target_instruction.truncated) truncationWarnings.push('bootstrap.target_instruction was truncated');
     if (bootstrap.target_config_json?.ok && bootstrap.target_config_json.truncated) truncationWarnings.push('bootstrap.target_config_json was truncated');
-    if (bootstrap.target_config_md?.ok && bootstrap.target_config_md.truncated) truncationWarnings.push('bootstrap.target_config_md was truncated');
 
     const initStatus = initFailures.length === 0
       ? `All initialization contexts loaded successfully. mind_root=${getMindRoot()}${targetDir ? `, target_dir=${targetDir}` : ''}${truncationWarnings.length > 0 ? ` ⚠️ ${truncationWarnings.length} files truncated` : ''}`
@@ -526,11 +520,9 @@ export async function POST(req: NextRequest) {
       } catch { /* keep original if parse fails */ }
       initContextBlocks.push(`## bootstrap_config_json\n\n${configContent}`);
     }
-    if (bootstrap.config_md?.ok) initContextBlocks.push(`## bootstrap_config_md\n\n${bootstrap.config_md.content}`);
     if (bootstrap.target_readme?.ok) initContextBlocks.push(`## bootstrap_target_readme\n\n${bootstrap.target_readme.content}`);
     if (bootstrap.target_instruction?.ok) initContextBlocks.push(`## bootstrap_target_instruction\n\n${bootstrap.target_instruction.content}`);
     if (bootstrap.target_config_json?.ok) initContextBlocks.push(`## bootstrap_target_config_json\n\n${bootstrap.target_config_json.content}`);
-    if (bootstrap.target_config_md?.ok) initContextBlocks.push(`## bootstrap_target_config_md\n\n${bootstrap.target_config_md.content}`);
 
     // Build initial context from attached/current files
     const contextParts: string[] = [];
@@ -594,7 +586,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { model, modelName, apiKey, provider } = getModelConfig({ hasImages: hasImages(messages) });
+    const provOverride = body.providerOverride && isProviderId(body.providerOverride)
+      ? body.providerOverride as ProviderId
+      : undefined;
+    const { model, modelName, apiKey, provider } = getModelConfig({
+      provider: provOverride,
+      hasImages: hasImages(messages),
+    });
 
     // Convert frontend messages to AgentMessage[]
     const agentMessages = toAgentMessages(messages);

@@ -7,8 +7,6 @@ import { apiFetch } from '@/lib/api';
 import type { SyncStatus, SyncTabProps } from './types';
 import type { Messages } from '@/lib/i18n';
 
-export { SyncStatus }; // Re-export for backward compatibility
-
 export function timeAgo(iso: string | null | undefined): string {
   if (!iso) return 'never';
   const diff = Date.now() - new Date(iso).getTime();
