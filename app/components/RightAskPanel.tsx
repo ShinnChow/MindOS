@@ -125,7 +125,7 @@ export default function RightAskPanel({
         </div>
       </ErrorBoundary>
 
-      {/* Drag resize handle — LEFT edge */}
+      {/* Drag resize handle — LEFT edge, always visible for bidirectional snap */}
       <div
         className="absolute top-0 -left-[3px] w-[6px] h-full cursor-col-resize z-40 group hidden md:block"
         onMouseDown={handleMouseDown}

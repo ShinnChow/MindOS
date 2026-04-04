@@ -703,7 +703,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
         )}
 
         {/* Mode + Agent + Provider selector row */}
-        <div className="flex items-center gap-1.5 px-3 pt-1 pb-0.5 overflow-x-auto">
+        <div className="flex items-center gap-1.5 px-3 pt-1 pb-0.5">
           <ModeCapsule mode={chatMode} onChange={setChatMode} disabled={isLoading} />
           {mounted && acpDetection.installedAgents.length > 0 && (
             <AgentSelectorCapsule

@@ -97,6 +97,15 @@ export default function ProviderModelCapsule({
     : 'anthropic';
   const configuredProviders = settingsData ? getConfiguredProviders(settingsData) : [];
 
+  // Auto-clear stale override if the provider lost its API key
+  useEffect(() => {
+    if (!settingsData || !value) return;
+    if (!configuredProviders.includes(value)) {
+      onChange(null);
+      persistProvider(null);
+    }
+  }, [settingsData, value, configuredProviders, onChange]);
+
   const activeProvider = value ?? defaultProvider;
   const activePreset = PROVIDER_PRESETS[activeProvider];
   const activeModel = settingsData?.ai?.providers?.[activeProvider]?.model || activePreset.defaultModel;
