@@ -9,7 +9,13 @@ import { FileNode } from '@/lib/types';
 import type { SpacePreview } from '@/lib/core/types';
 import { useLocale } from '@/lib/LocaleContext';
 
-const SYSTEM_FILES = new Set(['INSTRUCTION.md', 'README.md']);
+const SYSTEM_FILES = new Set([
+  'INSTRUCTION.md',
+  'README.md',
+  'CONFIG.json',
+  'CHANGELOG.md',
+  'TODO.md',
+]);
 
 async function copyPathToClipboard(path: string) {
   try { await navigator.clipboard.writeText(path); } catch { /* noop */ }
@@ -183,11 +189,8 @@ export default function DirView({ dirPath, entries, spacePreview }: DirViewProps
   }, []);
 
   const visibleEntries = useMemo(() => {
-    if (spacePreview) {
-      return entries.filter(e => e.type !== 'file' || !SYSTEM_FILES.has(e.name));
-    }
-    return entries.filter(e => e.type !== 'file' || e.name !== 'README.md');
-  }, [entries, spacePreview]);
+    return entries.filter(e => e.type !== 'file' || !SYSTEM_FILES.has(e.name));
+  }, [entries]);
 
   const fileCounts = useMemo(() => {
     const map = new Map<string, number>();
