@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Send, StopCircle, X, Plus } from 'lucide-react';
 import { useLocale } from '@/lib/LocaleContext';
 import type { AskMode } from '@/lib/types';
@@ -429,6 +429,12 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
 
   const toggleHistory = useCallback(() => setShowHistory(v => !v), []);
   const inputIconSize = 15;
+  const messageLabels = useMemo(() => ({
+    connecting: t.ask.connecting,
+    thinking: t.ask.thinking,
+    generating: t.ask.generating,
+    reconnecting: reconnectAttempt > 0 ? t.ask.reconnecting(reconnectAttempt, reconnectMaxRef.current) : undefined,
+  }), [t, reconnectAttempt]);
 
   return (
     <>
@@ -480,12 +486,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
         emptyPrompt={t.ask.emptyPrompt}
         suggestions={t.ask.suggestions}
         onSuggestionClick={setInput}
-        labels={{
-          connecting: t.ask.connecting,
-          thinking: t.ask.thinking,
-          generating: t.ask.generating,
-          reconnecting: reconnectAttempt > 0 ? t.ask.reconnecting(reconnectAttempt, reconnectMaxRef.current) : undefined,
-        }}
+        labels={messageLabels}
       />
 
       {/* Popovers — flex children so they stay within overflow boundary (absolute positioning would be clipped by RightAskPanel's overflow-hidden) */}
