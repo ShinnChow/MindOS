@@ -17,6 +17,8 @@ interface MarkdownViewProps {
   highlightLines?: number[];
   /** Callback to dismiss the highlight banner */
   onDismissHighlight?: () => void;
+  /** Placeholder shown when content is empty (read mode) */
+  emptyPlaceholder?: string;
 }
 
 function CopyButton({ code }: { code: string }) {
@@ -115,8 +117,16 @@ function extractText(node: React.ReactNode): string {
   return '';
 }
 
-export default function MarkdownView({ content, highlightLines, onDismissHighlight }: MarkdownViewProps) {
+export default function MarkdownView({ content, highlightLines, onDismissHighlight, emptyPlaceholder }: MarkdownViewProps) {
   const hasHighlights = highlightLines && highlightLines.length > 0;
+
+  if (!content.trim() && emptyPlaceholder) {
+    return (
+      <div className="py-12 text-center text-sm text-muted-foreground/50">
+        {emptyPlaceholder}
+      </div>
+    );
+  }
 
   return (
     <div>

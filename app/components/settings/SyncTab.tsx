@@ -66,7 +66,27 @@ function getSyncErrorHint(error: string, remote?: string | null, syncT?: Record<
 function ConflictRow({ file, time, syncT, onResolved }: {
   file: string; time: string; syncT?: Record<string, unknown>; onResolved: () => void;
 }) {
-  const [resolving, setResolving] = useState<string | null>(null); // 'local' | 'remote' | null
+  const [resolving, setResolving] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [preview, setPreview] = useState<{ local: string; remote: string } | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
+  const togglePreview = async () => {
+    if (expanded) { setExpanded(false); return; }
+    if (!preview) {
+      setLoadingPreview(true);
+      try {
+        const data = await apiFetch<{ local: string; remote: string }>('/api/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'conflict-preview', remote: file }),
+        });
+        setPreview(data);
+      } catch { /* ignore */ }
+      setLoadingPreview(false);
+    }
+    setExpanded(true);
+  };
 
   const handleResolve = async (strategy: 'keep-local' | 'keep-remote') => {
     setResolving(strategy === 'keep-local' ? 'local' : 'remote');
@@ -83,36 +103,67 @@ function ConflictRow({ file, time, syncT, onResolved }: {
   };
 
   return (
-    <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 text-xs">
-      <AlertCircle size={12} className="text-error shrink-0" />
-      <a
-        href={`/view/${encodeURIComponent(file)}`}
-        className="font-mono truncate hover:text-foreground hover:underline transition-colors flex-1 min-w-0"
-        title={file}
-      >
-        {file}
-      </a>
-      <span className="text-muted-foreground shrink-0">{timeAgo(time, syncT)}</span>
-      <div className="flex items-center gap-1 shrink-0">
+    <div className="rounded-lg border border-border/50 overflow-hidden">
+      {/* Header row */}
+      <div className="flex items-center gap-2 p-2 text-xs bg-muted/20">
+        <AlertCircle size={12} className="text-error shrink-0" />
         <button
           type="button"
-          onClick={() => handleResolve('keep-local')}
-          disabled={!!resolving}
-          className="px-2 py-0.5 rounded border border-border text-2xs hover:bg-muted transition-colors disabled:opacity-40"
-          title={syncT?.keepLocalHint ?? 'Keep this device\'s version'}
+          onClick={togglePreview}
+          className="font-mono truncate hover:text-foreground hover:underline transition-colors flex-1 min-w-0 text-left"
+          title={syncT?.viewDiff ?? 'View differences'}
         >
-          {resolving === 'local' ? <Loader2 size={10} className="animate-spin" /> : (syncT?.keepLocal ?? 'Keep local')}
+          <ChevronRight size={11} className={`inline mr-1 transition-transform ${expanded ? 'rotate-90' : ''}`} />
+          {file}
         </button>
-        <button
-          type="button"
-          onClick={() => handleResolve('keep-remote')}
-          disabled={!!resolving}
-          className="px-2 py-0.5 rounded border border-border text-2xs hover:bg-muted transition-colors disabled:opacity-40"
-          title={syncT?.keepRemoteHint ?? 'Replace with remote version'}
-        >
-          {resolving === 'remote' ? <Loader2 size={10} className="animate-spin" /> : (syncT?.keepRemote ?? 'Keep remote')}
-        </button>
+        <span className="text-muted-foreground shrink-0">{timeAgo(time, syncT)}</span>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => handleResolve('keep-local')}
+            disabled={!!resolving}
+            className="px-2 py-0.5 rounded border border-border text-2xs hover:bg-muted transition-colors disabled:opacity-40"
+            title={syncT?.keepLocalHint ?? 'Keep this device\'s version'}
+          >
+            {resolving === 'local' ? <Loader2 size={10} className="animate-spin" /> : (syncT?.keepLocal ?? 'Keep local')}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleResolve('keep-remote')}
+            disabled={!!resolving}
+            className="px-2 py-0.5 rounded border border-border text-2xs hover:bg-muted transition-colors disabled:opacity-40"
+            title={syncT?.keepRemoteHint ?? 'Replace with remote version'}
+          >
+            {resolving === 'remote' ? <Loader2 size={10} className="animate-spin" /> : (syncT?.keepRemote ?? 'Keep remote')}
+          </button>
+        </div>
       </div>
+
+      {/* Diff preview */}
+      {expanded && (
+        <div className="border-t border-border/50">
+          {loadingPreview ? (
+            <div className="flex justify-center py-3">
+              <Loader2 size={13} className="animate-spin text-muted-foreground" />
+            </div>
+          ) : preview ? (
+            <div className="grid grid-cols-2 divide-x divide-border/50 text-2xs font-mono max-h-60 overflow-auto">
+              <div className="p-2">
+                <div className="text-muted-foreground mb-1 font-sans text-xs font-medium">
+                  {syncT?.localVersion ?? 'Local (this device)'}
+                </div>
+                <pre className="whitespace-pre-wrap text-foreground/80 leading-relaxed">{preview.local || (syncT?.emptyFile ?? '(empty)')}</pre>
+              </div>
+              <div className="p-2">
+                <div className="text-muted-foreground mb-1 font-sans text-xs font-medium">
+                  {syncT?.remoteVersion ?? 'Remote'}
+                </div>
+                <pre className="whitespace-pre-wrap text-foreground/80 leading-relaxed">{preview.remote || (syncT?.emptyFile ?? '(empty)')}</pre>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
@@ -442,10 +493,12 @@ export function SyncTab({ t }: SyncTabProps) {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const data = await apiFetch<SyncStatus>('/api/sync');
+      const data = await apiFetch<SyncStatus>('/api/sync', { timeout: 10000 });
       setStatus(data);
     } catch {
-      setStatus(null);
+      // Keep existing status on refresh failure (don't flash init form during recompile)
+      // Only set null if we never had a status (first load)
+      setStatus(prev => prev ?? null);
     } finally {
       setLoading(false);
     }

@@ -132,6 +132,7 @@ interface MessageListProps {
   isLoading: boolean;
   loadingPhase: 'connecting' | 'thinking' | 'streaming' | 'reconnecting';
   emptyPrompt: string;
+  emptyHint?: string;
   suggestions: readonly string[];
   onSuggestionClick: (text: string) => void;
   labels: {
@@ -147,6 +148,7 @@ export default memo(function MessageList({
   isLoading,
   loadingPhase,
   emptyPrompt,
+  emptyHint,
   suggestions,
   onSuggestionClick,
   labels,
@@ -162,6 +164,9 @@ export default memo(function MessageList({
       {messages.length === 0 && (
         <div className="mt-6 space-y-3 max-w-md mx-auto">
           <p className="text-center text-sm text-muted-foreground/60">{emptyPrompt}</p>
+          {emptyHint && (
+            <p className="text-center text-[11px] text-muted-foreground/40">{emptyHint}</p>
+          )}
           <div className="flex flex-wrap gap-2 px-2">
             {suggestions.map((s, i) => (
               <button
