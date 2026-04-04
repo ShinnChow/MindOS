@@ -297,13 +297,6 @@ export async function initSync(mindRoot, opts = {}) {
   const gitignorePath = resolve(mindRoot, '.gitignore');
   const SYSTEM_IGNORES = [
     'INSTRUCTION.md',
-    'README.md',
-    'CONFIG.json',
-    'CHANGELOG.md',
-    'TODO.md',
-    'Agent-Audit.md',
-    'Agent-Diff.md',
-    'CONFIG.md',
   ];
   if (!existsSync(gitignorePath)) {
     writeFileSync(gitignorePath, [
@@ -317,7 +310,7 @@ export async function initSync(mindRoot, opts = {}) {
       'node_modules/',
       '.obsidian/',
       '',
-      '# MindOS system files (managed by the app, not user content)',
+      '# MindOS system files (regenerated on update, not user content)',
       ...SYSTEM_IGNORES,
       '',
     ].join('\n'), 'utf-8');

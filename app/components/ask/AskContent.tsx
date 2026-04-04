@@ -484,6 +484,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
         isLoading={isLoading}
         loadingPhase={loadingPhase}
         emptyPrompt={t.ask.emptyPrompt}
+        emptyHint={t.ask.emptyHint}
         suggestions={t.ask.suggestions}
         onSuggestionClick={setInput}
         labels={messageLabels}
