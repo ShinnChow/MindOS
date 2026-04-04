@@ -23,7 +23,7 @@ function truncateContent(v: unknown, max = 120): string {
 
 // ─── Op Card ───────────────────────────────────────────────────────────────────
 
-function OpCard({ op }: { op: AgentOp }) {
+function OpCard({ op, copy }: { op: AgentOp; copy?: Record<string, string> }) {
   const router = useRouter();
   const { locale } = useLocale();
   const [expanded, setExpanded] = useState(false);
@@ -111,7 +111,7 @@ function OpCard({ op }: { op: AgentOp }) {
           )}
           {op.agentName && (
             <div className="font-display" style={{ marginTop: 6, fontSize: '0.68rem', color: 'var(--muted-foreground)' }}>
-              Agent: <span style={{ color: 'var(--foreground)', fontWeight: 500 }}>{op.agentName}</span>
+              {copy?.agentLabel ?? 'Agent'}: <span style={{ color: 'var(--foreground)', fontWeight: 500 }}>{op.agentName}</span>
             </div>
           )}
           <div className="font-display" style={{ marginTop: 6, fontSize: '0.65rem', color: 'var(--muted-foreground)', opacity: 0.5 }}>
@@ -213,7 +213,7 @@ export default function AgentActivitySection() {
 
       {/* Ops list */}
       <div>
-        {filtered.map((op, i) => <OpCard key={op.id ?? i} op={op} />)}
+        {filtered.map((op, i) => <OpCard key={op.id ?? i} op={op} copy={copy} />)}
       </div>
     </div>
   );
