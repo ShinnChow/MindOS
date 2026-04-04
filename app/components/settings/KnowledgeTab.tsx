@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useSyncExternalStore, useRef } from 'react';
-import { Copy, Check, RefreshCw, Trash2, Sparkles, ChevronDown, ChevronRight, Loader2, Cpu, Zap, Database as DatabaseIcon, HardDrive, RotateCcw } from 'lucide-react';
+import { Copy, Check, RefreshCw, Trash2, Sparkles, ChevronDown, ChevronRight, Loader2, Cpu, Zap, Database as DatabaseIcon, HardDrive, RotateCcw, FlaskConical } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import type { KnowledgeTabProps } from './types';
 import { Field, Input, EnvBadge, SectionLabel, Toggle, SettingCard, SettingRow } from './Primitives';
@@ -15,6 +15,15 @@ import { scanExampleFilesAction, cleanupExamplesAction } from '@/lib/actions';
 export function KnowledgeTab({ data, setData, t }: KnowledgeTabProps) {
   const env = data.envOverrides ?? {};
   const k = t.settings.knowledge;
+  const a = t.settings.appearance;
+
+  // Labs feature flags
+  const [labsEcho, setLabsEcho] = useState(() =>
+    typeof window !== 'undefined' ? localStorage.getItem('mindos:labs-echo') === '1' : false
+  );
+  const [labsWorkflows, setLabsWorkflows] = useState(() =>
+    typeof window !== 'undefined' ? localStorage.getItem('mindos:labs-workflows') === '1' : false
+  );
 
   // Hidden files toggle
   const [showHidden, setShowHidden] = useState(() =>
@@ -290,6 +299,32 @@ export function KnowledgeTab({ data, setData, t }: KnowledgeTabProps) {
         </SettingCard>
       )}
 
+      {/* ── Card 4: Labs — experimental features ── */}
+      <SettingCard icon={<FlaskConical size={15} />} title={a.labsTitle ?? 'Labs'} description={a.labsDesc ?? 'Experimental features that are still in development.'}>
+        <div className="space-y-3">
+          <LabsToggle
+            label={a.labsEcho ?? 'Echo'}
+            description={a.labsEchoDesc ?? 'Reflective journaling powered by your notes.'}
+            checked={labsEcho}
+            onChange={v => {
+              setLabsEcho(v);
+              localStorage.setItem('mindos:labs-echo', v ? '1' : '0');
+              window.dispatchEvent(new Event('mindos:labs-changed'));
+            }}
+          />
+          <LabsToggle
+            label={a.labsWorkflows ?? 'Flows'}
+            description={a.labsWorkflowsDesc ?? 'Visual workflow automation for agents.'}
+            checked={labsWorkflows}
+            onChange={v => {
+              setLabsWorkflows(v);
+              localStorage.setItem('mindos:labs-workflows', v ? '1' : '0');
+              window.dispatchEvent(new Event('mindos:labs-changed'));
+            }}
+          />
+        </div>
+      </SettingCard>
+
       {/* System Monitoring — collapsible */}
       <MonitoringSection k={k} />
 
@@ -322,6 +357,36 @@ export function KnowledgeTab({ data, setData, t }: KnowledgeTabProps) {
         onCancel={() => setShowCleanupConfirm(false)}
       />
     </div>
+  );
+}
+
+/* ── Labs Toggle ── */
+function LabsToggle({ label, description, checked, onChange }: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center gap-3 cursor-pointer group">
+      <div className="flex-1 min-w-0">
+        <span className="text-sm font-medium text-foreground block">{label}</span>
+        <span className="text-xs text-muted-foreground">{description}</span>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${
+          checked ? 'bg-[var(--amber)]' : 'bg-muted-foreground/20'
+        }`}
+      >
+        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${
+          checked ? 'translate-x-4' : 'translate-x-0'
+        }`} />
+      </button>
+    </label>
   );
 }
 
