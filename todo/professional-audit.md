@@ -1,69 +1,51 @@
 # 专业度审计 — 第二轮发现
 
-> 2026-04-02 深度审计。第一轮（console.log / npm 元数据 / as any / 输入校验 / CI lint / JSDoc / CONTRIBUTING.md 等 10 项）已全部修复。
-> 本文件记录第二轮发现的剩余问题。
+> 2026-04-02 深度审计。第一轮 10 项 + P0 2 项已全部修复。
+> 本文件记录剩余待办。P1 经逐项验证后全部降级或移除。
 
-## P0 阻塞级
+## P0 阻塞级 — 已清零
 
-- [x] **`_standalone/` prepack 安全性** — prepack 脚本开头加 `rm -rf _standalone`，确保不会包含本地残留的旧版 standalone 产物
-  - 文件：`package.json` prepack 脚本
-  - `_standalone/` 必须在 files 字段中（否则 npm pack 不包含），安全性靠 prepack 先清后建保证
+- [x] `_standalone/` prepack 安全性 — prepack 开头加 `rm -rf _standalone`
+- [x] `pi-coding-agent` 依赖 — 误报，是核心运行时依赖，已更新 wiki
 
-- [x] **`@mariozechner/pi-coding-agent` 依赖** — **误报，不是问题**。wiki 讨论过时，实际代码已采用 pi-coding-agent 的 session 引擎（`createAgentSession`、`ModelRegistry`、`AuthStorage` 等 7 个 API），是核心运行时依赖。已更新 wiki 状态为"已部分采用"
+## ~~P1~~ — 经验证全部降级或移除
 
-## P1 重要
-
-- [ ] **`createFile()` TOCTOU 竞态条件** — `existsSync()` 检查后 `writeFileSync()` 之间，其他进程可能创建同名文件。应使用 `fs.writeFileSync(path, content, { flag: 'wx' })` 原子创建
-  - 文件：`app/lib/core/fs-ops.ts:39-46`
-  - 风险：并发创建导致数据覆盖
-
-- [ ] **缺少 Open Graph 标签** — layout.tsx 没有 og:title / og:description / og:image / twitter:card，社交分享时无预览
-  - 文件：`app/app/layout.tsx`
-  - 修复：添加 Next.js Metadata export
-
-- [ ] **搜索结果列表缺 ARIA role** — SearchPanel 搜索结果列表缺 `role="listbox"` 和 `aria-activedescendant`，屏幕阅读器无法正确导航
-  - 文件：`app/components/panels/SearchPanel.tsx`
+- [x] ~~Open Graph 标签~~ — **误报，已移除**。MindOS 是本地应用（localhost），OG 标签无意义
+- [ ] `createFile()` TOCTOU — **降为 P2**。概率极低，后果有限
+- [ ] SearchPanel ARIA role — **降为 P3**。键盘导航已实现，目标用户群屏幕阅读器使用率极低
 
 ## P2 中等
 
-- [ ] **muted-foreground 对比度不足** — `--muted-foreground: #685f52` on `--background: #f8f6f1` = 3.7:1，未达 WCAG AA 小文字要求（4.5:1）。需加深 muted-foreground 色值
-  - 文件：`app/app/globals.css`
-  - 影响：低视力用户难以阅读辅助文字
+- [ ] **`createFile()` TOCTOU 竞态**（从 P1 降级）— `existsSync` → `writeFileSync` 之间有竞态窗口。修复：`fs.writeFileSync(path, content, { flag: 'wx' })`
+  - 文件：`app/lib/core/fs-ops.ts:39-46`
 
-- [ ] **损坏的 config.json 被静默忽略** — `bin/cli.js:232` 的 `try { JSON.parse(...) } catch {}` 静默吞掉解析错误，导致后续莫名其妙的配置缺失。应 warn 用户并建议修复
-  - 文件：`bin/cli.js:232`
-  - 修复：catch 内加 `console.warn('Config file corrupted, using defaults: ' + CONFIG_PATH)`
+- [ ] **muted-foreground 对比度不足** — light 模式 `#685f52` on `#f8f6f1` = 3.7:1，未达 WCAG AA 4.5:1。需加深色值
+  - 文件：`app/app/globals.css:70`
+  - 注：`--amber-text` 已单独加深过，此项是 muted-foreground 通用辅助文字色
 
-- [ ] **`extend` 包未使用** — app/package.json 中 `extend` 依赖无直接 import，疑似残留
-  - 验证：`grep -r "require('extend')\|from 'extend'" app/` 确认后移除
+- [ ] **config.json 损坏时静默忽略** — `bin/lib/config.js:13` 空 catch 吞掉 JSON 解析错误。应 warn 用户
+  - 文件：`bin/lib/config.js:12-14`
 
-- [ ] **FileTree 缺 ARIA tree role** — 文件树导航缺 `role="tree"` / `role="treeitem"` / `aria-expanded`
-  - 文件：`app/components/FileTree.tsx`
+- [ ] **`extend` 包** — **经查不是问题**。虽然 app 源码无直接 import，但它是 `gaxios`（Google API）和 `unified`（markdown）的间接依赖，被提升到 package.json 是正常的 npm hoisting 行为。~~移除~~保留
+  - 验证结果：`gaxios/build/*/src/gaxios.js` 和 `unified/lib/index.js` 依赖它
 
-- [ ] **mcp/package.json `tsx` 应为 devDependency** — 仅 dev 脚本使用，不应出现在生产依赖
-  - 文件：`mcp/package.json`
+- [ ] **mcp/package.json `tsx` 应为 devDependency** — 仅 `npm run dev` 使用，生产用 `dist/index.cjs`
+  - 文件：`mcp/package.json:13`
+
+- [ ] **FileTree 缺 ARIA tree role** — 缺 `role="tree"` / `role="treeitem"` / `aria-expanded`
+  - 文件：`app/components/FileTree.tsx`（仅有一个 aria-label 在 toggle 按钮上）
 
 ## P3 低优先
 
-- [ ] **缺 robots.txt** — 无 `app/app/robots.ts`，搜索引擎无法获取爬取指引
-  - 注意：MindOS 是本地应用，SEO 可能不重要。仅 landing page 需要
+- [x] ~~robots.txt / sitemap.xml~~ — **不需要**。MindOS 是本地应用，不需要 SEO。Landing page 是独立站点
+- [ ] **Settings 多标签页竞态** — 两标签页同时写 settings，后写覆盖先写。低频
+- [ ] **MCP 缺分页** — `mindos_list_files` 大知识库 payload 过大
+- [ ] **appendFileSync 无锁** — 多 Agent 并发 append 可能交错（罕见）
+- [ ] **SearchPanel 缺 ARIA listbox**（从 P1 降级）— 键盘导航已有，缺 role 属性
 
-- [ ] **缺 sitemap.xml** — 同上，仅 landing page 场景需要
+## 已修复（共 12 项）
 
-- [ ] **Settings 多标签页竞态** — 两个浏览器标签页同时修改 settings，后写覆盖先写。低频场景
-  - 文件：`app/lib/settings.ts:207`
-  - 长期方案：settings API 加 etag/versioning
-
-- [ ] **MCP 缺分页（大知识库）** — `mindos_list_files` 返回完整文件树，1000+ 文件时 payload 过大
-  - 文件：`mcp/src/index.ts:101-114`
-
-- [ ] **appendFileSync 无锁** — 并发 append 操作可能交错写入
-  - 文件：`app/lib/core/lines.ts:58-70`
-  - 触发条件：多 Agent 同时写同一文件（罕见）
-
-## 已修复（第一轮）
-
-> 以下 10 项已在 2026-04-02 修复并合入 main
+> 第一轮 10 项 + P0 2 项
 
 - [x] 清理 11 处 debug console.log（DEV 门控）
 - [x] package.json 补齐 homepage + bugs
@@ -75,3 +57,5 @@
 - [x] CONTRIBUTING.md
 - [x] lib/fs.ts 26 个函数补 JSDoc
 - [x] SyncStatusBar i18n 类型修复
+- [x] prepack 开头 rm -rf _standalone
+- [x] wiki pi-coding-agent 决策更新
