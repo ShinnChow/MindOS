@@ -141,17 +141,29 @@ function getUnpushedCount(cwd) {
 // ── Core sync functions ─────────────────────────────────────────────────────
 
 function autoCommitAndPush(mindRoot, isSshUrl = false) {
+  const sshEnv = isSshUrl ? getSshEnv() : {};
+  const pushEnv = { ...process.env, ...sshEnv };
+
+  // Stage and commit any pending changes
   try {
-    const sshEnv = isSshUrl ? getSshEnv() : {};
     execFileSync('git', ['add', '-A'], { cwd: mindRoot, stdio: 'pipe' });
     const status = gitExec(['status', '--porcelain'], mindRoot);
-    if (!status) return;
-    const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
-    execFileSync('git', ['commit', '-m', `auto-sync: ${timestamp}`], { cwd: mindRoot, stdio: 'pipe' });
-    execFileSync('git', ['push', '-u', 'origin', 'HEAD'], { cwd: mindRoot, stdio: 'pipe', env: { ...process.env, ...sshEnv } });
+    if (status) {
+      const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+      execFileSync('git', ['commit', '-m', `auto-sync: ${timestamp}`], { cwd: mindRoot, stdio: 'pipe' });
+    }
+  } catch (err) {
+    saveSyncState({ ...loadSyncState(), lastError: `Commit failed: ${err.message}`, lastErrorTime: new Date().toISOString() });
+    return;
+  }
+
+  // Always try to push (even if no new commit — there may be unpushed commits from previous runs)
+  try {
+    execFileSync('git', ['push', '-u', 'origin', 'HEAD'], { cwd: mindRoot, stdio: 'pipe', env: pushEnv });
     saveSyncState({ ...loadSyncState(), lastSync: new Date().toISOString(), lastError: null });
   } catch (err) {
-    saveSyncState({ ...loadSyncState(), lastError: err.message, lastErrorTime: new Date().toISOString() });
+    saveSyncState({ ...loadSyncState(), lastError: `Push failed: ${err.message}`, lastErrorTime: new Date().toISOString() });
+    throw err; // Let caller know push failed
   }
 }
 
@@ -208,13 +220,10 @@ function autoPull(mindRoot, isSshUrl = false) {
 
   // Retry any pending pushes (handles previous push failures)
   try {
-    const unpushed = gitExec(['rev-list', '--count', '@{u}..HEAD'], mindRoot);
-    if (parseInt(unpushed) > 0) {
-      execFileSync('git', ['push'], { cwd: mindRoot, stdio: 'pipe' });
-      saveSyncState({ ...loadSyncState(), lastSync: new Date().toISOString(), lastError: null });
-    }
+    execFileSync('git', ['push', '-u', 'origin', 'HEAD'], { cwd: mindRoot, stdio: 'pipe', env: { ...process.env, ...sshEnv } });
+    saveSyncState({ ...loadSyncState(), lastSync: new Date().toISOString(), lastError: null });
   } catch {
-    // No upstream tracking or push failed — ignore silently, autoCommitAndPush handles primary pushes
+    // Push failed — will be retried next cycle or by manualSync
   }
 }
 
@@ -513,7 +522,7 @@ export function manualSync(mindRoot) {
   const remoteUrl = getRemoteUrl(mindRoot) || '';
   const isSshUrl = isSSHUrl(remoteUrl);
   autoPull(mindRoot, isSshUrl);
-  autoCommitAndPush(mindRoot, isSshUrl);
+  autoCommitAndPush(mindRoot, isSshUrl); // throws on push failure → API returns error
 }
 
 /**
