@@ -162,19 +162,23 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, session.messages, session.activeSessionId, isLoading]);
 
-  // Esc to close — modal only
+  // Esc to close modal or exit focus mode
   useEffect(() => {
-    if (variant !== 'modal' || !visible || !onClose) return;
+    if (!visible) return;
+    const isModal = variant === 'modal';
+    const isFocused = variant === 'panel' && maximized;
+    if (!isModal && !isFocused) return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (mention.mentionQuery !== null) { mention.resetMention(); return; }
         if (slash.slashQuery !== null) { slash.resetSlash(); return; }
-        onClose();
+        if (isFocused && onMaximize) { onMaximize(); return; }
+        if (isModal && onClose) { onClose(); }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [variant, visible, onClose, mention, slash]);
+  }, [variant, visible, onClose, mention, slash, maximized, onMaximize]);
 
   // Close attach menu on any outside click
   useEffect(() => {

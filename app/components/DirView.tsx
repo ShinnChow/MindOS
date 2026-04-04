@@ -5,11 +5,9 @@ import Link from 'next/link';
 import { FileText, Table, Folder, FolderOpen, LayoutGrid, List, FilePlus, ScrollText, BookOpen, Copy } from 'lucide-react';
 import Breadcrumb from '@/components/Breadcrumb';
 import { encodePath, relativeTime } from '@/lib/utils';
-import { FileNode } from '@/lib/types';
+import { FileNode, SYSTEM_FILES } from '@/lib/types';
 import type { SpacePreview } from '@/lib/core/types';
 import { useLocale } from '@/lib/LocaleContext';
-
-const SYSTEM_FILES = new Set(['INSTRUCTION.md', 'README.md']);
 
 async function copyPathToClipboard(path: string) {
   try { await navigator.clipboard.writeText(path); } catch { /* noop */ }
@@ -39,6 +37,27 @@ function countFiles(node: FileNode): number {
 }
 
 const DIR_VIEW_KEY = 'mindos-dir-view';
+const HIDDEN_FILES_KEY = 'show-hidden-files';
+
+function subscribeHiddenFiles(cb: () => void) {
+  const handler = (e: StorageEvent) => { if (e.key === HIDDEN_FILES_KEY) cb(); };
+  const custom = () => cb();
+  window.addEventListener('storage', handler);
+  window.addEventListener('mindos:hidden-files-changed', custom);
+  return () => {
+    window.removeEventListener('storage', handler);
+    window.removeEventListener('mindos:hidden-files-changed', custom);
+  };
+}
+
+function getShowHiddenFiles() {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(HIDDEN_FILES_KEY) === 'true';
+}
+
+function useShowHiddenFiles() {
+  return useSyncExternalStore(subscribeHiddenFiles, getShowHiddenFiles, () => false);
+}
 
 function useDirViewPref() {
   const view = useSyncExternalStore(
@@ -172,6 +191,7 @@ function DirContextMenu({ x, y, path, label, onClose }: {
 
 export default function DirView({ dirPath, entries, spacePreview }: DirViewProps) {
   const [view, setView] = useDirViewPref();
+  const showHidden = useShowHiddenFiles();
   const { t } = useLocale();
   const formatTime = (mtime: number) => relativeTime(mtime, t.home.relativeTime);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; path: string } | null>(null);
@@ -183,11 +203,8 @@ export default function DirView({ dirPath, entries, spacePreview }: DirViewProps
   }, []);
 
   const visibleEntries = useMemo(() => {
-    if (spacePreview) {
-      return entries.filter(e => e.type !== 'file' || !SYSTEM_FILES.has(e.name));
-    }
-    return entries.filter(e => e.type !== 'file' || e.name !== 'README.md');
-  }, [entries, spacePreview]);
+    return showHidden ? entries : entries.filter(e => e.type !== 'file' || !SYSTEM_FILES.has(e.name));
+  }, [entries, showHidden]);
 
   const fileCounts = useMemo(() => {
     const map = new Map<string, number>();

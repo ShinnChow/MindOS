@@ -1,5 +1,5 @@
 import { getModel as piGetModel, type Model } from '@mariozechner/pi-ai';
-import { effectiveAiConfig, type ProviderConfig } from '@/lib/settings';
+import { effectiveAiConfig } from '@/lib/settings';
 import { type ProviderId, PROVIDER_PRESETS, getPreset } from './providers';
 
 /** Check if any message in the conversation contains images */
@@ -109,9 +109,3 @@ function resolveModel(preset: typeof PROVIDER_PRESETS[ProviderId], modelName: st
   return model;
 }
 
-/** Get the effective provider's saved config (for API routes that read per-provider settings) */
-export function getProviderConfig(provider: ProviderId): ProviderConfig | undefined {
-  const { readSettings } = require('@/lib/settings');
-  const s = readSettings();
-  return s.ai.providers[provider];
-}

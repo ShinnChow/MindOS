@@ -7,8 +7,8 @@ import { useResizeDrag } from '@/hooks/useResizeDrag';
 
 const DEFAULT_WIDTH = 380;
 const MIN_WIDTH = 300;
-const MAX_WIDTH_ABS = 700;
-const MAX_WIDTH_RATIO = 0.45;
+const MAX_WIDTH_ABS = 1400;
+const MAX_WIDTH_RATIO = 0.92;
 
 import type { AcpAgentSelection } from '@/hooks/useAskModal';
 
@@ -41,20 +41,24 @@ export default function RightAskPanel({
     maxWidth: MAX_WIDTH_ABS,
     maxWidthRatio: MAX_WIDTH_RATIO,
     direction: 'left',
+    disabled: maximized,
     onResize: onWidthChange,
     onResizeEnd: onWidthCommit,
   });
+
+  const effectiveWidth = maximized
+    ? `calc(100vw - ${sidebarOffset}px)`
+    : `${width}px`;
 
   return (
     <aside
       className={`
         hidden md:flex fixed top-0 right-0 h-screen z-40
         flex-col bg-card border-l border-border
-        transition-all duration-200 ease-out
+        transition-[width,transform] duration-200 ease-out
         ${open ? 'translate-x-0' : 'translate-x-full pointer-events-none'}
-        ${maximized ? 'border-l-0' : ''}
       `}
-      style={maximized ? { left: `${sidebarOffset}px` } : { width: `${width}px` }}
+      style={{ width: effectiveWidth }}
       role="complementary"
       aria-label="MindOS Agent panel"
     >

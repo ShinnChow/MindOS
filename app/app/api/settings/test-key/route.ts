@@ -16,8 +16,10 @@ function classifyPiAiError(err: unknown): { code: ErrorCode; error: string } {
   if (err instanceof Error && err.name === 'AbortError')
     return { code: 'network_error', error: 'Request timed out' };
 
-  if (lower.includes('401') || lower.includes('403') || lower.includes('invalid') && lower.includes('key')
-    || lower.includes('authentication') || lower.includes('unauthorized'))
+  if (lower.includes('401') || lower.includes('403')
+    || (lower.includes('invalid') && lower.includes('key'))
+    || lower.includes('authentication') || lower.includes('unauthorized')
+    || lower.includes('api key') && (lower.includes('not valid') || lower.includes('incorrect')))
     return { code: 'auth_error', error: 'Invalid API key' };
 
   if (lower.includes('404') || lower.includes('not found') || lower.includes('does not exist'))

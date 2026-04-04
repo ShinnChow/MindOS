@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useTransition, useEffect, useSyncExternalStore } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { FileNode } from '@/lib/types';
+import { FileNode, SYSTEM_FILES } from '@/lib/types';
 import { encodePath } from '@/lib/utils';
 import {
   ChevronDown, FileText, Table, Folder, FolderOpen, Plus, Loader2,
@@ -21,8 +21,6 @@ function notifyFilesChanged() {
 async function copyPathToClipboard(path: string) {
   try { await navigator.clipboard.writeText(path); } catch { /* noop */ }
 }
-
-const SYSTEM_FILES = new Set(['INSTRUCTION.md', 'README.md']);
 
 const HIDDEN_FILES_KEY = 'show-hidden-files';
 
@@ -78,12 +76,10 @@ function countContentFiles(node: FileNode): number {
   return (node.children ?? []).reduce((sum, c) => sum + countContentFiles(c), 0);
 }
 
-function filterVisibleNodes(nodes: FileNode[], parentIsSpace: boolean): FileNode[] {
+function filterVisibleNodes(nodes: FileNode[]): FileNode[] {
   return nodes.filter(node => {
     if (node.type !== 'file') return true;
-    if (parentIsSpace && SYSTEM_FILES.has(node.name)) return false;
-    if (!parentIsSpace && node.name === 'README.md') return false;
-    return true;
+    return !SYSTEM_FILES.has(node.name);
   });
 }
 
@@ -761,9 +757,9 @@ export default function FileTree({ nodes, depth = 0, onNavigate, maxOpenDepth, p
   const currentPath = getCurrentFilePath(pathname);
   const showHidden = useShowHiddenFiles();
 
-  const isInsideDir = depth > 0;
-  let visibleNodes = isInsideDir ? filterVisibleNodes(nodes, !!parentIsSpace) : nodes;
-  if (!isInsideDir && !showHidden) {
+  const isRoot = depth === 0;
+  let visibleNodes = showHidden ? nodes : filterVisibleNodes(nodes);
+  if (isRoot && !showHidden) {
     visibleNodes = visibleNodes.filter(n => !n.name.startsWith('.'));
   }
 
