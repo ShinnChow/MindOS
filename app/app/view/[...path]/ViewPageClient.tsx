@@ -577,7 +577,7 @@ export default function ViewPageClient({
               <JsonView content={savedContent} />
             ) : (
               <>
-                <MarkdownView content={savedContent} highlightLines={changedLines} onDismissHighlight={() => setChangedLines([])} />
+                <MarkdownView content={savedContent} highlightLines={changedLines} onDismissHighlight={() => setChangedLines([])} emptyPlaceholder={t.view?.emptyNote} />
                 <TableOfContents content={savedContent} />
               </>
             )}

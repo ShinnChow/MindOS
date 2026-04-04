@@ -229,6 +229,18 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      case 'conflict-preview': {
+        const file = body.remote;
+        if (!file || typeof file !== 'string') {
+          return NextResponse.json({ error: 'Missing file path' }, { status: 400 });
+        }
+        const localPath = join(mindRoot, file);
+        const remotePath = join(mindRoot, file + '.sync-conflict');
+        const local = existsSync(localPath) ? readFileSync(localPath, 'utf-8') : '';
+        const remote = existsSync(remotePath) ? readFileSync(remotePath, 'utf-8') : '';
+        return NextResponse.json({ local, remote });
+      }
+
       default:
         return NextResponse.json({ error: `Unknown action: ${body.action}` }, { status: 400 });
     }

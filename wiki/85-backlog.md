@@ -166,8 +166,8 @@
 - [x] **P2：浮动按钮无 tooltip** — i18n title + aria-label（EN/ZH）
 - [x] **P3：代理未找到页面空旷** — 增加排查提示 + 已连接代理建议列表
 - [x] **Agent Inspector 身份追踪** — 审计日志记录操作来源 Agent（Claude Code / Cursor / Windsurf / MindOS Ask）。MCP clientInfo 端到端传递 + UI 徽标展示
-- [ ] **P3：帮助页面缺悬浮目录** — `/help` 长内容需添加浮动 TOC 或锚点跳转
-- [ ] **P3：Echo 侧边栏利用不足** — 5 项占 ~200px，添加最近活动或快捷统计
+- [x] **P3：帮助页面缺悬浮目录** — `/help` 长内容需添加浮动 TOC 或锚点跳转
+- [x] **P3：Echo 侧边栏利用不足** — 5 项占 ~200px，添加最近活动或快捷统计
 - [x] **P3：用例卡片截断不一致** — 验证已有 `line-clamp-2`，截断一致，无需修改
 - [x] **P3：操作类型徽章无按类型着色** — create/import=绿, delete=红, rename/move=灰, update=默认
 
