@@ -31,31 +31,31 @@ function getSyncErrorHint(error: string, remote?: string | null, syncT?: Record<
 
   // SSH authentication failures
   if (lower.includes('permission denied') || lower.includes('publickey')) {
-    return syncT?.hintSshAuth as string ?? 'SSH key may not be configured. Run: ssh-keygen -t ed25519 && ssh -T git@github.com';
+    return (syncT?.hintSshAuth as string) ?? 'SSH key may not be configured. Run: ssh-keygen -t ed25519 && ssh -T git@github.com';
   }
   // SSH host key / connection
   if (lower.includes('host key') || lower.includes('known_hosts') || lower.includes('fingerprint')) {
-    return syncT?.hintSshHost as string ?? 'Run: ssh-keyscan github.com >> ~/.ssh/known_hosts';
+    return (syncT?.hintSshHost as string) ?? 'Run: ssh-keyscan github.com >> ~/.ssh/known_hosts';
   }
   // HTTPS auth failures
   if (lower.includes('authentication failed') || lower.includes('invalid credentials') || lower.includes('401') || lower.includes('403')) {
-    return syncT?.hintHttpsAuth as string ?? 'Access token may be expired or missing. Check Settings → Developer settings → Personal access tokens.';
+    return (syncT?.hintHttpsAuth as string) ?? 'Access token may be expired or missing. Check Settings → Developer settings → Personal access tokens.';
   }
   // Network / timeout
   if (lower.includes('timed out') || lower.includes('timeout') || lower.includes('could not resolve')) {
-    return syncT?.hintNetwork as string ?? 'Check your network connection and try again.';
+    return (syncT?.hintNetwork as string) ?? 'Check your network connection and try again.';
   }
   // Remote not found
   if (lower.includes('not found') || lower.includes('does not exist') || lower.includes('repository not found')) {
-    return syncT?.hintNotFound as string ?? 'Repository not found. Check the URL and ensure the repo exists.';
+    return (syncT?.hintNotFound as string) ?? 'Repository not found. Check the URL and ensure the repo exists.';
   }
   // Push rejected (non-fast-forward)
   if (lower.includes('non-fast-forward') || lower.includes('rejected') || lower.includes('fetch first')) {
-    return syncT?.hintPushRejected as string ?? 'Remote has changes. Click "Sync Now" to pull and retry.';
+    return (syncT?.hintPushRejected as string) ?? 'Remote has changes. Click "Sync Now" to pull and retry.';
   }
   // Merge conflicts
   if (lower.includes('conflict') || lower.includes('merge')) {
-    return syncT?.hintConflict as string ?? 'Merge conflict detected. Check the Conflicts section below.';
+    return (syncT?.hintConflict as string) ?? 'Merge conflict detected. Check the Conflicts section below.';
   }
 
   return '';
@@ -111,7 +111,7 @@ function ConflictRow({ file, time, syncT, onResolved }: {
           type="button"
           onClick={togglePreview}
           className="font-mono truncate hover:text-foreground hover:underline transition-colors flex-1 min-w-0 text-left"
-          title={syncT?.viewDiff ?? 'View differences'}
+          title={(syncT?.viewDiff as string) ?? 'View differences'}
         >
           <ChevronRight size={11} className={`inline mr-1 transition-transform ${expanded ? 'rotate-90' : ''}`} />
           {file}
@@ -123,18 +123,18 @@ function ConflictRow({ file, time, syncT, onResolved }: {
             onClick={() => handleResolve('keep-local')}
             disabled={!!resolving}
             className="px-2 py-0.5 rounded border border-border text-2xs hover:bg-muted transition-colors disabled:opacity-40"
-            title={syncT?.keepLocalHint ?? 'Keep this device\'s version'}
+            title={(syncT?.keepLocalHint as string) ?? 'Keep this device\'s version'}
           >
-            {resolving === 'local' ? <Loader2 size={10} className="animate-spin" /> : (syncT?.keepLocal ?? 'Keep local')}
+            {resolving === 'local' ? <Loader2 size={10} className="animate-spin" /> : ((syncT?.keepLocal as string) ?? 'Keep local')}
           </button>
           <button
             type="button"
             onClick={() => handleResolve('keep-remote')}
             disabled={!!resolving}
             className="px-2 py-0.5 rounded border border-border text-2xs hover:bg-muted transition-colors disabled:opacity-40"
-            title={syncT?.keepRemoteHint ?? 'Replace with remote version'}
+            title={(syncT?.keepRemoteHint as string) ?? 'Replace with remote version'}
           >
-            {resolving === 'remote' ? <Loader2 size={10} className="animate-spin" /> : (syncT?.keepRemote ?? 'Keep remote')}
+            {resolving === 'remote' ? <Loader2 size={10} className="animate-spin" /> : ((syncT?.keepRemote as string) ?? 'Keep remote')}
           </button>
         </div>
       </div>
@@ -150,15 +150,15 @@ function ConflictRow({ file, time, syncT, onResolved }: {
             <div className="grid grid-cols-2 divide-x divide-border/50 text-2xs font-mono max-h-60 overflow-auto">
               <div className="p-2">
                 <div className="text-muted-foreground mb-1 font-sans text-xs font-medium">
-                  {syncT?.localVersion ?? 'Local (this device)'}
+                  {(syncT?.localVersion as string) ?? 'Local (this device)'}
                 </div>
-                <pre className="whitespace-pre-wrap text-foreground/80 leading-relaxed">{preview.local || (syncT?.emptyFile ?? '(empty)')}</pre>
+                <pre className="whitespace-pre-wrap text-foreground/80 leading-relaxed">{preview.local || ((syncT?.emptyFile as string) ?? '(empty)')}</pre>
               </div>
               <div className="p-2">
                 <div className="text-muted-foreground mb-1 font-sans text-xs font-medium">
-                  {syncT?.remoteVersion ?? 'Remote'}
+                  {(syncT?.remoteVersion as string) ?? 'Remote'}
                 </div>
-                <pre className="whitespace-pre-wrap text-foreground/80 leading-relaxed">{preview.remote || (syncT?.emptyFile ?? '(empty)')}</pre>
+                <pre className="whitespace-pre-wrap text-foreground/80 leading-relaxed">{preview.remote || ((syncT?.emptyFile as string) ?? '(empty)')}</pre>
               </div>
             </div>
           ) : null}
@@ -216,7 +216,7 @@ function GitignoreEditor({ syncT }: { syncT?: Record<string, unknown> }) {
       >
         <ChevronRight size={14} className={`shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
         <FileX2 size={13} className="shrink-0" />
-        <span>{syncT?.gitignoreTitle ?? 'Excluded files'}</span>
+        <span>{(syncT?.gitignoreTitle as string) ?? 'Excluded files'}</span>
         <span className="text-2xs opacity-50">.gitignore</span>
       </button>
 
@@ -233,7 +233,7 @@ function GitignoreEditor({ syncT }: { syncT?: Record<string, unknown> }) {
                 onChange={e => setContent(e.target.value)}
                 rows={8}
                 className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-mono leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-y"
-                placeholder={syncT?.gitignorePlaceholder ?? '# Files to exclude from sync\n*.tmp\nsecret/'}
+                placeholder={(syncT?.gitignorePlaceholder as string) ?? '# Files to exclude from sync\n*.tmp\nsecret/'}
                 spellCheck={false}
               />
               <div className="flex items-center gap-2">
@@ -243,12 +243,12 @@ function GitignoreEditor({ syncT }: { syncT?: Record<string, unknown> }) {
                     onClick={handleSave}
                     className="flex items-center gap-1.5 px-3 py-1 text-xs rounded-lg bg-[var(--amber)] text-[var(--amber-foreground)] hover:opacity-90 transition-opacity"
                   >
-                    {syncT?.gitignoreSave ?? 'Save'}
+                    {(syncT?.gitignoreSave as string) ?? 'Save'}
                   </button>
                 )}
                 {saveOk && (
                   <span className="flex items-center gap-1 text-xs text-success">
-                    <Check size={12} /> {syncT?.gitignoreSaved ?? 'Saved'}
+                    <Check size={12} /> {(syncT?.gitignoreSaved as string) ?? 'Saved'}
                   </span>
                 )}
               </div>
@@ -269,7 +269,7 @@ function isValidGitUrl(url: string): 'https' | 'ssh' | false {
 }
 
 function SyncEmptyState({ t, onInitComplete }: { t: Messages; onInitComplete: () => void }) {
-  const syncT = t.settings?.sync;
+  const syncT = t.settings?.sync as Record<string, unknown> | undefined;
 
   const [remoteUrl, setRemoteUrl] = useState('');
   const [token, setToken] = useState('');
@@ -312,7 +312,7 @@ function SyncEmptyState({ t, onInitComplete }: { t: Messages; onInitComplete: ()
     } catch (err: unknown) {
       let msg = err instanceof Error ? err.message : 'Connection failed';
       if (msg.includes('timed out')) {
-        msg = syncT?.timeoutError ?? 'Connection timed out. The remote repository may be large or the network is slow. Please try again.';
+        msg = (syncT?.timeoutError as string) ?? 'Connection timed out. The remote repository may be large or the network is slow. Please try again.';
       }
       const hint = getSyncErrorHint(msg, remoteUrl, syncT);
       setError(hint ? `${msg}\n${hint}` : msg);
@@ -324,24 +324,24 @@ function SyncEmptyState({ t, onInitComplete }: { t: Messages; onInitComplete: ()
   };
 
   const connectSteps = [
-    syncT?.stepConnecting ?? 'Connecting to remote...',
-    syncT?.stepAuthenticating ?? 'Authenticating...',
-    syncT?.stepSyncing ?? 'Syncing data...',
-    syncT?.stepAlmostDone ?? 'Almost done...',
+    (syncT?.stepConnecting as string) ?? 'Connecting to remote...',
+    (syncT?.stepAuthenticating as string) ?? 'Authenticating...',
+    (syncT?.stepSyncing as string) ?? 'Syncing data...',
+    (syncT?.stepAlmostDone as string) ?? 'Almost done...',
   ];
 
   return (
     <div className="space-y-4">
       <SettingCard
         icon={<GitBranch size={15} />}
-        title={syncT?.emptyTitle ?? 'Cross-device Sync'}
-        description={syncT?.emptyDesc ?? 'Automatically sync your knowledge base across devices via Git.'}
+        title={(syncT?.emptyTitle as string) ?? 'Cross-device Sync'}
+        description={(syncT?.emptyDesc as string) ?? 'Automatically sync your knowledge base across devices via Git.'}
       >
         {/* Git Remote URL */}
         <Field
-          label={syncT?.remoteUrl ?? 'Git Remote URL'}
+          label={(syncT?.remoteUrl as string) ?? 'Git Remote URL'}
           hint={urlType === 'ssh'
-            ? (syncT?.sshHint ?? 'Requires SSH key on this machine. Verify with: ssh -T git@github.com')
+            ? ((syncT?.sshHint as string) ?? 'Requires SSH key on this machine. Verify with: ssh -T git@github.com')
             : undefined
           }
         >
@@ -354,13 +354,13 @@ function SyncEmptyState({ t, onInitComplete }: { t: Messages; onInitComplete: ()
           />
           {!remoteUrl.trim() && (
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1.5">
-              <span><code className="text-foreground/60 bg-muted/60 px-1 py-0.5 rounded text-2xs">SSH</code> {syncT?.sshBrief ?? 'one-time key setup, no token needed'}</span>
-              <span><code className="text-foreground/60 bg-muted/60 px-1 py-0.5 rounded text-2xs">HTTPS</code> {syncT?.httpsBrief ?? 'works anywhere, token recommended'}</span>
+              <span><code className="text-foreground/60 bg-muted/60 px-1 py-0.5 rounded text-2xs">SSH</code> {(syncT?.sshBrief as string) ?? 'one-time key setup, no token needed'}</span>
+              <span><code className="text-foreground/60 bg-muted/60 px-1 py-0.5 rounded text-2xs">HTTPS</code> {(syncT?.httpsBrief as string) ?? 'works anywhere, token recommended'}</span>
             </div>
           )}
           {remoteUrl.trim() && !isValid && (
             <p className="text-xs text-destructive mt-1">
-              {syncT?.invalidUrl ?? 'Invalid Git URL — use HTTPS (https://...) or SSH (git@...)'}
+              {(syncT?.invalidUrl as string) ?? 'Invalid Git URL — use HTTPS (https://...) or SSH (git@...)'}
             </p>
           )}
         </Field>
@@ -368,7 +368,7 @@ function SyncEmptyState({ t, onInitComplete }: { t: Messages; onInitComplete: ()
         {/* Access Token (HTTPS only) */}
         {showTokenField && (
           <Field
-            label={<>{syncT?.accessToken ?? 'Access Token'} <span className="text-muted-foreground font-normal">{syncT?.optional ?? '(optional, for private repos)'}</span></>}
+            label={<>{(syncT?.accessToken as string) ?? 'Access Token'} <span className="text-muted-foreground font-normal">{(syncT?.optional as string) ?? '(optional, for private repos)'}</span></>}
             hint={undefined}
           >
             <div className="relative">
@@ -388,21 +388,21 @@ function SyncEmptyState({ t, onInitComplete }: { t: Messages; onInitComplete: ()
               </button>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {syncT?.tokenHint ?? 'GitHub:'}{' '}
+              {(syncT?.tokenHint as string) ?? 'GitHub:'}{' '}
               <a
                 href="https://github.com/settings/tokens/new?scopes=repo&description=MindOS+Sync"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:text-foreground transition-colors"
               >
-                {syncT?.tokenLink ?? 'Create a token (repo scope)'}
+                {(syncT?.tokenLink as string) ?? 'Create a token (repo scope)'}
               </a>
             </p>
           </Field>
         )}
 
         {/* Branch */}
-        <Field label={syncT?.branchLabel ?? 'Branch'}>
+        <Field label={(syncT?.branchLabel as string) ?? 'Branch'}>
           <Input
             type="text"
             value={branch}
@@ -419,7 +419,7 @@ function SyncEmptyState({ t, onInitComplete }: { t: Messages; onInitComplete: ()
             disabled={!isValid}
             className="flex items-center gap-2"
           >
-            {syncT?.connectButton ?? 'Connect & Start Sync'}
+            {(syncT?.connectButton as string) ?? 'Connect & Start Sync'}
           </PrimaryButton>
         )}
 
@@ -444,7 +444,7 @@ function SyncEmptyState({ t, onInitComplete }: { t: Messages; onInitComplete: ()
             {connectStep === 4 && (
               <div className="flex items-center gap-2 text-xs">
                 <CheckCircle2 size={13} className="text-success shrink-0" />
-                <span className="text-success font-medium">{syncT?.stepDone ?? 'Sync configured successfully!'}</span>
+                <span className="text-success font-medium">{(syncT?.stepDone as string) ?? 'Sync configured successfully!'}</span>
               </div>
             )}
           </div>
@@ -466,10 +466,10 @@ function SyncEmptyState({ t, onInitComplete }: { t: Messages; onInitComplete: ()
       {/* Features */}
       <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground px-5">
         {[
-          syncT?.featureAutoCommit ?? 'Auto-commit on save',
-          syncT?.featureAutoPull ?? 'Auto-pull from remote',
-          syncT?.featureConflict ?? 'Conflict detection',
-          syncT?.featureMultiDevice ?? 'Works across devices',
+          (syncT?.featureAutoCommit as string) ?? 'Auto-commit on save',
+          (syncT?.featureAutoPull as string) ?? 'Auto-pull from remote',
+          (syncT?.featureConflict as string) ?? 'Conflict detection',
+          (syncT?.featureMultiDevice as string) ?? 'Works across devices',
         ].map((f, i) => (
           <div key={i} className="flex items-center gap-1.5">
             <CheckCircle2 size={11} className="text-success/60 shrink-0" />
@@ -484,7 +484,7 @@ function SyncEmptyState({ t, onInitComplete }: { t: Messages; onInitComplete: ()
 /* ── Main SyncTab ──────────────────────────────────────────────── */
 
 export function SyncTab({ t }: SyncTabProps) {
-  const syncT = t.settings?.sync;
+  const syncT = t.settings?.sync as Record<string, unknown> | undefined;
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -516,7 +516,7 @@ export function SyncTab({ t }: SyncTabProps) {
         body: JSON.stringify({ action: 'now' }),
         timeout: 120_000, // sync can take 60s+ for large repos
       });
-      setMessage({ type: 'success', text: syncT?.syncComplete ?? 'Sync complete' });
+      setMessage({ type: 'success', text: (syncT?.syncComplete as string) ?? 'Sync complete' });
       await fetchStatus();
     } catch (err: unknown) {
       const raw = err instanceof Error ? err.message : 'Sync failed';
@@ -539,9 +539,9 @@ export function SyncTab({ t }: SyncTabProps) {
         body: JSON.stringify({ action }),
       });
       await fetchStatus();
-      setMessage({ type: 'success', text: status.enabled ? (syncT?.autoSyncDisabled ?? 'Auto-sync disabled') : (syncT?.autoSyncEnabled ?? 'Auto-sync enabled') });
+      setMessage({ type: 'success', text: status.enabled ? ((syncT?.autoSyncDisabled as string) ?? 'Auto-sync disabled') : ((syncT?.autoSyncEnabled as string) ?? 'Auto-sync enabled') });
     } catch {
-      setMessage({ type: 'error', text: syncT?.toggleFailed ?? 'Failed to toggle sync' });
+      setMessage({ type: 'error', text: (syncT?.toggleFailed as string) ?? 'Failed to toggle sync' });
     } finally {
       setToggling(false);
       setTimeout(() => setMessage(null), 3000);
@@ -558,7 +558,7 @@ export function SyncTab({ t }: SyncTabProps) {
       });
       await fetchStatus();
     } catch {
-      setMessage({ type: 'error', text: syncT?.resetFailed ?? 'Failed to reset sync configuration' });
+      setMessage({ type: 'error', text: (syncT?.resetFailed as string) ?? 'Failed to reset sync configuration' });
     } finally {
       setToggling(false);
       setTimeout(() => setMessage(null), 3000);
@@ -585,10 +585,10 @@ export function SyncTab({ t }: SyncTabProps) {
           <AlertCircle size={18} className="text-destructive shrink-0 mt-0.5" />
           <div className="space-y-2">
             <h3 className="text-sm font-medium text-destructive">
-              {syncT?.brokenTitle ?? 'Sync configuration is broken'}
+              {(syncT?.brokenTitle as string) ?? 'Sync configuration is broken'}
             </h3>
             <p className="text-xs text-destructive/80">
-              {status.lastError || (syncT?.brokenDesc ?? 'The git repository or remote is missing. Reset to re-configure.')}
+              {status.lastError || ((syncT?.brokenDesc as string) ?? 'The git repository or remote is missing. Reset to re-configure.')}
             </p>
             <PrimaryButton
               onClick={handleReset}
@@ -596,7 +596,7 @@ export function SyncTab({ t }: SyncTabProps) {
               className="flex items-center gap-2 mt-2"
             >
               {toggling && <Loader2 size={14} className="animate-spin" />}
-              {syncT?.resetButton ?? 'Reset & Re-configure'}
+              {(syncT?.resetButton as string) ?? 'Reset & Re-configure'}
             </PrimaryButton>
           </div>
         </div>
@@ -610,30 +610,34 @@ export function SyncTab({ t }: SyncTabProps) {
     <div className="space-y-4">
       <SettingCard
         icon={<GitBranch size={15} />}
-        title={syncT?.sectionTitle ?? 'Sync'}
+        title={(syncT?.sectionTitle as string) ?? 'Sync'}
         description={status.remote}
         badge={
           <span className="text-2xs px-1.5 py-0.5 rounded bg-success/15 text-success font-medium">
-            {syncT?.labelEnabled ?? 'Active'}
+            {(syncT?.labelEnabled as string) ?? 'Active'}
           </span>
         }
       >
         {/* Status rows */}
         <div className="space-y-2 text-sm">
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">{syncT?.labelBranch ?? 'Branch'}</span>
+            <span className="text-muted-foreground">{(syncT?.labelBranch as string) ?? 'Branch'}</span>
             <span className="font-mono text-xs">{status.branch}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">{syncT?.labelLastSync ?? 'Last sync'}</span>
+            <span className="text-muted-foreground">{(syncT?.labelLastSync as string) ?? 'Last sync'}</span>
             <span className="text-xs">{timeAgo(status.lastSync, syncT)}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">{syncT?.labelUnpushed ?? 'Unpushed'}</span>
-            <span className="text-xs">{(syncT?.unpushedCommits as ((n: number) => string))?.(status.unpushed) ?? `${status.unpushed} commits`}</span>
+            <span className="text-muted-foreground">{(syncT?.labelUnpushed as string) ?? 'Unpushed'}</span>
+            <span className="text-xs">
+              {typeof status.unpushed === 'string' && /^\d+$/.test(status.unpushed)
+                ? ((syncT?.unpushedCommits as ((n: number) => string))?.(parseInt(status.unpushed, 10)) ?? `${status.unpushed} commits`)
+                : `${status.unpushed ?? '?'} commits`}
+            </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">{syncT?.labelAutoSync ?? 'Auto-sync'}</span>
+            <span className="text-muted-foreground">{(syncT?.labelAutoSync as string) ?? 'Auto-sync'}</span>
             <span className="flex items-center gap-1 text-xs">
               commit{' '}
               <select
@@ -693,7 +697,7 @@ export function SyncTab({ t }: SyncTabProps) {
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <RefreshCw size={12} className={syncing ? 'animate-spin' : ''} />
-            {syncT?.syncNow ?? 'Sync Now'}
+            {(syncT?.syncNow as string) ?? 'Sync Now'}
           </button>
           <button
             type="button"
@@ -701,7 +705,7 @@ export function SyncTab({ t }: SyncTabProps) {
             disabled={toggling}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-border text-muted-foreground hover:text-destructive hover:border-destructive/50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            {syncT?.disableAutoSync ?? 'Disable Auto-sync'}
+            {(syncT?.disableAutoSync as string) ?? 'Disable Auto-sync'}
           </button>
         </div>
 
@@ -730,7 +734,7 @@ export function SyncTab({ t }: SyncTabProps) {
               {(syncT?.conflictsTitle as ((n: number) => string))?.(conflicts.length) ?? `Conflicts (${conflicts.length})`}
             </p>
             <p className="text-2xs text-muted-foreground">
-              {syncT?.conflictExplain ?? 'These files were changed on both this device and the remote. Choose which version to keep for each file.'}
+              {(syncT?.conflictExplain as string) ?? 'These files were changed on both this device and the remote. Choose which version to keep for each file.'}
             </p>
             <div className="space-y-2">
               {conflicts.map((c, i) => (
