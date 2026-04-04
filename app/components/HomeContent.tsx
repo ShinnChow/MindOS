@@ -244,17 +244,13 @@ export default function HomeContent({ recent, existingFiles, spaces }: { recent:
         </div>
       </div>
 
-      {/* ══════════ Knowledge Stats ══════════ */}
-      <KnowledgeStatsBar spaces={spaceList} totalFiles={recent.length} />
-
       {/* ══════════ Knowledge Pulse ══════════ */}
       <SystemPulse />
 
-      {/* ══════════ Pinned Files ══════════ */}
-      <PinnedFilesSection formatTime={formatTime} />
-
-      {/* ══════════ Inbox ══════════ */}
-      <InboxSection />
+      {/* ══════════ Recent Agent Activity ══════════ */}
+      <div className="mb-10">
+        <RecentActivityFeed />
+      </div>
 
       {/* ══════════ Spaces ══════════ */}
       {(spaceList.length > 0 || true) && (
@@ -319,10 +315,11 @@ export default function HomeContent({ recent, existingFiles, spaces }: { recent:
         </section>
       )}
 
-      {/* ══════════ Recent Agent Activity ══════════ */}
-      <div className="mb-10">
-        <RecentActivityFeed />
-      </div>
+      {/* ══════════ Pinned Files ══════════ */}
+      <PinnedFilesSection formatTime={formatTime} />
+
+      {/* ══════════ Inbox ══════════ */}
+      <InboxSection />
 
       {/* ══════════ Recently Edited ══════════ */}
       {recent.length > 0 && (
@@ -527,34 +524,6 @@ function CreateSpaceButton({ t }: { t: ReturnType<typeof useLocale>['t'] }) {
       <Plus size={12} />
       <span>{t.home.newSpace}</span>
     </button>
-  );
-}
-
-/* ── Knowledge Stats Bar ── */
-function KnowledgeStatsBar({ spaces, totalFiles }: { spaces: SpaceInfo[]; totalFiles: number }) {
-  const { t } = useLocale();
-  const totalFileCount = useMemo(() => spaces.reduce((sum, s) => sum + s.fileCount, 0), [spaces]);
-  const home = t.home;
-
-  if (totalFileCount === 0 && spaces.length === 0) return null;
-
-  return (
-    <section className="mb-8">
-      <div className="flex items-center gap-px rounded-lg overflow-hidden border border-border/40">
-        <div className="flex-1 px-3 py-2.5 bg-card">
-          <p className="text-2xs text-muted-foreground/50 leading-none mb-1 font-display">{home.statFiles ?? 'Files'}</p>
-          <p className="text-base font-semibold text-foreground font-mono tabular-nums leading-none">{totalFileCount}</p>
-        </div>
-        <div className="flex-1 px-3 py-2.5 bg-card border-l border-border/30">
-          <p className="text-2xs text-muted-foreground/50 leading-none mb-1 font-display">{home.statSpaces ?? 'Spaces'}</p>
-          <p className="text-base font-semibold text-foreground font-mono tabular-nums leading-none">{spaces.length}</p>
-        </div>
-        <div className="flex-1 px-3 py-2.5 bg-card border-l border-border/30">
-          <p className="text-2xs text-muted-foreground/50 leading-none mb-1 font-display">{home.statRecent ?? 'Recent'}</p>
-          <p className="text-base font-semibold text-foreground font-mono tabular-nums leading-none">{totalFiles}</p>
-        </div>
-      </div>
-    </section>
   );
 }
 

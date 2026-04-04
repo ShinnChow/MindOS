@@ -442,10 +442,12 @@ export function SyncTab({ t }: SyncTabProps) {
 
   const fetchStatus = useCallback(async () => {
     try {
-      const data = await apiFetch<SyncStatus>('/api/sync');
+      const data = await apiFetch<SyncStatus>('/api/sync', { timeout: 10000 });
       setStatus(data);
     } catch {
-      setStatus(null);
+      // Keep existing status on refresh failure (don't flash init form during recompile)
+      // Only set null if we never had a status (first load)
+      setStatus(prev => prev ?? null);
     } finally {
       setLoading(false);
     }
