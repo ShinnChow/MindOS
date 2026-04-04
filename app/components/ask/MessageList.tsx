@@ -1,15 +1,39 @@
 'use client';
 
-import { useRef, useEffect, memo } from 'react';
-import { Sparkles, Loader2, AlertCircle, Wrench, WifiOff, Zap } from 'lucide-react';
+import { useRef, useEffect, memo, useState, useCallback } from 'react';
+import { Sparkles, Loader2, AlertCircle, Wrench, WifiOff, Zap, Copy, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Message, ImagePart } from '@/lib/types';
 import { stripThinkingTags } from '@/hooks/useAiOrganize';
+import { copyToClipboard } from '@/lib/clipboard';
 import ToolCallBlock from './ToolCallBlock';
 import ThinkingBlock from './ThinkingBlock';
 
 const SKILL_PREFIX_RE = /^Use the skill ([^:]+):\s*/;
+
+function CopyMessageButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = useCallback(() => {
+    copyToClipboard(text).then(ok => {
+      if (ok) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    });
+  }, [text]);
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="absolute -bottom-1 right-1 p-1 rounded-md bg-card border border-border/60 shadow-sm text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+      title="Copy"
+    >
+      {copied ? <Check size={11} className="text-success" /> : <Copy size={11} />}
+    </button>
+  );
+}
 
 function UserMessageContent({ content, skillName, images }: { content: string; skillName?: string; images?: ImagePart[] }) {
   const resolved = skillName ?? content.match(SKILL_PREFIX_RE)?.[1];
@@ -209,12 +233,15 @@ export default memo(function MessageList({
               </div>
             </div>
           ) : (
-            <div className="max-w-[85%] px-3 py-2 rounded-xl rounded-bl-sm bg-muted text-foreground text-sm">
+            <div className="group relative max-w-[85%] px-3 py-2 rounded-xl rounded-bl-sm bg-muted text-foreground text-sm">
               {(m.parts && m.parts.length > 0) || stripThinkingTags(m.content) ? (
                 <>
                   <AssistantMessageWithParts message={m} isStreaming={isLoading && i === messages.length - 1} />
                   {isLoading && i === messages.length - 1 && (
                     <StepCounter parts={m.parts} />
+                  )}
+                  {!(isLoading && i === messages.length - 1) && stripThinkingTags(m.content) && (
+                    <CopyMessageButton text={stripThinkingTags(m.content)} />
                   )}
                 </>
               ) : isLoading && i === messages.length - 1 ? (
