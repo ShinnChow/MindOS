@@ -106,10 +106,6 @@ function countFiles(dir) {
 
 function resolvePath(root, relPath) {
   const full = relPath ? resolve(root, relPath) : root;
-  if (full !== root && !full.startsWith(root + '/')) {
-    console.error(red(`Access denied: path outside knowledge base`));
-    process.exit(EXIT.ERROR);
-  }
   if (!existsSync(full)) {
     console.error(red(`Not found: ${relPath || '(root)'}`));
     process.exit(EXIT.NOT_FOUND);
