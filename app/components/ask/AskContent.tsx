@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
-import { Sparkles, Send, StopCircle, SquarePen, History, X, Maximize2, Minimize2, PanelRight, AppWindow, Plus } from 'lucide-react';
+import { Send, StopCircle, X, Plus } from 'lucide-react';
 import { useLocale } from '@/lib/LocaleContext';
 import type { AskMode } from '@/lib/types';
 import ModeCapsule, { getPersistedMode } from '@/components/ask/ModeCapsule';
@@ -16,6 +16,7 @@ import MentionPopover from '@/components/ask/MentionPopover';
 import SlashCommandPopover from '@/components/ask/SlashCommandPopover';
 import SessionHistory from '@/components/ask/SessionHistory';
 import SessionTabBar from '@/components/ask/SessionTabBar';
+import AskHeader from '@/components/ask/AskHeader';
 import FileChip from '@/components/ask/FileChip';
 import AgentSelectorCapsule from '@/components/ask/AgentSelectorCapsule';
 import ProviderModelCapsule, { getPersistedProvider } from '@/components/ask/ProviderModelCapsule';
@@ -426,46 +427,23 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
     setTimeout(() => inputRef.current?.focus(), 0);
   }, [currentFile]);
 
-  const iconSize = isPanel ? 13 : 14;
+  const toggleHistory = useCallback(() => setShowHistory(v => !v), []);
   const inputIconSize = 15;
 
   return (
     <>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-        {!isPanel && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-8 h-1 rounded-full bg-muted-foreground/20 md:hidden" />
-        )}
-        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-          <Sparkles size={isPanel ? 14 : 15} className="text-[var(--amber)]" />
-          <span className={isPanel ? 'font-display text-xs uppercase tracking-wider text-muted-foreground' : 'font-display'}>
-            {isPanel ? 'MindOS Agent' : t.ask.title}
-          </span>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button type="button" onClick={(e) => { e.stopPropagation(); setShowHistory(v => !v); }} aria-pressed={showHistory} className={`p-2 rounded transition-colors ${showHistory ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`} title={t.hints.sessionHistory}>
-            <History size={iconSize} />
-          </button>
-          <button type="button" onClick={(e) => { e.stopPropagation(); handleResetSession(); }} disabled={isLoading} className="p-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-40" title={t.hints.newSession}>
-            <SquarePen size={iconSize} />
-          </button>
-          {isPanel && onMaximize && (
-            <button type="button" onClick={(e) => { e.stopPropagation(); onMaximize(); }} className="p-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title={maximized ? t.hints.restorePanel : t.hints.maximizePanel}>
-              {maximized ? <Minimize2 size={iconSize} /> : <Maximize2 size={iconSize} />}
-            </button>
-          )}
-          {onModeSwitch && (
-            <button type="button" onClick={(e) => { e.stopPropagation(); onModeSwitch(); }} className="p-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title={askMode === 'popup' ? t.hints.dockToSide : t.hints.openAsPopup}>
-              {askMode === 'popup' ? <PanelRight size={iconSize} /> : <AppWindow size={iconSize} />}
-            </button>
-          )}
-          {onClose && (
-            <button type="button" onClick={(e) => { e.stopPropagation(); onClose(); }} className="p-2 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title={t.hints.closePanel} aria-label="Close">
-              <X size={isPanel ? iconSize : 15} />
-            </button>
-          )}
-        </div>
-      </div>
+      <AskHeader
+        isPanel={isPanel}
+        showHistory={showHistory}
+        onToggleHistory={toggleHistory}
+        onReset={handleResetSession}
+        isLoading={isLoading}
+        maximized={maximized}
+        onMaximize={onMaximize}
+        askMode={askMode}
+        onModeSwitch={onModeSwitch}
+        onClose={onClose}
+      />
 
       {/* Session tabs — panel variant only */}
       {isPanel && session.sessions.length > 0 && (
