@@ -147,8 +147,8 @@ export default function StepReview({
         <div className="space-y-2 py-2">
           {phases.map(({ key, label }, i) => {
             const idx = phaseOrder.indexOf(key);
-            const isDone = currentIdx > idx || (key === 'done' && setupPhase === 'done');
-            const isActive = setupPhase === key && key !== 'done';
+            const isDone = currentIdx > idx;
+            const isActive = setupPhase === key;
             const isPending = currentIdx < idx;
             return (
               <div key={key} className="flex items-center gap-3">
@@ -260,7 +260,7 @@ function HealthCheckView({ state, selectedAgents, agentStatuses, needsRestart, s
 
   // Derive health check statuses
   const kbOk = !!state.mindRoot;
-  const aiOk = state.provider !== 'skip' && state.provider !== '';
+  const aiOk = state.provider !== 'skip';
   const successAgents = Object.values(agentStatuses).filter(a => a.state === 'ok').length;
   const agentsOk = successAgents > 0;
   const hasToken = !!state.authToken;
