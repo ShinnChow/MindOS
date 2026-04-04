@@ -147,9 +147,8 @@ function SyncEmptyState({ t, onInitComplete }: { t: Messages; onInitComplete: ()
           </p>
         )}
         {urlType === 'ssh' && (
-          <p className="text-xs text-muted-foreground flex items-center gap-1">
-            <AlertCircle size={11} className="shrink-0" />
-            {syncT?.sshHint ?? 'SSH URLs require SSH key configured on this machine. HTTPS with token recommended.'}
+          <p className="text-xs text-muted-foreground">
+            {syncT?.sshHint ?? 'Requires SSH key on this machine. Verify with: ssh -T git@github.com'}
           </p>
         )}
       </div>
@@ -178,7 +177,15 @@ function SyncEmptyState({ t, onInitComplete }: { t: Messages; onInitComplete: ()
             </button>
           </div>
           <p className="text-xs text-muted-foreground">
-            {syncT?.tokenHint ?? 'GitHub: Settings → Developer settings → Personal access tokens → repo scope'}
+            {syncT?.tokenHint ?? 'GitHub:'}{' '}
+            <a
+              href="https://github.com/settings/tokens/new?scopes=repo&description=MindOS+Sync"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-foreground transition-colors"
+            >
+              {syncT?.tokenLink ?? 'Create a token (repo scope)'}
+            </a>
           </p>
         </div>
       )}

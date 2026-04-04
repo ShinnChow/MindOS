@@ -192,7 +192,7 @@ export default function ActivityBar({
     >
       {/* Content wrapper — overflow-hidden prevents text flash during width transitions */}
       <div className="flex flex-col h-full w-full overflow-hidden">
-        {/* ── Top: Logo — fixed h matches PanelHeader (py-3 + 21px buttons + py-3 = 45px) ── */}
+        {/* ── Top: Logo — h-[45px] aligns divider with PanelHeader h-[46px] border-b (both at y=45) ── */}
         <Link
           href="/"
           className={`flex items-center ${expanded ? 'px-3 gap-2' : 'justify-center'} w-full h-[45px] shrink-0 hover:opacity-80 transition-opacity`}
