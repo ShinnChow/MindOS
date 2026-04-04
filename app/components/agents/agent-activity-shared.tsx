@@ -32,6 +32,11 @@ export function opKind(tool: string): OpKind {
   return 'other';
 }
 
+export const KIND_LABEL: Record<string, Record<OpKind, string>> = {
+  en: { read: 'Read', write: 'Write', create: 'Create', delete: 'Delete', search: 'Search', other: 'Other' },
+  zh: { read: '读取', write: '写入', create: '创建', delete: '删除', search: '搜索', other: '其他' },
+};
+
 export const KIND_STYLE: Record<OpKind, { bg: string; text: string; border: string }> = {
   read:   { bg: 'rgba(138,180,216,0.10)', text: '#8ab4d8', border: 'rgba(138,180,216,0.25)' },
   write:  { bg: 'rgba(200,135,58,0.10)',  text: 'var(--amber)', border: 'rgba(200,135,58,0.25)' },
@@ -79,4 +84,27 @@ export function relativeTs(ts: string): string {
 
 export function getFilePath(params: Record<string, unknown>): string | null {
   return typeof params.path === 'string' ? params.path : null;
+}
+
+/** Compact colored badge showing operation kind with icon + localized label. */
+export function KindBadge({ kind, locale, size = 'md' }: { kind: OpKind; locale?: string; size?: 'sm' | 'md' }) {
+  const style = KIND_STYLE[kind];
+  const lang = locale?.startsWith('zh') ? 'zh' : 'en';
+  const label = KIND_LABEL[lang][kind];
+  const iconSize = size === 'sm' ? 9 : 10;
+  const fontSize = size === 'sm' ? '0.6rem' : '0.68rem';
+  const padding = size === 'sm' ? '1px 6px' : '2px 8px';
+
+  return (
+    <span className="font-display" style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      padding, borderRadius: 999, fontSize,
+      fontWeight: 600,
+      background: style.bg, color: style.text, border: `1px solid ${style.border}`,
+      flexShrink: 0, whiteSpace: 'nowrap',
+    }}>
+      <OpIcon kind={kind} size={iconSize} />
+      {label}
+    </span>
+  );
 }

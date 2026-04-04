@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { RIGHT_ASK_DEFAULT_WIDTH, RIGHT_ASK_MIN_WIDTH, RIGHT_ASK_MAX_WIDTH } from '@/components/RightAskPanel';
 import { useAskModal, type AcpAgentSelection } from './useAskModal';
 
@@ -35,6 +35,7 @@ export function useAskPanel(): AskPanelState {
   const [askMaximized, setAskMaximized] = useState(false);
   const [askOpenSource, setAskOpenSource] = useState<'user' | 'guide' | 'guide-next'>('user');
   const [askAcpAgent, setAskAcpAgent] = useState<AcpAgentSelection | null>(null);
+  const prevWidthRef = useRef(RIGHT_ASK_DEFAULT_WIDTH);
 
   const askModal = useAskModal();
 
@@ -44,7 +45,10 @@ export function useAskPanel(): AskPanelState {
       const stored = localStorage.getItem('right-ask-panel-width');
       if (stored) {
         const w = parseInt(stored, 10);
-        if (w >= RIGHT_ASK_MIN_WIDTH && w <= RIGHT_ASK_MAX_WIDTH) setAskPanelWidth(w);
+        if (w >= RIGHT_ASK_MIN_WIDTH && w <= RIGHT_ASK_MAX_WIDTH) {
+          setAskPanelWidth(w);
+          prevWidthRef.current = w;
+        }
       }
       const mode = localStorage.getItem('ask-mode');
       if (mode === 'popup') setAskMode('popup');
@@ -88,8 +92,24 @@ export function useAskPanel(): AskPanelState {
     }
   }, [askMode]);
 
-  const closeAskPanel = useCallback(() => { setAskPanelOpen(false); setAskMaximized(false); }, []);
-  const toggleAskMaximized = useCallback(() => setAskMaximized(v => !v), []);
+  const closeAskPanel = useCallback(() => {
+    setAskPanelOpen(false);
+    if (askMaximized) {
+      setAskPanelWidth(prevWidthRef.current);
+      setAskMaximized(false);
+    }
+  }, [askMaximized]);
+
+  const toggleAskMaximized = useCallback(() => {
+    setAskMaximized(prev => {
+      if (!prev) {
+        prevWidthRef.current = askPanelWidth;
+      } else {
+        setAskPanelWidth(prevWidthRef.current);
+      }
+      return !prev;
+    });
+  }, [askPanelWidth]);
   const closeDesktopAskPopup = useCallback(() => setDesktopAskPopupOpen(false), []);
 
   const handleAskWidthChange = useCallback((w: number) => setAskPanelWidth(w), []);

@@ -158,54 +158,57 @@ export default function SetupWizard() {
       .then(r => r.json())
       .then(data => {
         if (data.homeDir) setHomeDir(data.homeDir);
-        // Build providerConfigs from server response (supports both old and new format)
-        const provConfigs: Partial<Record<ProviderId, ProviderSetupConfig>> = { ...prev.providerConfigs };
 
-        // Handle legacy flat format from server
-        if (data.anthropicApiKey || data.anthropicModel) {
-          provConfigs.anthropic = {
-            ...provConfigs.anthropic,
-            apiKey: provConfigs.anthropic?.apiKey ?? '',
-            model: data.anthropicModel || provConfigs.anthropic?.model || 'claude-sonnet-4-6',
-            apiKeyMask: data.anthropicApiKey || '',
-          };
-        }
-        if (data.openaiApiKey || data.openaiModel) {
-          provConfigs.openai = {
-            ...provConfigs.openai,
-            apiKey: provConfigs.openai?.apiKey ?? '',
-            model: data.openaiModel || provConfigs.openai?.model || 'gpt-5.4',
-            baseUrl: data.openaiBaseUrl ?? provConfigs.openai?.baseUrl ?? '',
-            apiKeyMask: data.openaiApiKey || '',
-          };
-        }
+        setState(prev => {
+          // Build providerConfigs from server response (supports both old and new format)
+          const provConfigs: Partial<Record<ProviderId, ProviderSetupConfig>> = { ...prev.providerConfigs };
 
-        // Handle new dynamic providers format from server
-        if (data.providerConfigs && typeof data.providerConfigs === 'object') {
-          for (const [id, cfg] of Object.entries(data.providerConfigs as Record<string, any>)) {
-            if (isProviderId(id) && cfg) {
-              provConfigs[id] = {
-                apiKey: provConfigs[id]?.apiKey ?? '',
-                model: cfg.model || PROVIDER_PRESETS[id].defaultModel,
-                baseUrl: cfg.baseUrl ?? '',
-                apiKeyMask: cfg.apiKeyMask || '',
-              };
+          // Handle legacy flat format from server
+          if (data.anthropicApiKey || data.anthropicModel) {
+            provConfigs.anthropic = {
+              ...provConfigs.anthropic,
+              apiKey: provConfigs.anthropic?.apiKey ?? '',
+              model: data.anthropicModel || provConfigs.anthropic?.model || 'claude-sonnet-4-6',
+              apiKeyMask: data.anthropicApiKey || '',
+            };
+          }
+          if (data.openaiApiKey || data.openaiModel) {
+            provConfigs.openai = {
+              ...provConfigs.openai,
+              apiKey: provConfigs.openai?.apiKey ?? '',
+              model: data.openaiModel || provConfigs.openai?.model || 'gpt-5.4',
+              baseUrl: data.openaiBaseUrl ?? provConfigs.openai?.baseUrl ?? '',
+              apiKeyMask: data.openaiApiKey || '',
+            };
+          }
+
+          // Handle new dynamic providers format from server
+          if (data.providerConfigs && typeof data.providerConfigs === 'object') {
+            for (const [id, cfg] of Object.entries(data.providerConfigs as Record<string, any>)) {
+              if (isProviderId(id) && cfg) {
+                provConfigs[id] = {
+                  apiKey: provConfigs[id]?.apiKey ?? '',
+                  model: cfg.model || PROVIDER_PRESETS[id].defaultModel,
+                  baseUrl: cfg.baseUrl ?? '',
+                  apiKeyMask: cfg.apiKeyMask || '',
+                };
+              }
             }
           }
-        }
 
-        const resolvedProvider = data.provider && isProviderId(data.provider) ? data.provider : prev.provider;
+          const resolvedProvider = data.provider && isProviderId(data.provider) ? data.provider : prev.provider;
 
-        setState(prev => ({
-          ...prev,
-          mindRoot: data.mindRoot || prev.mindRoot,
-          webPort: typeof data.port === 'number' ? data.port : prev.webPort,
-          mcpPort: typeof data.mcpPort === 'number' ? data.mcpPort : prev.mcpPort,
-          authToken: data.authToken || prev.authToken,
-          webPassword: data.webPassword || prev.webPassword,
-          provider: resolvedProvider,
-          providerConfigs: provConfigs,
-        }));
+          return {
+            ...prev,
+            mindRoot: data.mindRoot || prev.mindRoot,
+            webPort: typeof data.port === 'number' ? data.port : prev.webPort,
+            mcpPort: typeof data.mcpPort === 'number' ? data.mcpPort : prev.mcpPort,
+            authToken: data.authToken || prev.authToken,
+            webPassword: data.webPassword || prev.webPassword,
+            provider: resolvedProvider,
+            providerConfigs: provConfigs,
+          };
+        });
         // Generate a new token only if none exists yet
         if (!data.authToken) {
           fetch('/api/setup/generate-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })

@@ -1,6 +1,15 @@
 // Re-export core types as single source of truth
 export type { FileNode, SearchResult, BacklinkEntry } from './core/types';
 
+/** System configuration files that should be hidden from file tree by default */
+export const SYSTEM_FILES = new Set([
+  'INSTRUCTION.md',
+  'README.md',
+  'CONFIG.json',
+  'CHANGELOG.md',
+  'TODO.md',
+]);
+
 export interface SearchMatch {
   indices: [number, number][];
   value: string;

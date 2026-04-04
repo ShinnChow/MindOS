@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useTransition, useEffect, useSyncExternalStore } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { FileNode } from '@/lib/types';
+import { FileNode, SYSTEM_FILES } from '@/lib/types';
 import { encodePath } from '@/lib/utils';
 import {
   ChevronDown, FileText, Table, Folder, FolderOpen, Plus, Loader2,
@@ -21,14 +21,6 @@ function notifyFilesChanged() {
 async function copyPathToClipboard(path: string) {
   try { await navigator.clipboard.writeText(path); } catch { /* noop */ }
 }
-
-const SYSTEM_FILES = new Set([
-  'INSTRUCTION.md',
-  'README.md',
-  'CONFIG.json',
-  'CHANGELOG.md',
-  'TODO.md',
-]);
 
 const HIDDEN_FILES_KEY = 'show-hidden-files';
 

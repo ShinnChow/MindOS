@@ -11,7 +11,7 @@ import { Terminal, ChevronDown, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useLocale } from '@/lib/LocaleContext';
 import {
   type AgentOp, type OpKind,
-  opKind, KIND_STYLE, OpIcon, formatTs, relativeTs, getFilePath,
+  opKind, KIND_STYLE, OpIcon, KindBadge, formatTs, relativeTs, getFilePath,
 } from './agent-activity-shared';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -25,11 +25,11 @@ function truncateContent(v: unknown, max = 120): string {
 
 function OpCard({ op }: { op: AgentOp }) {
   const router = useRouter();
+  const { locale } = useLocale();
   const [expanded, setExpanded] = useState(false);
   const kind = opKind(op.tool);
   const style = KIND_STYLE[kind];
   const filePath = getFilePath(op.params);
-  const toolShort = op.tool.replace('mindos_', '');
 
   return (
     <div style={{
@@ -45,21 +45,7 @@ function OpCard({ op }: { op: AgentOp }) {
         onClick={() => setExpanded(v => !v)}
       >
         {/* kind badge */}
-        <span className="font-display" style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          padding: '2px 8px', borderRadius: 999, fontSize: '0.68rem',
-          fontWeight: 600,
-          background: style.bg, color: style.text, border: `1px solid ${style.border}`,
-          flexShrink: 0,
-        }}>
-          <OpIcon kind={kind} size={10} />
-          {kind}
-        </span>
-
-        {/* tool name */}
-        <span className="font-display" style={{ fontSize: '0.78rem', color: 'var(--foreground)', fontWeight: 600, flexShrink: 0 }}>
-          {toolShort}
-        </span>
+        <KindBadge kind={kind} locale={locale} />
 
         {/* file path */}
         {filePath && (
