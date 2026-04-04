@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { ChevronRight } from 'lucide-react';
 import GithubSlugger from 'github-slugger';
+import { useLocale } from '@/lib/LocaleContext';
+import { cn } from '@/lib/utils';
 
 interface Heading {
   id: string;
@@ -16,7 +18,6 @@ function parseHeadings(content: string): Heading[] {
   const headings: Heading[] = [];
   let inCodeBlock = false;
   for (const line of lines) {
-    // Toggle code fence state (``` or ~~~, with optional language tag)
     if (/^(`{3,}|~{3,})/.test(line)) {
       inCodeBlock = !inCodeBlock;
       continue;
@@ -42,10 +43,29 @@ interface TableOfContentsProps {
 }
 
 export default function TableOfContents({ content }: TableOfContentsProps) {
-  const headings = parseHeadings(content);
+  const { t } = useLocale();
+  const { headings, minLevel } = useMemo(() => {
+    const h = parseHeadings(content);
+    return { headings: h, minLevel: h.length > 0 ? Math.min(...h.map(x => x.level)) : 1 };
+  }, [content]);
   const [activeId, setActiveId] = useState<string>('');
   const [collapsed, setCollapsed] = useState(false);
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const navRef = useRef<HTMLElement | null>(null);
+  const linkRefs = useRef<Map<string, HTMLAnchorElement>>(new Map());
+
+  const scrollActiveIntoView = useCallback((id: string) => {
+    const link = linkRefs.current.get(id);
+    const nav = navRef.current;
+    if (!link || !nav || !link.isConnected) return;
+    const navRect = nav.getBoundingClientRect();
+    const linkRect = link.getBoundingClientRect();
+    const isAbove = linkRect.top < navRect.top + 40;
+    const isBelow = linkRect.bottom > navRect.bottom - 40;
+    if (isAbove || isBelow) {
+      link.scrollIntoView({ block: 'center', behavior: 'auto' });
+    }
+  }, []);
 
   useEffect(() => {
     if (headings.length === 0) return;
@@ -58,7 +78,11 @@ export default function TableOfContents({ content }: TableOfContentsProps) {
       observerRef.current = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {
-            if (entry.isIntersecting) { setActiveId(entry.target.id); break; }
+            if (entry.isIntersecting) {
+              setActiveId(entry.target.id);
+              scrollActiveIntoView(entry.target.id);
+              break;
+            }
           }
         },
         { rootMargin: `-${SCROLL_OFFSET}px 0% -70% 0%`, threshold: 0 }
@@ -66,12 +90,11 @@ export default function TableOfContents({ content }: TableOfContentsProps) {
       elements.forEach(el => observerRef.current?.observe(el));
     }, 150);
     return () => { clearTimeout(timer); observerRef.current?.disconnect(); };
+  // headings is derived from content via useMemo; scrollActiveIntoView is stable (no deps)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content]);
+  }, [headings]);
 
   if (headings.length < 2) return null;
-
-  const minLevel = Math.min(...headings.map(h => h.level));
 
   const handleClick = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
@@ -84,28 +107,25 @@ export default function TableOfContents({ content }: TableOfContentsProps) {
 
   return (
     <aside
-      className="hidden xl:block fixed z-10"
+      className="hidden xl:flex flex-col fixed z-10 overflow-hidden"
       style={{
         top: TOPBAR_H,
         height: `calc(100vh - ${TOPBAR_H}px)`,
-        // Always reserve full width so content margin doesn't jump
         width: NAV_W,
-        // Shift right when Ask AI panel is open (CSS var injected by SidebarLayout)
         right: 'var(--right-panel-width, 0px)',
-        // Slide the entire panel off the right edge when collapsed
         transform: collapsed ? `translateX(${NAV_W}px)` : 'translateX(0)',
         transition: 'transform 200ms ease-in-out, right 200ms ease-out',
       }}
     >
-      {/* Collapse / expand button — tab attached to left edge of the panel */}
+      {/* Collapse / expand toggle */}
       <button
         onClick={() => setCollapsed(v => !v)}
         className="absolute top-6 flex items-center justify-center w-5 h-8 rounded-l-md border border-r-0 border-border hover:bg-muted transition-colors"
         style={{
-          left: -20,           // sticks out to the left of the panel
+          left: -20,
           background: 'var(--background)',
         }}
-        title={collapsed ? 'Expand TOC' : 'Collapse TOC'}
+        title={collapsed ? t.view.tocExpand : t.view.tocCollapse}
       >
         <ChevronRight
           size={11}
@@ -114,16 +134,17 @@ export default function TableOfContents({ content }: TableOfContentsProps) {
         />
       </button>
 
-      {/* Nav list */}
+      {/* Scrollable nav list — min-h-0 enables flex child to shrink & scroll */}
       <nav
-        className="flex flex-col gap-0.5 overflow-y-auto py-5 pl-2 pr-3 h-full border-l border-border"
+        ref={navRef}
+        aria-label={t.view.tocTitle}
+        className="flex flex-col gap-0.5 overflow-y-auto min-h-0 flex-1 py-5 pl-2 pr-3 border-l border-border"
         style={{ background: 'var(--background)' }}
       >
         <p
-          className="text-2xs font-semibold uppercase tracking-wider px-2 mb-1"
-          style={{ color: 'var(--muted-foreground)', opacity: 0.5 }}
+          className="text-2xs font-semibold uppercase tracking-wider px-2 mb-1 text-muted-foreground/50 shrink-0"
         >
-          On this page
+          {t.view.tocTitle}
         </p>
         {headings.map((heading, i) => {
           const indent = (heading.level - minLevel) * 14;
@@ -132,25 +153,36 @@ export default function TableOfContents({ content }: TableOfContentsProps) {
           return (
             <a
               key={`${heading.id}-${i}`}
+              ref={el => {
+                if (el) linkRefs.current.set(heading.id, el);
+                else linkRefs.current.delete(heading.id);
+              }}
               href={`#${heading.id}`}
               onClick={(e) => handleClick(e, heading.id)}
-              className="block text-xs py-1 rounded transition-colors duration-100 leading-snug"
-              suppressHydrationWarning
+              className={cn(
+                'block text-xs py-1 rounded transition-colors duration-100 leading-snug shrink-0 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                isActive && 'font-medium',
+              )}
               style={{
                 paddingLeft: `${8 + indent}px`,
                 paddingRight: '8px',
-                borderLeft: isNested ? '1px solid var(--border)' : 'none',
-                marginLeft: isNested ? '8px' : '0',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
+                borderLeft: '2px solid',
+                borderLeftColor: isActive
+                  ? 'var(--amber)'
+                  : isNested
+                    ? 'var(--border)'
+                    : 'transparent',
+                marginLeft: isNested ? '7px' : '0',
                 ...(isActive
                   ? { color: 'var(--amber)', background: 'var(--amber-dim)' }
                   : { color: 'var(--muted-foreground)' }
-                )
+                ),
               }}
+              title={heading.text}
             >
-              {heading.text}
+              <span className="line-clamp-2">
+                {heading.text}
+              </span>
             </a>
           );
         })}

@@ -309,6 +309,9 @@ export const knowledgeEn = {
     cancel: 'Cancel',
     rename: 'Rename',
     dismiss: 'Dismiss',
+    tocTitle: 'On this page',
+    tocCollapse: 'Collapse',
+    tocExpand: 'Expand',
   },
   findInPage: {
     placeholder: 'Find in document…',
@@ -626,6 +629,9 @@ export const knowledgeZh = {
     cancel: '取消',
     rename: '重命名',
     dismiss: '关闭',
+    tocTitle: '本页目录',
+    tocCollapse: '收起',
+    tocExpand: '展开',
   },
   findInPage: {
     placeholder: '在文档中查找…',
