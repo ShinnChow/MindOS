@@ -128,11 +128,6 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Invalid remote URL — must be HTTPS or SSH format' }, { status: 400 });
         }
 
-        // Check if sync is already configured
-        if (config.sync?.enabled && isGitRepo(mindRoot) && getRemoteUrl(mindRoot)) {
-          return NextResponse.json({ error: 'Sync already configured' }, { status: 400 });
-        }
-
         const branch = body.branch?.trim() || 'main';
 
         // Call CLI's sync init — pass clean remote + token separately (never embed token in URL)
