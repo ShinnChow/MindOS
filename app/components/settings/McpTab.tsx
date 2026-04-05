@@ -162,7 +162,12 @@ function ConnectGuide({ status, mode, onModeChange, m }: {
   const hasToken = status.authConfigured && !!status.authToken;
   const displayToken = revealed ? (status.authToken ?? '') : (status.maskedToken ?? '');
   const serverUrl = status.endpoint || `http://127.0.0.1:${status.port}/mcp`;
-  const webUrl = serverUrl.replace('/mcp', '').replace(`:${status.port}`, `:${status.port}`);
+  // For "remote access" instructions, use the browser's actual hostname (not localhost from MCP status)
+  // so remote users see the correct IP, and local users see a meaningful address.
+  const browserHost = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
+  const webPort = typeof window !== 'undefined' ? window.location.port : String(status.port);
+  const remoteUrl = `http://${browserHost}:${webPort}`;
+  const maskedAuthToken = status.maskedToken ?? '';
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -220,9 +225,9 @@ function ConnectGuide({ status, mode, onModeChange, m }: {
             <div className="space-y-1">
               <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">{m?.cliSkillRemote ?? 'Remote access'}</span>
               <div className="space-y-1">
-                <CodeBlock code={`mindos config set url ${webUrl}`} onCopy={handleCopy} copiedField={copiedField} fieldId="cli-url" compact />
+                <CodeBlock code={`mindos config set url ${remoteUrl}`} onCopy={handleCopy} copiedField={copiedField} fieldId="cli-url" compact />
                 <CodeBlock
-                  code={`mindos config set authToken ${hasToken ? (revealed ? status.authToken! : '••••••') : '<token>'}`}
+                  code={`mindos config set authToken ${hasToken ? maskedAuthToken : '<token>'}`}
                   onCopy={handleCopy} copiedField={copiedField} fieldId="cli-token" compact
                 />
               </div>
