@@ -28,7 +28,7 @@
 | Markdown 本地存储 | 纯 Markdown 本地优先 | ✅ 完全一致 |
 | LLM 建反向链接 | Wiki Graph 自动链接 | ✅ 一致 |
 | LLM "健康检查" | 记忆代谢：矛盾检测 | ✅ 同思路 |
-| 单个 LLM 读写 wiki | 所有 Agent 通过 MCP 读写 | **多 Agent 共享** |
+| 单个 LLM 读写 wiki | 所有 Agent 共享同一个知识库 | **多 Agent 共享** |
 | 手动问问题写回 wiki | Agent 交互自动沉淀 Skill | 全自动 |
 | 愿景：fine-tune on wiki | 认知镜像：AI 深度理解你 | 终局一致 |
 
