@@ -60,8 +60,8 @@ describe('i18n walkthrough keys', () => {
     expect(w.exploreCta).toBeTruthy();
   });
 
-  it('defines exactly 4 steps', () => {
-    expect(w.steps).toHaveLength(4);
+  it('defines exactly 3 steps', () => {
+    expect(w.steps).toHaveLength(3);
   });
 
   it('each step has title and body', () => {
