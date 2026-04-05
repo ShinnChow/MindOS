@@ -29,7 +29,7 @@ export default function SkillsSection({ t }: McpSkillsSectionProps) {
   const [createError, setCreateError] = useState('');
 
   const [search, setSearch] = useState('');
-  const [builtinCollapsed, setBuiltinCollapsed] = useState(false);
+  const [builtinCollapsed, setBuiltinCollapsed] = useState(true);
   const [editing, setEditing] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
   const [editError, setEditError] = useState('');

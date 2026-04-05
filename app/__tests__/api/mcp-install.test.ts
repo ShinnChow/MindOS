@@ -176,6 +176,29 @@ describe('POST /api/mcp/install', () => {
     expect(content).toContain('[mcp_servers.mindos]');
   });
 
+  it('handles empty config file gracefully (e.g. fresh VS Code mcp.json)', async () => {
+    const { POST } = await importInstallRoute();
+    // Pre-create an empty config file (common with VS Code)
+    const copilotDir = path.join(tempHome, '.config', 'Code', 'User');
+    fs.mkdirSync(copilotDir, { recursive: true });
+    fs.writeFileSync(path.join(copilotDir, 'mcp.json'), '', 'utf-8');
+
+    const req = new NextRequest('http://localhost/api/mcp/install', {
+      method: 'POST',
+      body: JSON.stringify({
+        agents: [{ key: 'github-copilot', scope: 'global' }],
+        transport: 'stdio',
+      }),
+      headers: { 'content-type': 'application/json' },
+    });
+    const res = await POST(req);
+    const body = await res.json();
+    expect(body.results[0].status).toBe('ok');
+
+    const config = JSON.parse(fs.readFileSync(path.join(copilotDir, 'mcp.json'), 'utf-8'));
+    expect(config.servers.mindos.type).toBe('stdio');
+  });
+
   it('installs github-copilot agent with servers key for global scope', async () => {
     const { POST } = await importInstallRoute();
     const req = new NextRequest('http://localhost/api/mcp/install', {

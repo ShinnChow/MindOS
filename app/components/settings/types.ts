@@ -178,6 +178,8 @@ export interface McpAgentInstallProps {
   agents: AgentInfo[];
   t: Messages;
   onRefresh: () => void;
+  mode?: 'cli' | 'mcp';
+  activeSkillName?: string;
 }
 
 export interface McpSkillsSectionProps {

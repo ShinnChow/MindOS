@@ -5,10 +5,11 @@ import path from 'path';
 import { MCP_AGENTS, expandHome } from '@/lib/mcp-agents';
 import { readSettings } from '@/lib/settings';
 
-/** Parse JSONC — strips single-line (//) and block comments before JSON.parse */
+/** Parse JSONC — strips comments before JSON.parse. Returns {} for empty/whitespace-only input. */
 function parseJsonc(text: string): Record<string, unknown> {
   let stripped = text.replace(/\\"|"(?:\\"|[^"])*"|(\/\/.*$)/gm, (m, g) => g ? '' : m);
   stripped = stripped.replace(/\/\*[\s\S]*?\*\//g, '');
+  if (!stripped.trim()) return {};
   return JSON.parse(stripped);
 }
 

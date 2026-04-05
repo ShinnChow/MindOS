@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Loader2, Copy, Check, Monitor, Globe, AlertCircle, RotateCcw, RefreshCw, Eye, EyeOff, ChevronDown, ChevronRight, Link2, Shield, Terminal, Plug } from 'lucide-react';
+import { Loader2, Copy, Check, Monitor, Globe, AlertCircle, RotateCcw, RefreshCw, Eye, EyeOff, ChevronDown, ChevronRight, Link2, Shield, Terminal, Plug, CheckCircle2, Sparkles, Users } from 'lucide-react';
 import { toast } from '@/lib/toast';
 import { useMcpDataOptional } from '@/lib/stores/mcp-store';
 import { generateSnippet } from '@/lib/mcp-snippets';
@@ -17,9 +17,9 @@ export function McpTab({ t }: McpTabProps) {
   const mcp = useMcpDataOptional();
   const m = t.settings?.mcp;
 
+  const [mode, setMode] = useState<'cli' | 'mcp'>('cli');
   const [restarting, setRestarting] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState('');
-  const [transport, setTransport] = useState<'stdio' | 'http'>('stdio');
   const restartPollRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   useEffect(() => () => clearInterval(restartPollRef.current), []);
@@ -37,6 +37,10 @@ export function McpTab({ t }: McpTabProps) {
   const notFoundAgents = mcp.agents.filter(a => !a.present);
   const effectiveSelected = selectedAgent || (mcp.agents[0]?.key ?? '');
   const currentAgent = mcp.agents.find(a => a.key === effectiveSelected);
+
+  // Determine active skill name based on which mindos skill is enabled
+  const mindosEnabled = mcp.skills?.find(s => s.name === 'mindos')?.enabled ?? true;
+  const activeSkillName = mindosEnabled ? 'mindos' : 'mindos-zh';
 
   const handleRestart = async () => {
     setRestarting(true);
@@ -68,73 +72,54 @@ export function McpTab({ t }: McpTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* 1. Connect an AI Agent — primary content */}
-      <ConnectGuide status={mcp.status} m={m} />
+      {/* 1. Auth Token */}
+      <AuthTokenCard status={mcp.status} m={m} />
 
-      {/* 2. MCP Server & Agent Config (collapsed — MCP users only) */}
-      <CollapsibleSection title={m?.serverTitle ?? 'MCP Server & Agent Config'} defaultOpen={false}>
-        <div className="space-y-4">
-          <McpStatusCard status={mcp.status} restarting={restarting} onRestart={handleRestart} onRefresh={mcp.refresh} m={m} />
-          {mcp.agents.length > 0 && (
-            <AgentConfigViewer
-              connectedAgents={connectedAgents}
-              detectedAgents={detectedAgents}
-              notFoundAgents={notFoundAgents}
-              currentAgent={currentAgent ?? null}
-              mcpStatus={mcp.status}
-              selectedAgent={effectiveSelected}
-              onSelectAgent={(key) => setSelectedAgent(key)}
-              transport={transport}
-              onTransportChange={setTransport}
-              onCopy={async (snippet) => {
-                const ok = await copyToClipboard(snippet);
-                if (ok) toast.copy();
-              }}
-              m={m}
-            />
-          )}
-          <AgentInstall agents={mcp.agents} t={t} onRefresh={mcp.refresh} />
+      {/* 2. Connect Agents (CLI/MCP guides + detected agents) */}
+      <ConnectCard
+        mode={mode}
+        onModeChange={setMode}
+        status={mcp.status}
+        agents={mcp.agents}
+        connectedAgents={connectedAgents}
+        detectedAgents={detectedAgents}
+        notFoundAgents={notFoundAgents}
+        currentAgent={currentAgent ?? null}
+        selectedAgent={effectiveSelected}
+        onSelectAgent={setSelectedAgent}
+        restarting={restarting}
+        onRestart={handleRestart}
+        onRefresh={mcp.refresh}
+        activeSkillName={activeSkillName}
+        m={m}
+        t={t}
+      />
+
+      {/* 3. Skills */}
+      <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <div className="flex items-center gap-2.5 px-4 pt-4 pb-3">
+          <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center shrink-0">
+            <Sparkles size={14} className="text-muted-foreground" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-foreground">{m?.skillsTitle ?? 'Skills'}</h3>
+            <p className="text-2xs text-muted-foreground">{m?.skillsDesc ?? 'Teach agents how to operate your knowledge base.'}</p>
+          </div>
         </div>
-      </CollapsibleSection>
-
-      {/* 3. Skills management */}
-      <CollapsibleSection title={m?.skillsTitle ?? 'Skills'} defaultOpen={false}>
-        <SkillsSection t={t} />
-      </CollapsibleSection>
+        <div className="px-4 pb-4">
+          <SkillsSection t={t} />
+        </div>
+      </div>
     </div>
   );
 }
 
-/* ── Collapsible Section ── */
+/* ── Auth Token Card ── */
 
-function CollapsibleSection({ title, defaultOpen = true, children }: {
-  title: string;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3 hover:text-foreground transition-colors"
-      >
-        {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-        {title}
-      </button>
-      {open && children}
-    </div>
-  );
-}
-
-/* ── Connect Guide — CLI / MCP dual mode ── */
-
-function ConnectGuide({ status, m }: {
+function AuthTokenCard({ status, m }: {
   status: McpStatus | null;
   m: Record<string, any> | undefined;
 }) {
-  const [mode, setMode] = useState<'cli' | 'mcp'>('cli');
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
 
@@ -155,11 +140,80 @@ function ConnectGuide({ status, m }: {
 
   const hasToken = status.authConfigured && !!status.authToken;
   const displayToken = revealed ? (status.authToken ?? '') : (status.maskedToken ?? '');
-  const serverUrl = status.endpoint || `http://127.0.0.1:${status.port}/mcp`;
-  const remoteHost = status.localIP || 'localhost';
-  const webPort = typeof window !== 'undefined' ? window.location.port || '3456' : '3456';
-  const remoteUrl = `http://${remoteHost}:${webPort}`;
-  const maskedAuthToken = status.maskedToken ?? '';
+
+  return (
+    <div className="rounded-xl border border-border bg-card overflow-hidden">
+      <div className="flex items-center gap-2.5 px-4 pt-4 pb-3">
+        <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center shrink-0">
+          <Shield size={14} className="text-muted-foreground" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-semibold text-foreground">{m?.tokenCardTitle ?? 'Auth Token'}</h3>
+          <p className="text-2xs text-muted-foreground">{m?.tokenCardDesc ?? 'Used by CLI remote mode and MCP connections.'}</p>
+        </div>
+      </div>
+      <div className="px-4 pb-4">
+        {hasToken ? (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 flex items-center gap-2 px-2.5 py-1.5 bg-muted/50 border border-border rounded-lg min-h-[34px]">
+              <code className="flex-1 text-xs font-mono text-foreground break-all select-all leading-relaxed">{displayToken}</code>
+            </div>
+            <button type="button" onClick={() => setRevealed(v => !v)}
+              className="shrink-0 p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+              title={revealed ? (m?.tokenHide ?? 'Hide') : (m?.tokenShow ?? 'Show')}>
+              {revealed ? <EyeOff size={13} /> : <Eye size={13} />}
+            </button>
+            <CopyButton onCopy={() => handleCopy(status.authToken ?? '', 'token-card')} copied={copiedField === 'token-card'} title={m?.tokenCopy ?? 'Copy'} size="sm" />
+          </div>
+        ) : (
+          <div className="px-2.5 py-2 bg-[var(--amber-subtle)] border border-[var(--amber)]/20 rounded-lg">
+            <p className="text-xs text-[var(--amber-text)]">{m?.tokenNone ?? 'No token set.'}</p>
+            <p className="text-2xs text-muted-foreground mt-0.5">{m?.tokenNoneAction ?? 'Generate one in Settings → General → Security.'}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Shared copy-state hook for guide sub-components ── */
+
+function useCopyField() {
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+  useEffect(() => {
+    if (!copiedField) return;
+    const timer = setTimeout(() => setCopiedField(null), 2000);
+    return () => clearTimeout(timer);
+  }, [copiedField]);
+  const handleCopy = useCallback(async (text: string, field: string) => {
+    if (!text) return;
+    const ok = await copyToClipboard(text);
+    if (ok) { setCopiedField(field); toast.copy(); }
+  }, []);
+  return { copiedField, handleCopy };
+}
+
+/* ── Connect Card — header + CLI/MCP tabs + detected agents ── */
+
+function ConnectCard({ mode, onModeChange, status, agents, connectedAgents, detectedAgents, notFoundAgents, currentAgent, selectedAgent, onSelectAgent, restarting, onRestart, onRefresh, activeSkillName, m, t }: {
+  mode: 'cli' | 'mcp';
+  onModeChange: (m: 'cli' | 'mcp') => void;
+  status: McpStatus | null;
+  agents: AgentInfo[];
+  connectedAgents: AgentInfo[];
+  detectedAgents: AgentInfo[];
+  notFoundAgents: AgentInfo[];
+  currentAgent: AgentInfo | null;
+  selectedAgent: string;
+  onSelectAgent: (key: string) => void;
+  restarting: boolean;
+  onRestart: () => void;
+  onRefresh: () => void;
+  activeSkillName: string;
+  m: Record<string, any> | undefined;
+  t: McpTabProps['t'];
+}) {
+  if (!status) return null;
 
   return (
     <div className="rounded-xl border border-border bg-card overflow-hidden">
@@ -168,15 +222,13 @@ function ConnectGuide({ status, m }: {
         <div className="w-7 h-7 rounded-lg bg-[var(--amber-subtle)] flex items-center justify-center shrink-0">
           <Link2 size={14} className="text-[var(--amber)]" />
         </div>
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-semibold text-foreground">{m?.connectionTitle ?? 'Connect an AI Agent'}</h3>
-        </div>
+        <h3 className="text-sm font-semibold text-foreground">{m?.connectionTitle ?? 'Connect Agents'}</h3>
       </div>
 
-      {/* Tab switcher — CLI vs MCP with descriptions */}
+      {/* Tab switcher */}
       <div className="grid grid-cols-2 mx-4 mb-3 rounded-lg border border-border overflow-hidden">
         <button
-          onClick={() => setMode('cli')}
+          onClick={() => onModeChange('cli')}
           className={`flex flex-col items-start px-3 py-2.5 text-left transition-colors ${
             mode === 'cli' ? 'bg-muted' : 'hover:bg-muted/50'
           }`}
@@ -184,12 +236,12 @@ function ConnectGuide({ status, m }: {
           <span className="flex items-center gap-1.5">
             <Terminal size={12} className={mode === 'cli' ? 'text-[var(--amber)]' : 'text-muted-foreground'} />
             <span className={`text-xs font-semibold ${mode === 'cli' ? 'text-foreground' : 'text-muted-foreground'}`}>CLI</span>
-            <span className="text-2xs px-1 py-0.5 rounded bg-[var(--amber-subtle)] text-[var(--amber-text)] font-medium leading-none">Recommended</span>
+            <span className="text-2xs px-1 py-0.5 rounded bg-[var(--amber-subtle)] text-[var(--amber-text)] font-medium leading-none">{m?.recommended ?? 'Recommended'}</span>
           </span>
-          <span className="text-2xs text-muted-foreground mt-0.5">Claude Code · Gemini CLI · Codex</span>
+          <span className="text-2xs text-muted-foreground mt-0.5">{m?.cliAgents ?? 'Claude Code · Gemini CLI · Codex'}</span>
         </button>
         <button
-          onClick={() => setMode('mcp')}
+          onClick={() => onModeChange('mcp')}
           className={`flex flex-col items-start px-3 py-2.5 text-left transition-colors border-l border-border ${
             mode === 'mcp' ? 'bg-muted' : 'hover:bg-muted/50'
           }`}
@@ -198,107 +250,330 @@ function ConnectGuide({ status, m }: {
             <Plug size={12} className={mode === 'mcp' ? 'text-foreground' : 'text-muted-foreground'} />
             <span className={`text-xs font-semibold ${mode === 'mcp' ? 'text-foreground' : 'text-muted-foreground'}`}>MCP</span>
           </span>
-          <span className="text-2xs text-muted-foreground mt-0.5">Claude Desktop · Cursor</span>
+          <span className="text-2xs text-muted-foreground mt-0.5">{m?.mcpAgents ?? 'Claude Desktop · Cursor'}</span>
         </button>
       </div>
 
-      {/* Content for selected mode */}
-      <div className="px-4 pb-4 space-y-3">
+      {/* Tab content */}
+      <div className="px-4 pb-4 space-y-4">
         {mode === 'cli' ? (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              <span className="text-[var(--amber-text)]">~90% lower token cost.</span> Skill included — just install and go.
-            </p>
-            <CodeBlock label="Install" code="npm install -g @geminilight/mindos" onCopy={handleCopy} copiedField={copiedField} fieldId="cli-install" />
-            <div className="space-y-1">
-              <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">Remote</span>
-              <CodeBlock code={`mindos config set url ${remoteUrl}`} onCopy={handleCopy} copiedField={copiedField} fieldId="cli-url" compact />
-              <CodeBlock code={`mindos config set authToken ${hasToken ? maskedAuthToken : '<token>'}`} onCopy={handleCopy} copiedField={copiedField} fieldId="cli-token" compact />
-            </div>
-            <CodeBlock label="Verify" code="mindos file list" onCopy={handleCopy} copiedField={copiedField} fieldId="cli-verify" />
-          </div>
+          <CliGuide status={status} activeSkillName={activeSkillName} agents={agents} connectedAgents={connectedAgents} detectedAgents={detectedAgents} notFoundAgents={notFoundAgents} onRefresh={onRefresh} m={m} t={t} />
         ) : (
-          <div className="space-y-3">
-            <p className="text-xs text-muted-foreground">
-              Requires per-agent MCP config. Install Skill separately via <code className="text-2xs bg-muted px-1 rounded">mindos mcp install</code>.
-            </p>
-            <div className="space-y-1.5">
-              <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">{m?.serverUrl ?? 'MCP Server URL'}</span>
-              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 border border-border rounded-lg">
-                <code className="flex-1 text-xs font-mono text-foreground select-all truncate">{serverUrl}</code>
-                <CopyButton onCopy={() => handleCopy(serverUrl, 'mcp-url')} copied={copiedField === 'mcp-url'} size="sm" />
-              </div>
-            </div>
-            <ol className="pl-3 border-l-2 border-border/50 space-y-1 text-xs text-muted-foreground list-decimal list-inside">
-              <li>{m?.howToStep1 ?? "Open agent's MCP settings"}</li>
-              <li>{m?.howToStep2 ?? 'Add MCP server with URL above'}</li>
-              <li>{m?.howToStep3 ?? 'Set Auth Token as bearer token'}</li>
-              <li>{m?.howToStep4 ?? 'Save and verify'}</li>
-            </ol>
-          </div>
+          <McpGuide
+            status={status} agents={agents} activeSkillName={activeSkillName}
+            connectedAgents={connectedAgents} detectedAgents={detectedAgents} notFoundAgents={notFoundAgents}
+            currentAgent={currentAgent} selectedAgent={selectedAgent} onSelectAgent={onSelectAgent}
+            restarting={restarting} onRestart={onRestart} onRefresh={onRefresh} m={m} t={t}
+          />
         )}
-
-        {/* Shared Auth Token */}
-        <div className="pt-3 border-t border-border">
-          <div className="space-y-1.5">
-            <label className="flex items-center gap-1.5 text-2xs font-medium text-muted-foreground uppercase tracking-wider">
-              <Shield size={11} />
-              {m?.tokenLabel ?? 'Auth Token'}
-            </label>
-            {hasToken ? (
-              <div className="flex items-center gap-2">
-                <div className="flex-1 flex items-center gap-2 px-3 py-2 bg-muted/50 border border-border rounded-lg min-h-[38px]">
-                  <code className="flex-1 text-xs font-mono text-foreground break-all select-all leading-relaxed">{displayToken}</code>
-                </div>
-                <button type="button" onClick={() => setRevealed(v => !v)}
-                  className="shrink-0 p-2 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors focus-visible:ring-2 focus-visible:ring-ring"
-                  title={revealed ? (m?.tokenHide ?? 'Hide') : (m?.tokenShow ?? 'Show')}>
-                  {revealed ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-                <CopyButton onCopy={() => handleCopy(status.authToken ?? '', 'token')} copied={copiedField === 'token'} title={m?.tokenCopy ?? 'Copy'} />
-              </div>
-            ) : (
-              <div className="px-3 py-2.5 bg-[var(--amber-subtle)] border border-[var(--amber)]/20 rounded-lg">
-                <p className="text-xs text-[var(--amber-text)]">{m?.tokenNone ?? 'No token set.'}</p>
-                <p className="text-xs text-muted-foreground mt-1">{m?.tokenNoneAction ?? 'Generate one in Settings → General → Security.'}</p>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   );
 }
 
-/* ── Reusable: Code Block with copy ── */
+/* ── CLI Guide (local + remote setup) ── */
 
-function CodeBlock({ label, code, onCopy, copiedField, fieldId, compact }: {
-  label?: string;
-  code: string;
-  onCopy: (text: string, field: string) => void;
-  copiedField: string | null;
-  fieldId: string;
-  compact?: boolean;
+function CliGuide({ status, activeSkillName, agents, connectedAgents, detectedAgents, notFoundAgents, onRefresh, m, t }: {
+  status: McpStatus; activeSkillName: string; agents: AgentInfo[]; connectedAgents: AgentInfo[]; detectedAgents: AgentInfo[]; notFoundAgents: AgentInfo[];
+  onRefresh: () => void; m: Record<string, any> | undefined; t: McpTabProps['t'];
+}) {
+  const { copiedField, handleCopy } = useCopyField();
+
+  const hasToken = status.authConfigured && !!status.authToken;
+  const remoteHost = status.localIP || 'localhost';
+  const webPort = typeof window !== 'undefined' ? window.location.port || '3456' : '3456';
+  const remoteUrl = `http://${remoteHost}:${webPort}`;
+  const maskedAuthToken = status.maskedToken ?? '';
+
+  return (
+    <>
+      {/* Local */}
+      <div className="space-y-2.5">
+        <div className="flex items-center gap-2">
+          <Monitor size={12} className="text-success" />
+          <span className="text-xs font-semibold text-foreground">{m?.localTitle ?? 'Local'}</span>
+          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-2xs font-medium bg-success/10 text-success">
+            <CheckCircle2 size={10} />
+            {m?.localReady ?? 'Ready to use'}
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {m?.cliLocalDesc ?? 'MindOS Skill is built-in. Install the CLI and you\'re good to go.'}
+        </p>
+        <CodeBlock code="mindos file list" label={m?.cliSkillVerify ?? 'Verify'} onCopy={handleCopy} copiedField={copiedField} fieldId="cli-verify" />
+
+        {/* Detected Agents — install Skill locally */}
+        {agents.length > 0 && (
+          <InlineCollapsible
+            icon={<Users size={12} className="text-muted-foreground" />}
+            title={m?.detectedAgentsTitle ?? 'Detected Agents'}
+            badge={`${connectedAgents.length + detectedAgents.length}/${agents.length}`}
+          >
+            <AgentInstall agents={agents} t={t} onRefresh={onRefresh} mode="cli" activeSkillName={activeSkillName} />
+          </InlineCollapsible>
+        )}
+      </div>
+
+      {/* Remote */}
+      <div className="border-t border-border pt-3 space-y-3">
+        <div className="flex items-center gap-2">
+          <Globe size={12} className="text-muted-foreground" />
+          <span className="text-xs font-semibold text-foreground">{m?.remoteTitle ?? 'Remote Access'}</span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {m?.cliRemoteDesc ?? 'Install the CLI on another machine and connect to this MindOS server.'}
+        </p>
+        <StepBlock step="1" label={m?.cliSkillInstall ?? 'Install'}>
+          <CodeBlock code="npm install -g @geminilight/mindos" onCopy={handleCopy} copiedField={copiedField} fieldId="cli-install" compact />
+        </StepBlock>
+        <StepBlock step="2" label={m?.cliRemoteConfigure ?? 'Configure'}>
+          <div className="space-y-1">
+            <CodeBlock code={`mindos config set url ${remoteUrl}`} onCopy={handleCopy} copiedField={copiedField} fieldId="cli-url" compact />
+            <CodeBlock
+              code={`mindos config set authToken ${hasToken ? maskedAuthToken : '<token>'}`}
+              onCopy={(_, field) => {
+                handleCopy(`mindos config set authToken ${status.authToken ?? '<token>'}`, field);
+              }}
+              copiedField={copiedField} fieldId="cli-token" compact
+              hint={hasToken ? (m?.tokenCopyFullHint ?? 'Copies full token') : undefined}
+            />
+          </div>
+        </StepBlock>
+        <StepBlock step="3" label={m?.cliInstallSkill ?? 'Install Skill'}>
+          <CodeBlock code={`npx skills add GeminiLight/MindOS --skill ${activeSkillName} -g -y`} onCopy={handleCopy} copiedField={copiedField} fieldId="cli-skill" compact />
+        </StepBlock>
+        <StepBlock step="4" label={m?.cliSkillVerify ?? 'Verify'}>
+          <CodeBlock code="mindos file list" onCopy={handleCopy} copiedField={copiedField} fieldId="cli-remote-verify" compact />
+        </StepBlock>
+      </div>
+    </>
+  );
+}
+
+/* ── MCP Guide (status + snippets + remote) ── */
+
+function McpGuide({ status, agents, activeSkillName, connectedAgents, detectedAgents, notFoundAgents, currentAgent, selectedAgent, onSelectAgent, restarting, onRestart, onRefresh, m, t }: {
+  status: McpStatus;
+  agents: AgentInfo[];
+  activeSkillName: string;
+  connectedAgents: AgentInfo[];
+  detectedAgents: AgentInfo[];
+  notFoundAgents: AgentInfo[];
+  currentAgent: AgentInfo | null;
+  selectedAgent: string;
+  onSelectAgent: (key: string) => void;
+  restarting: boolean;
+  onRestart: () => void;
+  onRefresh: () => void;
+  m: Record<string, any> | undefined;
+  t: McpTabProps['t'];
+}) {
+  const { copiedField, handleCopy } = useCopyField();
+
+  const hasToken = status.authConfigured && !!status.authToken;
+  const remoteHost = status.localIP || 'localhost';
+  const mcpUrl = `http://${remoteHost}:${status.port}/mcp`;
+
+  const localSnippet = useMemo(
+    () => currentAgent ? generateSnippet(currentAgent, status, 'stdio') : null,
+    [currentAgent, status]
+  );
+  const remoteSnippet = useMemo(
+    () => currentAgent ? generateSnippet(currentAgent, status, 'http') : null,
+    [currentAgent, status]
+  );
+
+  return (
+    <>
+      {/* MCP Status */}
+      <McpStatusInline status={status} restarting={restarting} onRestart={onRestart} onRefresh={onRefresh} m={m} />
+
+      {/* Local (stdio) */}
+      <div className="space-y-2.5">
+        <div className="flex items-center gap-2">
+          <Monitor size={12} className={status.running ? 'text-success' : 'text-muted-foreground'} />
+          <span className="text-xs font-semibold text-foreground">{m?.localTitle ?? 'Local'}</span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          {m?.mcpLocalDesc ?? 'Copy the config snippet and paste into your agent\'s MCP settings.'}
+        </p>
+        {agents.length > 0 && (
+          <div className="space-y-3">
+            <CustomSelect
+              value={selectedAgent}
+              onChange={onSelectAgent}
+              options={[
+                ...(connectedAgents.length > 0 ? [{ label: m?.connectedGroup ?? 'Connected', options: connectedAgents.map(a => ({ value: a.key, label: a.name })) }] : []),
+                ...(detectedAgents.length > 0 ? [{ label: m?.detectedGroup ?? 'Detected', options: detectedAgents.map(a => ({ value: a.key, label: a.name })) }] : []),
+                ...(notFoundAgents.length > 0 ? [{ label: m?.notFoundGroup ?? 'Not Installed', options: notFoundAgents.map(a => ({ value: a.key, label: a.name })) }] : []),
+              ] as SelectItem[]}
+            />
+            {currentAgent && localSnippet && (
+              <>
+                {currentAgent.present && currentAgent.installed && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-success/10 text-success">
+                    <CheckCircle2 size={10} /> {m?.tagConnected ?? 'Connected'}
+                  </span>
+                )}
+                <pre className="text-[11px] font-mono bg-muted/50 border border-border rounded-lg p-3 overflow-x-auto whitespace-pre select-all max-h-[200px] overflow-y-auto">
+                  {localSnippet.displaySnippet}
+                </pre>
+                <div className="flex items-center gap-3 text-sm">
+                  <button onClick={async () => { const ok = await copyToClipboard(localSnippet.snippet); if (ok) toast.copy(); }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0">
+                    <Copy size={14} /> {m?.copyConfig ?? 'Copy'}
+                  </button>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="font-mono text-muted-foreground truncate text-2xs">{localSnippet.path}</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Detected Agents — install MCP config + Skill locally */}
+      {agents.length > 0 && (
+        <InlineCollapsible
+          icon={<Users size={12} className="text-muted-foreground" />}
+          title={m?.detectedAgentsTitle ?? 'Detected Agents'}
+          badge={`${connectedAgents.length + detectedAgents.length}/${agents.length}`}
+        >
+          <AgentInstall agents={agents} t={t} onRefresh={onRefresh} mode="mcp" activeSkillName={activeSkillName} />
+        </InlineCollapsible>
+      )}
+
+      {/* Remote */}
+      <div className="border-t border-border pt-3 space-y-3">
+        <div className="flex items-center gap-2">
+          <Globe size={12} className="text-muted-foreground" />
+          <span className="text-xs font-semibold text-foreground">{m?.remoteTitle ?? 'Remote Access'}</span>
+        </div>
+        {!hasToken && (
+          <p className="flex items-center gap-1.5 text-xs text-[var(--amber-text)]">
+            <AlertCircle size={12} /> {m?.noAuthWarning ?? 'Set an Auth Token in Settings → General before enabling remote access.'}
+          </p>
+        )}
+        <div className="space-y-1">
+          <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">{m?.serverUrl ?? 'MCP Server URL'}</span>
+          <div className="flex items-center gap-2 px-2.5 py-1.5 bg-muted/50 border border-border rounded-lg">
+            <code className="flex-1 text-xs font-mono text-foreground select-all truncate">{mcpUrl}</code>
+            <CopyButton onCopy={() => handleCopy(mcpUrl, 'mcp-url')} copied={copiedField === 'mcp-url'} size="sm" />
+          </div>
+        </div>
+        {agents.length > 0 && currentAgent && remoteSnippet && (
+          <>
+            <pre className="text-[11px] font-mono bg-muted/50 border border-border rounded-lg p-3 overflow-x-auto whitespace-pre select-all max-h-[200px] overflow-y-auto">
+              {remoteSnippet.displaySnippet}
+            </pre>
+            <div className="flex items-center gap-3 text-sm">
+              <button onClick={async () => { const ok = await copyToClipboard(remoteSnippet.snippet); if (ok) toast.copy(); }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0">
+                <Copy size={14} /> {m?.copyConfig ?? 'Copy'}
+              </button>
+              <span className="text-muted-foreground">→</span>
+              <span className="font-mono text-muted-foreground truncate text-2xs">{remoteSnippet.path}</span>
+            </div>
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
+/* ── Inline Collapsible (inside a card) ── */
+
+function InlineCollapsible({ icon, title, badge, defaultOpen = false, children }: {
+  icon?: React.ReactNode;
+  title: string;
+  badge?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-lg border border-border overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-2 w-full px-3 py-2 text-left bg-muted/30 hover:bg-muted/60 transition-colors"
+      >
+        {open ? <ChevronDown size={11} className="text-muted-foreground" /> : <ChevronRight size={11} className="text-muted-foreground" />}
+        {icon}
+        <span className="text-xs font-medium text-muted-foreground">{title}</span>
+        {badge && <span className="text-2xs text-muted-foreground/70 ml-auto">{badge}</span>}
+      </button>
+      {open && <div className="px-3 py-2.5 border-t border-border">{children}</div>}
+    </div>
+  );
+}
+
+/* ── Step Block ── */
+
+function StepBlock({ step, label, children }: { step: string; label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <span className="w-4 h-4 rounded-full bg-muted flex items-center justify-center text-2xs font-semibold text-muted-foreground shrink-0">{step}</span>
+        <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">{label}</span>
+      </div>
+      <div className="pl-6">{children}</div>
+    </div>
+  );
+}
+
+/* ── MCP Status (compact inline) ── */
+
+function McpStatusInline({ status, restarting, onRestart, onRefresh, m }: {
+  status: McpStatus; restarting: boolean; onRestart: () => void; onRefresh: () => void; m: Record<string, any> | undefined;
+}) {
+  return (
+    <div className="flex items-center justify-between px-3 py-2 rounded-lg border border-border bg-muted/30">
+      <div className="flex items-center gap-2 text-xs">
+        {restarting ? (
+          <><Loader2 size={11} className="animate-spin text-[var(--amber)]" /><span className="text-[var(--amber)]">{m?.restarting ?? 'Restarting...'}</span></>
+        ) : (
+          <>
+            <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${status.running ? 'bg-success' : 'bg-muted-foreground'}`} />
+            <span className="font-medium text-foreground">MCP {status.running ? (m?.running ?? 'Running') : (m?.stopped ?? 'Stopped')}</span>
+            {status.running && <><span className="text-muted-foreground">·</span><span className="text-muted-foreground">:{status.port}</span><span className="text-muted-foreground">·</span><span className="text-muted-foreground">{status.toolCount} {m?.tools ?? 'tools'}</span></>}
+          </>
+        )}
+      </div>
+      <div className="flex items-center gap-1.5">
+        {!status.running && !restarting && (
+          <button onClick={onRestart} className="flex items-center gap-1 px-2 py-1 text-2xs rounded-md font-medium text-[var(--amber-foreground)] bg-[var(--amber)] transition-colors">
+            <RotateCcw size={11} /> {m?.restart ?? 'Restart'}
+          </button>
+        )}
+        <button onClick={onRefresh} className="p-1 rounded-md border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+          <RefreshCw size={11} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Code Block ── */
+
+function CodeBlock({ label, code, onCopy, copiedField, fieldId, compact, hint }: {
+  label?: string; code: string; onCopy: (text: string, field: string) => void; copiedField: string | null; fieldId: string; compact?: boolean; hint?: string;
 }) {
   return (
     <div className={compact ? '' : 'space-y-1'}>
       {label && <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">{label}</span>}
       <div className={`flex items-center gap-2 ${compact ? 'px-2.5 py-1.5' : 'px-3 py-2'} bg-muted/50 border border-border rounded-lg`}>
         <code className="flex-1 text-xs font-mono text-foreground select-all truncate">{code}</code>
+        {hint && <span className="text-2xs text-muted-foreground/60 shrink-0 hidden sm:inline">{hint}</span>}
         <CopyButton onCopy={() => onCopy(code, fieldId)} copied={copiedField === fieldId} size="sm" />
       </div>
     </div>
   );
 }
 
-/* ── Reusable: Copy Button ── */
+/* ── Copy Button ── */
 
-function CopyButton({ onCopy, copied, title, size }: {
-  onCopy: () => void;
-  copied: boolean;
-  title?: string;
-  size?: 'sm' | 'md';
-}) {
+function CopyButton({ onCopy, copied, title, size }: { onCopy: () => void; copied: boolean; title?: string; size?: 'sm' | 'md' }) {
   const sz = size === 'sm' ? 11 : 14;
   const pad = size === 'sm' ? 'p-1' : 'p-2';
   return (
@@ -308,146 +583,5 @@ function CopyButton({ onCopy, copied, title, size }: {
       }`}>
       {copied ? <Check size={sz} /> : <Copy size={sz} />}
     </button>
-  );
-}
-
-/* ── MCP Status Card ── */
-
-function McpStatusCard({ status, restarting, onRestart, onRefresh, m }: {
-  status: McpStatus | null;
-  restarting: boolean;
-  onRestart: () => void;
-  onRefresh: () => void;
-  m: Record<string, any> | undefined;
-}) {
-  if (!status) return null;
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 flex items-center justify-between">
-      <div className="flex items-center gap-2.5 text-sm">
-        {restarting ? (
-          <>
-            <Loader2 size={12} className="animate-spin text-[var(--amber)]" />
-            <span className="text-[var(--amber)]">{m?.restarting ?? 'Restarting...'}</span>
-          </>
-        ) : (
-          <>
-            <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${status.running ? 'bg-success' : 'bg-muted-foreground'}`} />
-            <span className="text-foreground font-medium">
-              {status.running ? (m?.running ?? 'Running') : (m?.stopped ?? 'Stopped')}
-            </span>
-            {status.running && (
-              <>
-                <span className="text-muted-foreground">·</span>
-                <span className="font-mono text-muted-foreground">{status.endpoint}</span>
-                <span className="text-muted-foreground">·</span>
-                <span className="text-muted-foreground">{status.toolCount} {m?.tools ?? 'tools'}</span>
-              </>
-            )}
-          </>
-        )}
-      </div>
-      <div className="flex items-center gap-2">
-        {!status.running && !restarting && (
-          <button onClick={onRestart}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg font-medium text-[var(--amber-foreground)] bg-[var(--amber)] transition-colors">
-            <RotateCcw size={14} /> {m?.restart ?? 'Restart'}
-          </button>
-        )}
-        <button onClick={onRefresh}
-          className="p-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-          <RefreshCw size={14} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ── Agent Config Viewer (dropdown + snippet) ── */
-
-function AgentConfigViewer({ connectedAgents, detectedAgents, notFoundAgents, currentAgent, mcpStatus, selectedAgent, onSelectAgent, transport, onTransportChange, onCopy, m }: {
-  connectedAgents: AgentInfo[];
-  detectedAgents: AgentInfo[];
-  notFoundAgents: AgentInfo[];
-  currentAgent: AgentInfo | null;
-  mcpStatus: McpStatus | null;
-  selectedAgent: string;
-  onSelectAgent: (key: string) => void;
-  transport: 'stdio' | 'http';
-  onTransportChange: (t: 'stdio' | 'http') => void;
-  onCopy: (snippet: string) => void;
-  m: Record<string, any> | undefined;
-}) {
-  const snippet = useMemo(
-    () => currentAgent ? generateSnippet(currentAgent, mcpStatus, transport) : null,
-    [currentAgent, mcpStatus, transport]
-  );
-
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 space-y-3">
-      <CustomSelect
-        value={selectedAgent}
-        onChange={onSelectAgent}
-        options={[
-          ...(connectedAgents.length > 0 ? [{ label: m?.connectedGroup ?? 'Connected', options: connectedAgents.map(a => ({ value: a.key, label: `${a.name} — ${a.transport ?? 'stdio'} · ${a.scope ?? 'global'}` })) }] : []),
-          ...(detectedAgents.length > 0 ? [{ label: m?.detectedGroup ?? 'Detected (not configured)', options: detectedAgents.map(a => ({ value: a.key, label: `${a.name} — ${m?.notConfigured ?? 'not configured'}` })) }] : []),
-          ...(notFoundAgents.length > 0 ? [{ label: m?.notFoundGroup ?? 'Not Installed', options: notFoundAgents.map(a => ({ value: a.key, label: a.name })) }] : []),
-        ] as SelectItem[]}
-      />
-
-      {currentAgent && (
-        <>
-          <div className="flex items-center gap-2">
-            {currentAgent.present && currentAgent.installed ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-success/10 text-success">
-                <span className="w-1.5 h-1.5 rounded-full bg-success inline-block" /> {m?.tagConnected ?? 'Connected'}
-              </span>
-            ) : currentAgent.present && !currentAgent.installed ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-[var(--amber-subtle)] text-[var(--amber-text)]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--amber)] inline-block" /> {m?.tagDetected ?? 'Detected'}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-2xs font-medium bg-muted text-muted-foreground">
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground inline-block" /> {m?.tagNotInstalled ?? 'Not installed'}
-              </span>
-            )}
-            {currentAgent.transport && <span className="px-1.5 py-0.5 rounded text-2xs bg-muted text-muted-foreground">{currentAgent.transport}</span>}
-            {currentAgent.scope && <span className="px-1.5 py-0.5 rounded text-2xs bg-muted text-muted-foreground">{currentAgent.scope}</span>}
-          </div>
-
-          <div className="flex items-center rounded-lg border border-border overflow-hidden w-fit">
-            <button onClick={() => onTransportChange('stdio')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${transport === 'stdio' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'}`}>
-              <Monitor size={14} /> {m?.transportLocal ?? 'Local'}
-            </button>
-            <button onClick={() => onTransportChange('http')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-sm transition-colors ${transport === 'http' ? 'bg-muted text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'}`}>
-              <Globe size={14} /> {m?.transportRemote ?? 'Remote'}
-            </button>
-          </div>
-
-          {transport === 'http' && mcpStatus && !mcpStatus.authConfigured && (
-            <p className="flex items-center gap-1.5 text-xs text-[var(--amber-text)]">
-              <AlertCircle size={12} /> {m?.noAuthWarning ?? 'Auth not configured.'}
-            </p>
-          )}
-
-          {snippet && (
-            <>
-              <pre className="text-[11px] font-mono bg-muted/50 border border-border rounded-lg p-3 overflow-x-auto whitespace-pre select-all max-h-[200px] overflow-y-auto">
-                {snippet.displaySnippet}
-              </pre>
-              <div className="flex items-center gap-3 text-sm">
-                <button onClick={() => onCopy(snippet.snippet)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0">
-                  <Copy size={14} /> {m?.copyConfig ?? 'Copy'}
-                </button>
-                <span className="text-muted-foreground">→</span>
-                <span className="font-mono text-muted-foreground truncate text-2xs">{snippet.path}</span>
-              </div>
-            </>
-          )}
-        </>
-      )}
-    </div>
   );
 }

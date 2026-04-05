@@ -28,6 +28,12 @@ export interface SetupState {
   webPassword: string;
 }
 
+// ─── Connection mode (CLI / MCP toggle) ──────────────────────────────────────
+export interface ConnectionMode {
+  cli: boolean;
+  mcp: boolean;
+}
+
 // ─── Port check ──────────────────────────────────────────────────────────────
 export interface PortStatus {
   checking: boolean;
