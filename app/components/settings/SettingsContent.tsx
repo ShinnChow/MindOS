@@ -30,6 +30,7 @@ export default function SettingsContent({ visible, initialTab, variant, onClose 
   const router = useRouter();
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const dataLoaded = useRef(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const [font, setFont] = useState('lora');
   const [fontSize, setFontSize] = useState('15px');
@@ -77,8 +78,13 @@ export default function SettingsContent({ visible, initialTab, variant, onClose 
   }, [visible, isPanel]);
 
   useEffect(() => {
-    if (visible && initialTab) setTab(initialTab);
+    if (visible && initialTab) switchTab(initialTab);
   }, [visible, initialTab]);
+
+  const switchTab = useCallback((id: Tab) => {
+    setTab(id);
+    contentRef.current?.scrollTo?.(0, 0);
+  }, []);
 
   useEffect(() => {
     const fontMap: Record<string, string> = {
@@ -166,8 +172,8 @@ export default function SettingsContent({ visible, initialTab, variant, onClose 
     { id: 'ai', label: t.settings.tabs.ai, icon: <Sparkles size={iconSize} /> },
     { id: 'mcp', label: t.settings.tabs.mcp ?? 'Connections', icon: <Plug size={iconSize} /> },
     { id: 'knowledge', label: t.settings.tabs.knowledge, icon: <Settings size={iconSize} /> },
-    { id: 'sync', label: t.settings.tabs.sync ?? 'Sync', icon: <RefreshCw size={iconSize} /> },
     { id: 'appearance', label: t.settings.tabs.appearance, icon: <Palette size={iconSize} /> },
+    { id: 'sync', label: t.settings.tabs.sync ?? 'Sync', icon: <RefreshCw size={iconSize} /> },
     { id: 'update', label: t.settings.tabs.update ?? 'Update', icon: <Download size={iconSize} />, badge: hasUpdate },
     { id: 'uninstall', label: t.settings.tabs.uninstall ?? 'Uninstall', icon: <Trash2 size={iconSize} /> },
   ];
@@ -176,7 +182,7 @@ export default function SettingsContent({ visible, initialTab, variant, onClose 
 
   /* ── Shared content & footer ── */
   const renderContent = () => (
-    <div className={`flex-1 overflow-y-auto min-h-0 ${isPanel ? 'px-4 py-4 space-y-4' : 'px-5 py-5 space-y-5'}`}>
+    <div ref={contentRef} className={`flex-1 overflow-y-auto min-h-0 ${isPanel ? 'px-4 py-4 space-y-4' : 'px-5 py-5 space-y-5'}`}>
       {status === 'load-error' && (tab === 'ai' || tab === 'knowledge') ? (
         <div className="flex flex-col items-center gap-2 py-8 text-center">
           <AlertCircle size={isPanel ? 18 : 20} className="text-destructive" />
@@ -257,7 +263,7 @@ export default function SettingsContent({ visible, initialTab, variant, onClose 
           {TABS.map(tabItem => (
             <button
               key={tabItem.id}
-              onClick={() => setTab(tabItem.id)}
+              onClick={() => switchTab(tabItem.id)}
               className={`flex items-center gap-1 px-2 py-2 text-xs font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${
                 tab === tabItem.id
                   ? 'border-[var(--amber)] text-foreground'
@@ -308,7 +314,7 @@ export default function SettingsContent({ visible, initialTab, variant, onClose 
           {TABS.map(tabItem => (
             <button
               key={tabItem.id}
-              onClick={() => setTab(tabItem.id)}
+              onClick={() => switchTab(tabItem.id)}
               className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${
                 tab === tabItem.id
                   ? 'border-[var(--amber)] text-foreground'
@@ -344,7 +350,7 @@ export default function SettingsContent({ visible, initialTab, variant, onClose 
             {TABS.map(tabItem => (
               <button
                 key={tabItem.id}
-                onClick={() => setTab(tabItem.id)}
+                onClick={() => switchTab(tabItem.id)}
                 className={`flex items-center gap-2 w-full px-4 py-2 text-sm font-medium transition-colors relative ${
                   tab === tabItem.id
                     ? 'text-foreground bg-muted'
