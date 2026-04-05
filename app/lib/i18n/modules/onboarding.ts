@@ -211,10 +211,6 @@ export const onboardingEn = {
         title: 'Connect Any Agent',
         body: 'Link Cursor, Claude Code, or Windsurf via MCP — they all share the same project memory.',
       },
-      {
-        title: 'Echo — Growth Compounds',
-        body: 'About you, daily reflections, growth tracking — MindOS helps you accumulate cognitive compound interest over time.',
-      },
     ],
   },
 } as const;
@@ -429,10 +425,6 @@ export const onboardingZh = {
       {
         title: '多 Agent 共享记忆',
         body: '通过 MCP 连接 Cursor、Claude Code、Windsurf，它们共享同一份项目记忆。',
-      },
-      {
-        title: '回响 — 认知在积累',
-        body: '关于你、每日回顾、成长轨迹——MindOS 帮你沉淀判断与偏好，让经验不断复利。',
       },
     ],
   },
