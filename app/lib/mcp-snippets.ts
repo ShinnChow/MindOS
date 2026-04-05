@@ -94,9 +94,13 @@ export function generateSnippet(
   if (transport === 'stdio') {
     return generateStdioSnippet(agent);
   }
+  // For remote/http mode, prefer localIP over endpoint (which is always localhost)
+  const endpoint = status?.localIP
+    ? `http://${status.localIP}:${status.port}/mcp`
+    : (status?.endpoint ?? 'http://127.0.0.1:8781/mcp');
   return generateHttpSnippet(
     agent,
-    status?.endpoint ?? 'http://127.0.0.1:8781/mcp',
+    endpoint,
     status?.authToken,
     status?.maskedToken,
   );

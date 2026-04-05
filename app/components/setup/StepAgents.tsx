@@ -2,16 +2,18 @@
 
 import { useState, useMemo } from 'react';
 import {
-  Loader2, CheckCircle2, XCircle, Brain, ChevronDown,
+  Loader2, CheckCircle2, XCircle, Brain, ChevronDown, Terminal, Plug,
 } from 'lucide-react';
 import { Field, Select } from '@/components/settings/Primitives';
-import type { SetupMessages, McpMessages, Template, AgentEntry, AgentInstallStatus } from './types';
+import type { SetupMessages, McpMessages, AgentEntry, AgentInstallStatus, ConnectionMode } from './types';
 
 export interface StepAgentsProps {
   agents: AgentEntry[];
   agentsLoading: boolean;
   selectedAgents: Set<string>;
   setSelectedAgents: React.Dispatch<React.SetStateAction<Set<string>>>;
+  connectionMode: ConnectionMode;
+  setConnectionMode: React.Dispatch<React.SetStateAction<ConnectionMode>>;
   agentTransport: 'auto' | 'stdio' | 'http';
   setAgentTransport: (v: 'auto' | 'stdio' | 'http') => void;
   agentScope: 'global' | 'project';
@@ -19,13 +21,13 @@ export interface StepAgentsProps {
   agentStatuses: Record<string, AgentInstallStatus>;
   s: SetupMessages;
   settingsMcp: McpMessages;
-  template: Template;
 }
 
 export default function StepAgents({
   agents, agentsLoading, selectedAgents, setSelectedAgents,
+  connectionMode, setConnectionMode,
   agentTransport, setAgentTransport, agentScope, setAgentScope,
-  agentStatuses, s, settingsMcp, template,
+  agentStatuses, s, settingsMcp,
 }: StepAgentsProps) {
   const toggleAgent = (key: string) => {
     setSelectedAgents(prev => {
@@ -105,17 +107,82 @@ export default function StepAgents({
         disabled={agentStatuses[agent.key]?.state === 'installing'}
       />
       <span className="text-sm flex-1" style={{ color: 'var(--foreground)' }}>{agent.name}</span>
-      <span className="text-2xs px-1.5 py-0.5 rounded font-mono"
-        style={{ background: 'color-mix(in srgb, var(--muted-foreground) 8%, transparent)', color: 'var(--muted-foreground)' }}>
-        {getEffectiveTransport(agent)}
-      </span>
+      {connectionMode.mcp && (
+        <span className="text-2xs px-1.5 py-0.5 rounded font-mono"
+          style={{ background: 'color-mix(in srgb, var(--muted-foreground) 8%, transparent)', color: 'var(--muted-foreground)' }}>
+          {getEffectiveTransport(agent)}
+        </span>
+      )}
       {getStatusBadge(agent.key, agent)}
     </label>
   );
 
   return (
     <div className="space-y-5">
-      <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>{s.agentToolsHint}</p>
+      {/* Connection Mode Toggle */}
+      <div className="space-y-2">
+        <p className="text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>
+          {s.connectionModeTitle}
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <label
+            className="flex items-start gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all"
+            style={{
+              borderColor: connectionMode.cli ? 'var(--amber)' : 'var(--border)',
+              background: connectionMode.cli ? 'color-mix(in srgb, var(--amber) 6%, transparent)' : 'transparent',
+            }}>
+            <input
+              type="checkbox"
+              checked={connectionMode.cli}
+              onChange={() => setConnectionMode(prev => ({ ...prev, cli: !prev.cli }))}
+              className="form-check mt-0.5"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                <Terminal size={13} className="shrink-0" /> CLI
+              </div>
+              <p className="text-2xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
+                {s.connectionModeCliHint}
+              </p>
+            </div>
+          </label>
+          <label
+            className="flex items-start gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all"
+            style={{
+              borderColor: connectionMode.mcp ? 'var(--amber)' : 'var(--border)',
+              background: connectionMode.mcp ? 'color-mix(in srgb, var(--amber) 6%, transparent)' : 'transparent',
+            }}>
+            <input
+              type="checkbox"
+              checked={connectionMode.mcp}
+              onChange={() => setConnectionMode(prev => ({ ...prev, mcp: !prev.mcp }))}
+              className="form-check mt-0.5"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 text-sm font-medium" style={{ color: 'var(--foreground)' }}>
+                <Plug size={13} className="shrink-0" /> MCP
+              </div>
+              <p className="text-2xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
+                {s.connectionModeMcpHint}
+              </p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      {/* Hint — contextual based on connection mode */}
+      {!connectionMode.cli && !connectionMode.mcp ? (
+        <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs"
+          style={{ background: 'color-mix(in srgb, var(--amber) 8%, transparent)', color: 'var(--amber)' }}>
+          <Brain size={13} className="shrink-0" />
+          <span>{s.agentToolsHintNone}</span>
+        </div>
+      ) : (
+        <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
+          {!connectionMode.mcp && connectionMode.cli ? s.agentToolsHintCliOnly : s.agentToolsHint}
+        </p>
+      )}
+
       {agentsLoading ? (
         <div className="flex items-center gap-2 py-4" style={{ color: 'var(--muted-foreground)' }}>
           <Loader2 size={14} className="animate-spin" />
@@ -172,54 +239,45 @@ export default function StepAgents({
               )}
             </div>
           )}
-          {/* CLI Skill hint when no agents selected */}
-          {selectedAgents.size === 0 && (
+          {/* Hint when no agents selected — only relevant for MCP mode */}
+          {connectionMode.mcp && selectedAgents.size === 0 && (
             <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs"
               style={{ background: 'color-mix(in srgb, var(--amber) 8%, transparent)', color: 'var(--amber)' }}>
               <Brain size={13} className="shrink-0" />
               <span>{s.agentNoneSelected}</span>
             </div>
           )}
-          {/* Skill context + auto-install hint */}
-          <div className="space-y-1.5">
-            <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-              {s.skillWhat}
-            </p>
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
-              style={{ background: 'color-mix(in srgb, var(--muted-foreground) 6%, transparent)', color: 'var(--muted-foreground)' }}>
-              <Brain size={13} className="shrink-0" />
-              <span>{s.skillAutoHint(template === 'zh' ? 'mindos-zh' : 'mindos')}</span>
+          {/* Advanced options — only when MCP is enabled */}
+          {connectionMode.mcp && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                aria-expanded={showAdvanced}
+                className="flex items-center gap-1.5 text-xs py-1.5 transition-colors"
+                style={{ color: 'var(--muted-foreground)' }}>
+                <ChevronDown size={12} className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+                {s.agentAdvanced}
+              </button>
+              {showAdvanced && (
+                <div className="grid grid-cols-2 gap-4 mt-2">
+                  <Field label={s.agentTransport}>
+                    <Select value={agentTransport} onChange={e => setAgentTransport(e.target.value as 'auto' | 'stdio' | 'http')}>
+                      <option value="auto">{s.agentTransportAuto}</option>
+                      <option value="stdio">{settingsMcp.transportStdio}</option>
+                      <option value="http">{settingsMcp.transportHttp}</option>
+                    </Select>
+                  </Field>
+                  <Field label={s.agentScope}>
+                    <Select value={agentScope} onChange={e => setAgentScope(e.target.value as 'global' | 'project')}>
+                      <option value="global">{s.agentScopeGlobal}</option>
+                      <option value="project">{s.agentScopeProject}</option>
+                    </Select>
+                  </Field>
+                </div>
+              )}
             </div>
-          </div>
-          {/* Advanced options — collapsed by default */}
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              aria-expanded={showAdvanced}
-              className="flex items-center gap-1.5 text-xs py-1.5 transition-colors"
-              style={{ color: 'var(--muted-foreground)' }}>
-              <ChevronDown size={12} className={`transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
-              {s.agentAdvanced}
-            </button>
-            {showAdvanced && (
-              <div className="grid grid-cols-2 gap-4 mt-2">
-                <Field label={s.agentTransport}>
-                  <Select value={agentTransport} onChange={e => setAgentTransport(e.target.value as 'auto' | 'stdio' | 'http')}>
-                    <option value="auto">{s.agentTransportAuto}</option>
-                    <option value="stdio">{settingsMcp.transportStdio}</option>
-                    <option value="http">{settingsMcp.transportHttp}</option>
-                  </Select>
-                </Field>
-                <Field label={s.agentScope}>
-                  <Select value={agentScope} onChange={e => setAgentScope(e.target.value as 'global' | 'project')}>
-                    <option value="global">{s.agentScopeGlobal}</option>
-                    <option value="project">{s.agentScopeProject}</option>
-                  </Select>
-                </Field>
-              </div>
-            )}
-          </div>
+          )}
           <div className="flex gap-2 mt-1">
             <button
               type="button"

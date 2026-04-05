@@ -5,7 +5,7 @@ import { Sparkles, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLocale } from '@/lib/stores/locale-store';
 import { copyToClipboard } from '@/lib/clipboard';
 import { toast } from '@/lib/toast';
-import type { SetupState, PortStatus, AgentEntry, AgentInstallStatus, ProviderSetupConfig } from './types';
+import type { SetupState, PortStatus, AgentEntry, AgentInstallStatus, ProviderSetupConfig, ConnectionMode } from './types';
 import { type ProviderId, isProviderId, PROVIDER_PRESETS } from '@/lib/agent/providers';
 import { TOTAL_STEPS, STEP_KB, STEP_AI, STEP_AGENTS, STEP_REVIEW } from './constants';
 import StepKB from './StepKB';
@@ -149,8 +149,8 @@ export default function SetupWizard() {
   const [agentTransport, setAgentTransport] = useState<'auto' | 'stdio' | 'http'>('auto');
   const [agentScope, setAgentScope] = useState<'global' | 'project'>('global');
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentInstallStatus>>({});
-  const [skillInstallResult, setSkillInstallResult] = useState<{ ok?: boolean; skill?: string; error?: string } | null>(null);
-  const [setupPhase, setSetupPhase] = useState<'review' | 'saving' | 'agents' | 'skill' | 'done'>('review');
+  const [connectionMode, setConnectionMode] = useState<ConnectionMode>({ cli: true, mcp: false });
+  const [setupPhase, setSetupPhase] = useState<'review' | 'saving' | 'agents' | 'done'>('review');
 
   // Load existing config as defaults on mount, generate token if none exists
   useEffect(() => {
@@ -291,6 +291,9 @@ export default function SetupWizard() {
       if (webPortStatus.available === false || mcpPortStatus.available === false) return false;
       return true;
     }
+    if (step === STEP_AGENTS) {
+      return connectionMode.cli || connectionMode.mcp;
+    }
     return true;
   };
 
@@ -325,9 +328,9 @@ export default function SetupWizard() {
       return;
     }
 
-    // Phase 2: Install agents
-    setSetupPhase('agents');
-    if (agentKeys.length > 0) {
+    // Phase 2: Install MCP config to agents (only when MCP mode is enabled)
+    if (connectionMode.mcp && agentKeys.length > 0) {
+      setSetupPhase('agents');
       const initialStatuses: Record<string, AgentInstallStatus> = {};
       for (const key of agentKeys) initialStatuses[key] = { state: 'installing' };
       setAgentStatuses(initialStatuses);
@@ -342,9 +345,6 @@ export default function SetupWizard() {
         setAgentStatuses(errStatuses);
       }
     }
-
-    // Phase 3: Skill is now built into SKILL.md — no install needed.
-    // .mindos/user-preferences.md will be created on first preference capture.
 
     setSubmitting(false);
     setCompleted(true);
@@ -412,10 +412,10 @@ export default function SetupWizard() {
           <StepAgents
             agents={agents} agentsLoading={agentsLoading}
             selectedAgents={selectedAgents} setSelectedAgents={setSelectedAgents}
+            connectionMode={connectionMode} setConnectionMode={setConnectionMode}
             agentTransport={agentTransport} setAgentTransport={setAgentTransport}
             agentScope={agentScope} setAgentScope={setAgentScope}
             agentStatuses={agentStatuses} s={s} settingsMcp={t.settings.mcp}
-            template={state.template}
           />
         )}
         {step === 3 && (
@@ -424,8 +424,9 @@ export default function SetupWizard() {
             agentStatuses={agentStatuses} onRetryAgent={retryAgent}
             error={error} needsRestart={needsRestart}
             s={s}
-            skillInstallResult={skillInstallResult}
             setupPhase={setupPhase}
+            cliEnabled={connectionMode.cli}
+            mcpEnabled={connectionMode.mcp}
           />
         )}
 

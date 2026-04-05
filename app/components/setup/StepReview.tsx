@@ -91,32 +91,34 @@ export interface StepReviewProps {
   error: string;
   needsRestart: boolean;
   s: SetupMessages;
-  skillInstallResult: { ok?: boolean; skill?: string; error?: string } | null;
-  setupPhase: 'review' | 'saving' | 'agents' | 'skill' | 'done';
+  setupPhase: 'review' | 'saving' | 'agents' | 'done';
+  cliEnabled: boolean;
+  mcpEnabled: boolean;
 }
 
 export default function StepReview({
   state, selectedAgents, agentStatuses, onRetryAgent, error, needsRestart, s,
-  skillInstallResult, setupPhase,
+  setupPhase, cliEnabled, mcpEnabled,
 }: StepReviewProps) {
   const failedAgents = Object.entries(agentStatuses).filter(([, v]) => v.state === 'error');
 
   // Compact config summary (only key info)
+  const modeLabel = cliEnabled && mcpEnabled ? 'CLI + MCP' : cliEnabled ? 'CLI' : mcpEnabled ? 'MCP' : '—';
   const summaryRows: [string, string][] = [
     [s.kbPath, state.mindRoot],
     [s.webPort, `${state.webPort} / ${state.mcpPort}`],
-    [s.agentToolsTitle, selectedAgents.size > 0 ? s.agentCountSummary(selectedAgents.size) : '—'],
+    [s.agentToolsTitle, mcpEnabled && selectedAgents.size > 0 ? `${modeLabel} · ${s.agentCountSummary(selectedAgents.size)}` : modeLabel],
   ];
 
-  // Progress stepper phases
+  // Progress stepper phases — dynamically built based on selected modes
   type Phase = typeof setupPhase;
+  const showAgentPhase = mcpEnabled && selectedAgents.size > 0;
   const phases: { key: Phase; label: string }[] = [
     { key: 'saving', label: s.phaseSaving },
-    { key: 'agents', label: s.phaseAgents },
-    { key: 'skill', label: s.phaseSkill },
+    ...(showAgentPhase ? [{ key: 'agents' as Phase, label: s.phaseAgents }] : []),
     { key: 'done', label: s.phaseDone },
   ];
-  const phaseOrder: Phase[] = ['saving', 'agents', 'skill', 'done'];
+  const phaseOrder: Phase[] = phases.map(p => p.key);
   const currentIdx = phaseOrder.indexOf(setupPhase);
 
   return (
@@ -195,21 +197,6 @@ export default function StepReview({
             </div>
           ))}
           <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>{s.agentFailureNote}</p>
-        </div>
-      )}
-
-      {/* Skill result — compact */}
-      {skillInstallResult && setupPhase === 'done' && (
-        <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg" style={{
-          background: skillInstallResult.ok ? 'color-mix(in srgb, var(--success) 6%, transparent)' : 'color-mix(in srgb, var(--error) 6%, transparent)',
-        }}>
-          {skillInstallResult.ok ? (
-            <><CheckCircle2 size={11} className="text-success shrink-0" />
-            <span style={{ color: 'var(--foreground)' }}>{s.skillInstalled} — {skillInstallResult.skill}</span></>
-          ) : (
-            <><XCircle size={11} className="text-error shrink-0" />
-            <span style={{ color: 'var(--error)' }}>{s.skillFailed}{skillInstallResult.error ? `: ${skillInstallResult.error}` : ''}</span></>
-          )}
         </div>
       )}
 
@@ -300,13 +287,13 @@ function HealthCheckView({ state, selectedAgents, agentStatuses, needsRestart, s
     {
       ok: agentsOk,
       icon: <Plug size={14} />,
-      title: s.healthAgents ?? 'Agent Tools',
+      title: s.healthAgents ?? 'Agent Connection',
       detail: agentsOk
         ? (s.healthAgentsOk?.(successAgents) ?? `${successAgents} agent(s) configured`)
         : selectedAgents.size > 0
           ? (s.healthAgentsPartial ?? 'Configuration in progress...')
           : (s.healthAgentsNone ?? 'No agents configured'),
-      action: agentsOk ? undefined : (s.healthAgentsAction ?? 'You can add agents later in Settings → MCP.'),
+      action: agentsOk ? undefined : (s.healthAgentsAction ?? 'You can add agents later in Settings → Connections.'),
     },
   ];
 
@@ -350,7 +337,7 @@ function HealthCheckView({ state, selectedAgents, agentStatuses, needsRestart, s
         <div className="rounded-xl border p-4 space-y-2" style={{ borderColor: 'var(--border)', background: 'var(--card)' }}>
           <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--muted-foreground)' }}>
             <Shield size={11} />
-            {s.healthTokenTitle ?? 'MCP Auth Token'}
+            {s.healthTokenTitle ?? 'Auth Token'}
           </div>
           <div className="flex items-center gap-2">
             <div className="flex-1 flex items-center px-3 py-2 rounded-lg min-h-[38px]"
@@ -373,7 +360,7 @@ function HealthCheckView({ state, selectedAgents, agentStatuses, needsRestart, s
             </button>
           </div>
           <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-            {s.healthTokenHint ?? 'Use this token when connecting AI agents. Also available in Settings → MCP.'}
+            {s.healthTokenHint ?? 'Use this token when connecting AI agents. Also available in Settings → Connections.'}
           </p>
         </div>
       )}
