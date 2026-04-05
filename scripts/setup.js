@@ -125,29 +125,16 @@ const T = {
   syncSetup:      { en: 'Set up cross-device sync via Git?', zh: '是否配置 Git 跨设备同步？' },
   syncLater:      { en: '  → Run `mindos sync init` anytime to set up sync later.', zh: '  → 随时运行 `mindos sync init` 配置同步。' },
 
-  // mode selection step (Step 7a)
-  modeSelectTitle:  { en: 'Agent Connection', zh: 'Agent 连接' },
-  modeSelectHint:   { en: 'Connection mode (Space to toggle, Enter to confirm):', zh: '连接方式（空格切换，Enter 确认）：' },
+  // mode selection step (Step 7)
+  modeSelectHint:   { en: 'Connection mode (Space to toggle, Enter to confirm):', zh: '连接模式（空格切换，Enter 确认）：' },
   modeCli:          { en: 'CLI    Operate KB via command line', zh: 'CLI    通过命令行操作知识库' },
   modeCliHint:      { en: 'recommended, more token-efficient', zh: '推荐，更省 token' },
   modeMcp:          { en: 'MCP    Connect via MCP protocol', zh: 'MCP    通过 MCP 协议连接' },
   modeMcpHint:      { en: 'optional, may consume more tokens', zh: '可选，可能消耗更多 token' },
   modeNoneError:    { en: 'Please select at least one mode.', zh: '请至少选择一种模式。' },
 
-  // mcp install step
-  mcpStepTitle:   { en: 'Agent Tools (MCP)', zh: 'Agent 工具 (MCP)' },
-  mcpStepHint:    { en: 'Select AI agents to configure (Space to toggle, A for all, Enter to confirm).\nAgents not yet installed can be pre-configured — they will work once you install the app.', zh: '选择要配置的 AI Agent（空格切换，A 全选，Enter 确认）。\n未安装的 Agent 可以预先配置，安装应用后即可生效。' },
-  mcpInstalling:  { en: (n) => `⏳ Configuring ${n} agent(s)...`, zh: (n) => `⏳ 正在配置 ${n} 个 Agent...` },
-  mcpInstallOk:   { en: (name, path) => `  ${c.green('✔')} ${name}  ${c.dim('→ ' + path)}`, zh: (name, path) => `  ${c.green('✔')} ${name}  ${c.dim('→ ' + path)}` },
-  mcpInstallFail: { en: (name, msg) => `  ${c.red('✘')} ${name}  ${c.dim(msg)}`, zh: (name, msg) => `  ${c.red('✘')} ${name}  ${c.dim(msg)}` },
-  mcpInstallDone: { en: (n) => `✔ ${n} agent(s) configured`, zh: (n) => `✔ 已配置 ${n} 个 Agent` },
-  mcpSkipped:     { en: '  → Skipped. Run `mindos mcp install` anytime to configure agents.', zh: '  → 已跳过。随时运行 `mindos mcp install` 配置 Agent。' },
-
   // agent config install (internal, Skill concept hidden from user)
-  skillInstalling:  { en: (name) => ``, zh: (name) => `` },
-  skillInstallOk:   { en: (name) => ``, zh: (name) => `` },
   skillInstallFail: { en: (name, msg) => `  ${c.red('✘')} Configuration failed: ${msg}`, zh: (name, msg) => `  ${c.red('✘')} 配置失败：${msg}` },
-  skillSkipped:     { en: '', zh: '' },
 
   // restart prompts (re-onboard with config changes)
   restartRequired:   { en: 'Config changed. Service restart required.', zh: '配置已变更，需要重启服务。' },
@@ -631,7 +618,7 @@ function isAgentInstalled(agentKey) {
 }
 
 /**
- * Step 7a: mode selection — CLI (default-on) vs MCP (default-off).
+ * Step 7: mode selection — CLI (default-on) vs MCP (default-off).
  * Returns { cli: boolean, mcp: boolean }.
  */
 async function runModeSelect() {
@@ -818,20 +805,15 @@ const SKILL_UNSUPPORTED = new Set([]);
  * @param {string[]} selectedAgents - MCP agent keys from the multi-select step
  */
 function runSkillInstallStep(template, selectedAgents) {
-  if (!selectedAgents || selectedAgents.length === 0) {
-    write(c.dim(t('skillSkipped') + '\n'));
-    return;
-  }
+  if (!selectedAgents || selectedAgents.length === 0) return true;
 
   const skillName = template === 'zh' ? 'mindos-zh' : 'mindos';
   const localSource = resolve(ROOT, 'skills');
   const githubSource = 'GeminiLight/MindOS';
 
-  // Filter to non-universal, skill-capable agents
   const additionalAgents = selectedAgents
     .flatMap((key) => {
       if (SKILL_UNSUPPORTED.has(key)) return [];
-      // Keep backward-compatibility for non-MCP universal keys.
       if (UNIVERSAL_AGENTS.has(key)) return [];
       const reg = SKILL_AGENT_REGISTRY[key];
       if (!reg) return [key];
@@ -840,12 +822,10 @@ function runSkillInstallStep(template, selectedAgents) {
       return [reg.skillAgentName || key];
     });
 
-  // Each agent needs its own -a flag (skills CLI does NOT accept comma-separated)
   const agentFlags = additionalAgents.length > 0
     ? additionalAgents.map(a => `-a ${a}`).join(' ')
     : '-a universal';
 
-  // Try GitHub source first, fall back to local path
   const sources = [githubSource, localSource];
 
   for (const source of sources) {
@@ -858,11 +838,11 @@ function runSkillInstallStep(template, selectedAgents) {
         env: { ...process.env, NODE_ENV: 'production' },
         stdio: 'pipe',
       });
-      return;
+      return true;
     } catch { /* try next source */ }
   }
 
-  write(tf('skillInstallFail', skillName, 'All sources failed') + '\n');
+  return false;
 }
 
 // ── GUI Setup ─────────────────────────────────────────────────────────────────
@@ -1305,11 +1285,17 @@ async function main() {
     if (modes.mcp) {
       installMcpConfig(selectedAgents, mcpPort, authToken);
     }
-    runSkillInstallStep(selectedTemplate, selectedAgents);
+    const skillOk = runSkillInstallStep(selectedTemplate, selectedAgents);
 
-    write(c.green(uiLang === 'zh'
-      ? `  ✔ ${agentCount} 个 Agent 已配置完成\n`
-      : `  ✔ ${agentCount} agent${agentCount > 1 ? 's' : ''} configured\n`));
+    if (skillOk) {
+      write(c.green(uiLang === 'zh'
+        ? `  ✔ ${agentCount} 个 Agent 已配置完成\n`
+        : `  ✔ ${agentCount} agent${agentCount > 1 ? 's' : ''} configured\n`));
+    } else {
+      write(c.yellow(uiLang === 'zh'
+        ? `  ⚠ ${agentCount} 个 Agent 配置部分完成，CLI 指令文档安装失败\n`
+        : `  ⚠ ${agentCount} agent${agentCount > 1 ? 's' : ''} partially configured — CLI guide install failed\n`));
+    }
 
     if (!modes.mcp) {
       write(c.dim(uiLang === 'zh'
