@@ -77,11 +77,12 @@ function countContentFiles(node: FileNode): number {
   return (node.children ?? []).reduce((sum, c) => sum + countContentFiles(c), 0);
 }
 
-/** Filter out system files and dot-entries that shouldn't appear by default. */
+/** Filter out hidden entries (dot-files at root, system files) when show-hidden is off. */
 function filterHiddenNodes(nodes: FileNode[], isRoot: boolean): FileNode[] {
   return nodes.filter(node => {
     if (isRoot && node.name.startsWith('.')) return false;
     if (node.type === 'file' && SYSTEM_FILES.has(node.name)) return false;
+    if (node.type === 'directory' && node.name.startsWith('.')) return false;
     return true;
   });
 }
