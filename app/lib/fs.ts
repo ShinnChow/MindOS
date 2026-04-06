@@ -33,12 +33,14 @@ import {
   listContentChanges as coreListContentChanges,
   markContentChangesSeen as coreMarkContentChangesSeen,
   getContentChangeSummary as coreGetContentChangeSummary,
+  resolveSafe,
 } from './core';
 import type { MindSpaceSummary } from './core';
 import type { ContentChangeEvent, ContentChangeInput, ContentChangeSummary } from './core';
 import { FileNode, SpacePreview } from './core/types';
 import { SearchMatch } from './types';
 import { effectiveSopRoot } from './settings';
+import { extractPdfText } from './core/pdf-text';
 
 // ─── Root helpers ─────────────────────────────────────────────────────────────
 
@@ -463,9 +465,23 @@ export function getRecentlyModified(limit = 10): Array<{ path: string; mtime: nu
 
 // ─── Public API: File operations (delegated to @mindos/core) ─────────────────
 
-/** Reads the content of a file given a relative path from MIND_ROOT. */
+/** Reads the content of a file given a relative path from MIND_ROOT.
+ *  PDF files are automatically extracted to text via pdfjs-dist. */
 export function getFileContent(filePath: string): string {
-  return coreReadFile(getMindRoot(), filePath);
+  const root = getMindRoot();
+  if (path.extname(filePath).toLowerCase() === '.pdf') {
+    const resolved = resolveSafe(root, filePath);
+    const text = extractPdfText(resolved);
+    if (!text) {
+      throw new MindOSError(
+        ErrorCodes.FILE_NOT_FOUND,
+        `Could not extract text from PDF: ${filePath}`,
+        { filePath },
+      );
+    }
+    return text;
+  }
+  return coreReadFile(root, filePath);
 }
 
 /** Atomically writes content to a file given a relative path from MIND_ROOT. */

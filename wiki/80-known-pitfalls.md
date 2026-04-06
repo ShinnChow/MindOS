@@ -1353,3 +1353,17 @@
 - **预防：** 每次 `npm run build` / `npm run release` 后，重启 dev server 前先 `rm -rf .next`
 - **注意：** 仅影响 dev mode。Production build 所有 route 预编译，不存在 compile 阶段
 
+### Settings 关闭时 API Key 丢失（debounce 800ms + unmount race）（2026-04-06）
+
+- **现象：** 用户在 Settings UI 填写 API Key 后关闭面板/Modal，Key 未持久化到 config.json
+- **根因：** `SettingsContent` 使用 800ms debounce 自动保存。`SettingsModal` 在 `!open` 时 `return null`，导致组件 unmount → `useEffect` cleanup 清除 pending 的保存 timer → `doSave` 永远不会触发
+- **解决：** 增加两个 flush 机制：(1) `visible` 变 false 时立即 `doSave` (panel variant)；(2) 组件 unmount 时 fire-and-forget `apiFetch` POST (modal variant)
+- **规则：** 有 debounce + 可被关闭/卸载的组件 → 必须在关闭/卸载路径上 flush pending 操作
+
+### Agent 读取 PDF 返回乱码（readFile 未做 PDF 文本提取）（2026-04-06）
+
+- **现象：** MCP `mindos_read_file` 对 PDF 文件返回二进制乱码，Agent 无法理解内容
+- **根因：** `readFile` (fs-ops.ts) 对所有文件统一使用 `readFileSync(path, 'utf-8')`，PDF 是二进制格式。`extractPdfText` 函数仅接入了搜索索引，未接入 Agent 读取路径
+- **解决：** 在 `getFileContent` (fs.ts) 中检测 `.pdf` 扩展名，调用 `extractPdfText` 提取文本后返回。提取 PDF 处理函数到 `pdf-text.ts` 共享模块，搜索索引同步使用
+- **规则：** 新文件类型支持需检查所有读取路径（搜索索引、Agent 读取、Web UI 预览、导入/上传），不能只接入一条路径
+
