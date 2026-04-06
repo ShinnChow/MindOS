@@ -40,7 +40,9 @@ export async function register() {
       try {
         const projRoot = process.env.MINDOS_PROJECT_ROOT || resolve(process.cwd(), '..');
         const skillCheckModule = resolve(projRoot, 'bin', 'lib', 'skill-check.js');
-        const { checkSkillVersions, updateSkill } = await import(skillCheckModule);
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval
+        const dynamicRequireSkill = new Function('id', 'return require(id)') as (id: string) => any;
+        const { checkSkillVersions, updateSkill } = dynamicRequireSkill(skillCheckModule);
         const mismatches = checkSkillVersions(projRoot);
         for (const m of mismatches) {
           try {
