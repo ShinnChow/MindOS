@@ -1,0 +1,85 @@
+name: Publish Browser Extension
+
+# Runs on the PUBLIC repo (GeminiLight/MindOS) only.
+# Triggered by clipper-v* tags synced from dev repo.
+on:
+  push:
+    tags:
+      - 'clipper-v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag (e.g. clipper-v0.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: cd browser-extension && npm ci
+
+      - name: Build extension
+        run: cd browser-extension && npm run build
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          VERSION="${TAG#clipper-v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Verify manifest version matches tag
+        run: |
+          MANIFEST_VERSION=$(node -p "require('./browser-extension/extension/manifest.json').version")
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+          if [ "$MANIFEST_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Version mismatch: manifest.json=${MANIFEST_VERSION}, tag=${TAG_VERSION}"
+            echo "::error::Update browser-extension/src/manifest.json before tagging."
+            exit 1
+          fi
+
+      - name: Package zip
+        run: |
+          cd browser-extension/extension
+          zip -r ../mindos-web-clipper-${{ steps.version.outputs.version }}.zip .
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+
+          cat > /tmp/release-notes.md <<EOF
+          ## MindOS Web Clipper v${VERSION}
+
+          ### Install
+
+          1. Download \`mindos-web-clipper-${VERSION}.zip\` below
+          2. Unzip it
+          3. Open Chrome → \`chrome://extensions\` → Developer mode → Load unpacked → select the unzipped folder
+
+          ### What's new
+
+          See [browser-extension/README.md](https://github.com/GeminiLight/MindOS/blob/main/browser-extension/README.md) for details.
+          EOF
+
+          gh release create "${TAG}" \
+            --title "MindOS Web Clipper v${VERSION}" \
+            --notes-file /tmp/release-notes.md \
+            browser-extension/mindos-web-clipper-${VERSION}.zip
