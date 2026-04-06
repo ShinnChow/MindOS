@@ -134,12 +134,46 @@ export default function SettingsContent({ visible, initialTab, variant, onClose 
     }
   }, []);
 
+  // Track unsaved data so we can flush on close/unmount
+  const pendingData = useRef<SettingsData | null>(null);
+
   useEffect(() => {
     if (!data || !dataLoaded.current) return;
+    pendingData.current = data;
     clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => doSave(data), 800);
+    saveTimer.current = setTimeout(() => {
+      pendingData.current = null;
+      doSave(data);
+    }, 800);
     return () => clearTimeout(saveTimer.current);
   }, [data, doSave]);
+
+  // Flush unsaved changes when panel hides (panel variant)
+  useEffect(() => {
+    if (!visible && pendingData.current) {
+      const d = pendingData.current;
+      pendingData.current = null;
+      clearTimeout(saveTimer.current);
+      doSave(d);
+    }
+  }, [visible, doSave]);
+
+  // Flush unsaved changes on unmount (modal variant: SettingsModal returns null when !open)
+  useEffect(() => {
+    return () => {
+      if (pendingData.current) {
+        clearTimeout(saveTimer.current);
+        const d = pendingData.current;
+        pendingData.current = null;
+        apiFetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ai: d.ai, agent: d.agent, mindRoot: d.mindRoot, webPassword: d.webPassword, authToken: d.authToken }),
+        }).catch(() => {});
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const updateAi = useCallback((patch: Partial<AiSettings>) => {
     setData(d => d ? { ...d, ai: { ...d.ai, ...patch } } : d);
