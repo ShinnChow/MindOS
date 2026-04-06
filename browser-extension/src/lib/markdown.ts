@@ -18,10 +18,14 @@ function frontmatter(meta: Record<string, string | null | undefined>): string {
   const lines = ['---'];
   for (const [key, val] of Object.entries(meta)) {
     if (val == null || val === '') continue;
-    // Escape YAML special chars in values
-    const safe = val.includes(':') || val.includes('#') || val.includes("'")
-      ? `"${val.replace(/"/g, '\\"')}"`
-      : val;
+    // Collapse newlines (YAML scalar values must be single-line in flow style)
+    const clean = val.replace(/[\r\n]+/g, ' ').trim();
+    // Quote if value contains YAML-special characters
+    const needsQuote = clean.includes(':') || clean.includes('#') || clean.includes("'")
+      || clean.includes('"') || clean.includes('[') || clean.includes('{');
+    const safe = needsQuote
+      ? `"${clean.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+      : clean;
     lines.push(`${key}: ${safe}`);
   }
   lines.push('---', '');

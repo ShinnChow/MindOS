@@ -9,15 +9,7 @@ const shared = {
   minify: !isWatch,
   sourcemap: isWatch ? 'inline' : false,
   target: ['chrome120'],
-  format: 'esm',
 };
-
-// Entry points
-const entries = [
-  { in: 'src/popup/popup.ts', out: 'popup/popup' },
-  { in: 'src/background/service-worker.ts', out: 'background/service-worker' },
-  { in: 'src/content/extractor.ts', out: 'content/extractor' },
-];
 
 async function run() {
   mkdirSync('dist/popup', { recursive: true });
@@ -31,18 +23,38 @@ async function run() {
   cpSync('src/popup/popup.css', 'dist/popup/popup.css');
   cpSync('src/icons', 'dist/icons', { recursive: true });
 
-  const buildOptions = {
+  // ESM entries (popup + service worker)
+  const esmOptions = {
     ...shared,
-    entryPoints: entries.map(e => ({ in: e.in, out: e.out })),
+    format: 'esm',
+    entryPoints: [
+      { in: 'src/popup/popup.ts', out: 'popup/popup' },
+      { in: 'src/background/service-worker.ts', out: 'background/service-worker' },
+    ],
     outdir: 'dist',
   };
 
+  // Content script must be IIFE — executeScript needs it to return
+  // the last expression value, which ESM module wrappers prevent.
+  const contentOptions = {
+    ...shared,
+    format: 'iife',
+    entryPoints: ['src/content/extractor.ts'],
+    outfile: 'dist/content/extractor.js',
+  };
+
   if (isWatch) {
-    const ctx = await context(buildOptions);
-    await ctx.watch();
+    const [ctx1, ctx2] = await Promise.all([
+      context(esmOptions),
+      context(contentOptions),
+    ]);
+    await Promise.all([ctx1.watch(), ctx2.watch()]);
     console.log('[watch] Watching for changes...');
   } else {
-    await build(buildOptions);
+    await Promise.all([
+      build(esmOptions),
+      build(contentOptions),
+    ]);
     console.log('[build] Done.');
   }
 }

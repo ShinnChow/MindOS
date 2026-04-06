@@ -250,6 +250,7 @@ body {
   background: var(--bg-muted);
   border-radius: 99px;
 }
+.meta-badge:empty { display: none; }
 
 /* ── Error Bar ── */
 
