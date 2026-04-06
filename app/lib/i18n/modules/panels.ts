@@ -387,6 +387,8 @@ export const panelsEn = {
       reconnectAllRunning: 'Reconnecting...',
       reconnectAllDone: (ok: number, failed: number) => `Done: ${ok} reconnected${failed > 0 ? `, ${failed} failed` : ''}.`,
       serverTransport: (t: string) => `Transport: ${t}`,
+      mcpDisabledMessage: 'MCP mode is not enabled.',
+      mcpDisabledHint: 'Enable it in Settings → Connections to use MCP agents.',
     },
     skills: {
       title: 'Skills',
@@ -1021,6 +1023,8 @@ export const panelsZh = {
       reconnectAllRunning: '正在重连...',
       reconnectAllDone: (ok: number, failed: number) => `完成：${ok} 已重连${failed > 0 ? `，${failed} 失败` : ''}。`,
       serverTransport: (t: string) => `传输：${t}`,
+      mcpDisabledMessage: 'MCP 模式未启用。',
+      mcpDisabledHint: '请在设置 → 连接中启用，以使用 MCP 智能体。',
     },
     skills: {
       title: '技能',

@@ -169,7 +169,9 @@ function parseGuideState(raw: unknown): GuideState | undefined {
   };
 }
 
-/** Infer connectionMode from old config: if mcpPort is set and has agents configured, assume MCP was enabled */
+/** Infer connectionMode from old config.
+ *  Old configs don't have connectionMode — both CLI and MCP were always available.
+ *  So we default to { cli: true, mcp: true } for existing users to avoid breaking change. */
 function inferConnectionMode(parsed: Record<string, unknown>): { cli: boolean; mcp: boolean } {
   // If already has explicit connectionMode, return it
   if (parsed.connectionMode && typeof parsed.connectionMode === 'object') {
@@ -178,12 +180,12 @@ function inferConnectionMode(parsed: Record<string, unknown>): { cli: boolean; m
       return { cli: obj.cli, mcp: obj.mcp };
     }
   }
-  // Fallback inference for old configs: MCP was in use if mcpPort was set to non-default
-  const mcpPort = typeof parsed.mcpPort === 'number' ? parsed.mcpPort : undefined;
-  const mcpPortConfigured = !!(mcpPort && mcpPort > 0 && mcpPort !== 8781); // 8781 is default
+  // Old config without connectionMode: default to both enabled (backwards-compat)
+  // Only fresh installs (setupPending=true or missing config) get mcp: false
+  const isNewInstall = parsed.setupPending === true || !parsed.mindRoot;
   return {
-    cli: true, // CLI is always on
-    mcp: mcpPortConfigured, // Only assume MCP if port was explicitly configured
+    cli: true,
+    mcp: !isNewInstall, // Existing users keep MCP, new users start with CLI-only
   };
 }
 
