@@ -94,7 +94,13 @@ function sameFileList(a: string[], b: string[]): boolean {
 /** Monotonically increasing counter — bumped on every file mutation so the
  *  client can cheaply detect changes without rebuilding the full tree. */
 export function getTreeVersion(): number {
-  if (_cache && !isCacheValid()) {
+  if (!_cache) {
+    // Cache was invalidated (by watcher or explicit invalidateCache) — rebuild.
+    // _treeVersion was already bumped by the invalidator, no need to bump again.
+    _cache = buildCache(getMindRoot());
+    _searchIndex = null;
+  } else if (!isCacheValid()) {
+    // Cache expired by TTL — rebuild and check if files actually changed
     const next = buildCache(getMindRoot());
     const changed = !sameFileList(_cache.allFiles, next.allFiles);
     _cache = next;
@@ -202,6 +208,7 @@ export function startFileWatcher(): void {
       if (_watchDebounce) clearTimeout(_watchDebounce);
       _watchDebounce = setTimeout(() => {
         _cache = null; // Invalidate tree cache — next read will rebuild
+        _treeVersion++; // Bump version so polling clients detect the change
         _watchDebounce = null;
       }, 500);
     });
