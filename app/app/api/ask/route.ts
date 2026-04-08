@@ -20,7 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import { getFileContent, getMindRoot, collectAllFiles } from '@/lib/fs';
 import { getModelConfig, hasImages } from '@/lib/agent/model';
-import { isProviderId, type ProviderId } from '@/lib/agent/providers';
+import { isProviderId, type ProviderId, toPiProvider } from '@/lib/agent/providers';
 import { getRequestScopedTools, getOrganizeTools, getChatTools, WRITE_TOOLS, truncate } from '@/lib/agent/tools';
 import { AGENT_SYSTEM_PROMPT, ORGANIZE_SYSTEM_PROMPT, CHAT_SYSTEM_PROMPT } from '@/lib/agent/prompt';
 import type { AskModeApi } from '@/lib/types';
@@ -1016,7 +1016,7 @@ export async function POST(req: NextRequest) {
     const customTools = toPiCustomToolDefinitions(requestTools);
 
     const authStorage = AuthStorage.create();
-    authStorage.setRuntimeApiKey(provider, requestApiKey);
+    authStorage.setRuntimeApiKey(toPiProvider(provider), requestApiKey);
     const modelRegistry = new ModelRegistry(authStorage);
     const settingsManager = SettingsManager.inMemory({
       enableSkillCommands: true,

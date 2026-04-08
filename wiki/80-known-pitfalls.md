@@ -478,6 +478,20 @@ rootcause: app/api/ask/route.ts:143 直接传递 llmHistoryMessages（pi-ai Mess
 - **规则：** 有自定义 baseUrl → `openai-completions`；无 baseUrl（直连 OpenAI）→ `openai-responses`
 - **文件：** `app/lib/agent/model.ts`
 
+### piProviderOverride 导致 API Key 查找不命中（#23）
+- **现象：** 用户配置 DeepSeek/Ollama/zai-cn 后，对话报错 "No API key found for openai"
+- **原因：** `ask/route.ts` 调用 `authStorage.setRuntimeApiKey(provider, apiKey)` 时 `provider` 是 MindOS ProviderId（如 `"deepseek"`），但 pi-coding-agent 内部通过 `model.provider` 查找 API key，而 `model.provider` = `toPiProvider(provider)`（如 `"openai"`）。存储和查找使用了不同的 key
+- **解决：** 改为 `authStorage.setRuntimeApiKey(toPiProvider(provider), requestApiKey)`，确保存储 key 与查找 key 一致
+- **规则：** 所有传给 `pi-coding-agent` / `pi-ai` 的 provider 标识符必须经过 `toPiProvider()` 转换。MindOS ProviderId 仅用于 UI 层和 settings 层
+- **文件：** `app/app/api/ask/route.ts`
+
+### ACP sendAndWait 不感知进程死亡 — 30 秒盲等（#23）
+- **现象：** 用户选择未安装的 ACP agent（如 Auggie），等待 30 秒后报错 "ACP Agent Error: ACP RPC timeout after 30000ms for method: initialize"
+- **原因：** `sendAndWait()` 发送 JSON-RPC 后仅靠 `setTimeout` 等待响应，不监听进程 `close`/`error` 事件。当 `spawn` 失败（ENOENT）或进程崩溃时，进程立即死亡但 `sendAndWait` 仍盲等到超时
+- **解决：** (1) `sendAndWait` 增加 `close`/`error` 事件监听，进程死亡立即 reject (2) 调用前检查 `acpProc.alive` 快速失败 (3) 错误信息包含 `spawnError` 和安装提示
+- **规则：** 任何等待子进程响应的 Promise 都必须监听进程终止事件，防止 Promise 挂起。`spawn` 的 `error` 事件必须传播到调用方，不能只 `console.error`
+- **文件：** `app/lib/acp/subprocess.ts`
+
 ### pi-agent-core 迁移：compact 失败不能静默返回
 - **现象：** `compactMessages()` 调用 `complete()` 失败时直接返回未压缩的消息。如果上下文已超 70%，后续调用大概率超 token limit → 不可预测行为
 - **解决：** 失败时 fallback 到 `hardPrune()`，pruning 也失败才 throw

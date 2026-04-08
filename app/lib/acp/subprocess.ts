@@ -27,6 +27,10 @@ export interface AcpProcess {
   agentId: string;
   proc: ChildProcess;
   alive: boolean;
+  /** Set when the process fails to spawn or exits with an error. */
+  spawnError?: string;
+  /** Exit code when the process has terminated. */
+  exitCode?: number | null;
 }
 
 type MessageCallback = (msg: AcpJsonRpcResponse) => void;
@@ -119,15 +123,18 @@ export function spawnAcpAgent(
 
   proc.on('close', (code) => {
     acpProc.alive = false;
-    if (code && code !== 0 && stderrBuf.trim()) {
-      console.error(`[ACP] ${entry.id} exited with code ${code}: ${stderrBuf.trim().slice(0, 500)}`);
+    acpProc.exitCode = code;
+    if (code && code !== 0) {
+      acpProc.spawnError = stderrBuf.trim().slice(0, 500) || `Process exited with code ${code}`;
+      console.error(`[ACP] ${entry.id} exited with code ${code}: ${acpProc.spawnError}`);
     }
-    messageListeners.delete(id);
-    requestListeners.delete(id);
+    // Do NOT delete listeners here — sendAndWait still needs them to reject.
+    // Listeners are cleaned up in killAgent() and by individual unsub calls.
   });
 
   proc.on('error', (err) => {
     acpProc.alive = false;
+    acpProc.spawnError = err.message;
     console.error(`[ACP] ${entry.id} spawn error:`, err.message);
   });
 
@@ -176,20 +183,61 @@ export function sendAndWait(
   timeoutMs = 30_000,
 ): Promise<AcpJsonRpcResponse> {
   return new Promise((resolve, reject) => {
-    const rpcId = sendMessage(acpProc, method, params);
+    // Fail fast if process is already dead (e.g. binary not found).
+    if (!acpProc.alive) {
+      const reason = acpProc.spawnError || 'Process is not alive';
+      reject(new Error(
+        `Agent "${acpProc.agentId}" is not running: ${reason}. ` +
+        `Please check that the agent is installed and available on your PATH.`,
+      ));
+      return;
+    }
+
+    let rpcId: string;
+    try {
+      rpcId = sendMessage(acpProc, method, params);
+    } catch (err) {
+      reject(err);
+      return;
+    }
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      unsub();
+      acpProc.proc.removeListener('close', onClose);
+      acpProc.proc.removeListener('error', onError);
+    };
 
     const timer = setTimeout(() => {
-      unsub();
+      cleanup();
       reject(new Error(`ACP RPC timeout after ${timeoutMs}ms for method: ${method}`));
     }, timeoutMs);
 
     const unsub = onMessage(acpProc, (msg) => {
       if (String(msg.id) === rpcId) {
-        clearTimeout(timer);
-        unsub();
+        cleanup();
         resolve(msg);
       }
     });
+
+    // Reject immediately if the process dies while we're waiting.
+    const onClose = (code: number | null) => {
+      cleanup();
+      const reason = acpProc.spawnError || `Process exited with code ${code}`;
+      reject(new Error(
+        `Agent "${acpProc.agentId}" exited unexpectedly: ${reason}. ` +
+        `Please check that the agent is installed and available on your PATH.`,
+      ));
+    };
+    const onError = (err: Error) => {
+      cleanup();
+      reject(new Error(
+        `Agent "${acpProc.agentId}" failed to start: ${err.message}. ` +
+        `Please check that the agent is installed and available on your PATH.`,
+      ));
+    };
+    acpProc.proc.once('close', onClose);
+    acpProc.proc.once('error', onError);
   });
 }
 
