@@ -91,14 +91,18 @@ export default function ProviderModelCapsule({
   const { t, locale } = useLocale();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null); // wraps BOTH panels
+  const containerRef = useRef<HTMLDivElement>(null);
+  const flyoutRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const modelListRef = useRef<HTMLDivElement>(null);
 
   const [settingsData, setSettingsData] = useState<SettingsData | null>(null);
 
   // Flyout state
-  const [hoveredProvider, setHoveredProvider] = useState<ProviderId | null>(null);
+  const providerPanelRef = useRef<HTMLDivElement>(null);
+  const hoveredRowRef = useRef<HTMLDivElement>(null);
+  const [hoveredProvider, setHoveredProvider] = useState<ProviderId | `cp_${string}` | null>(null);
+  const [flyoutStyle, setFlyoutStyle] = useState<React.CSSProperties>({});
   const [expandedModels, setExpandedModels] = useState<string[] | null>(null);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelsError, setModelsError] = useState('');
@@ -186,7 +190,7 @@ export default function ProviderModelCapsule({
     const goUp = rect.top > window.innerHeight - rect.bottom && rect.top > 280;
     setDropdownStyle({
       position: 'fixed',
-      left: Math.min(rect.left, window.innerWidth - 460),
+      left: Math.min(rect.left, window.innerWidth - 230),
       ...(goUp ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }),
       zIndex: 50,
     });
@@ -212,13 +216,14 @@ export default function ProviderModelCapsule({
     };
   }, [open, debouncedReposition]);
 
-  // Close on outside click — uses the single container ref
+  // Close on outside click — check trigger, provider panel, and flyout
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
       if (triggerRef.current?.contains(target)) return;
       if (containerRef.current?.contains(target)) return;
+      if (flyoutRef.current?.contains(target)) return;
       setOpen(false); setHoveredProvider(null);
     };
     document.addEventListener('mousedown', handler);
@@ -239,7 +244,7 @@ export default function ProviderModelCapsule({
   }, [open, hoveredProvider]);
 
   /* ── Model fetching ── */
-  const fetchModels = useCallback(async (providerId: ProviderId, force = false) => {
+  const fetchModels = useCallback(async (providerId: ProviderId | `cp_${string}`, force = false) => {
     if (!force && modelsCacheRef.current[providerId]) {
       setExpandedModels(modelsCacheRef.current[providerId]);
       setModelsLoading(false);
@@ -249,9 +254,11 @@ export default function ProviderModelCapsule({
     setModelsLoading(true); setModelsError(''); setExpandedModels(null);
     const version = ++fetchVersionRef.current;
     try {
-      const body: Record<string, string> = { provider: providerId };
-      const provCfg = settingsData?.ai?.providers?.[providerId];
-      if (provCfg?.baseUrl) body.baseUrl = provCfg.baseUrl;
+      const isCustom = isCustomProviderId(String(providerId));
+      const body: Record<string, string> = isCustom 
+        ? { customProviderId: providerId }
+        : { provider: providerId };
+      
       const res = await fetch('/api/settings/list-models', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -268,14 +275,59 @@ export default function ProviderModelCapsule({
     } finally {
       if (version === fetchVersionRef.current) setModelsLoading(false);
     }
+  }, []);
+
+  const canCustomProviderExpand = useCallback((cpId: string) => {
+    if (!isCustomProviderId(cpId)) return false;
+    const cp = findCustomProvider(settingsData?.customProviders ?? [], cpId);
+    return !!cp; // All custom providers can now expand (they use their baseProviderId)
   }, [settingsData]);
 
+  // Determine if a provider can show model flyout
+  const canProviderExpand = useCallback((id: ProviderId | `cp_${string}`) => {
+    if (isCustomProviderId(String(id))) {
+      return canCustomProviderExpand(String(id));
+    }
+    return PROVIDER_PRESETS[id as ProviderId]?.supportsListModels ?? false;
+  }, [canCustomProviderExpand]);
+
+  // Compute flyout position: anchored to right edge of provider panel, aligned to hovered row
+  const computeFlyoutPosition = useCallback(() => {
+    const panel = providerPanelRef.current;
+    const row = hoveredRowRef.current;
+    if (!panel || !row) return;
+    const panelRect = panel.getBoundingClientRect();
+    const rowRect = row.getBoundingClientRect();
+    const flyoutWidth = 220;
+    const flyoutMaxH = 320; // approx max height of flyout
+    const gap = 4;
+    const left = panelRect.right + gap;
+    // Align top to the hovered row by default
+    let top = rowRect.top;
+    // If flyout would overflow below viewport, shift upward
+    const spaceBelow = window.innerHeight - top;
+    if (spaceBelow < flyoutMaxH) {
+      // Align bottom of flyout to bottom of row instead
+      top = Math.max(8, rowRect.bottom - flyoutMaxH);
+    }
+    // If flyout would overflow right edge, flip to left side
+    const actualLeft = left + flyoutWidth > window.innerWidth - 8
+      ? panelRect.left - flyoutWidth - gap
+      : left;
+    setFlyoutStyle({
+      position: 'fixed',
+      left: actualLeft,
+      top,
+      zIndex: 51,
+    });
+  }, []);
+
   // Open flyout for a provider (debounced to prevent flicker)
-  const openFlyout = useCallback((providerId: ProviderId) => {
+  const openFlyout = useCallback((providerId: ProviderId | `cp_${string}`) => {
     cancelCloseTimer();
     if (openTimerRef.current) clearTimeout(openTimerRef.current);
     openTimerRef.current = setTimeout(() => {
-      if (!PROVIDER_PRESETS[providerId]?.supportsListModels) {
+      if (!canProviderExpand(providerId)) {
         setHoveredProvider(null); setModelSearch('');
         return;
       }
@@ -283,9 +335,13 @@ export default function ProviderModelCapsule({
       setModelSearch(''); setModelHighlight(-1); setModelsError('');
       setExpandedModels(modelsCacheRef.current[providerId] ?? null);
       if (!modelsCacheRef.current[providerId]) fetchModels(providerId);
-      setTimeout(() => searchInputRef.current?.focus(), 80);
-    }, 80); // Reduced delay to 80ms for snappier response
-  }, [cancelCloseTimer, fetchModels]);
+      // Position flyout after state update
+      requestAnimationFrame(() => {
+        computeFlyoutPosition();
+        setTimeout(() => searchInputRef.current?.focus(), 50);
+      });
+    }, 80);
+  }, [cancelCloseTimer, fetchModels, computeFlyoutPosition, canProviderExpand]);
 
   // Close flyout for non-expandable items (immediate, no debounce)
   const closeFlyoutImmediate = useCallback(() => {
@@ -341,18 +397,26 @@ export default function ProviderModelCapsule({
   const customIds = configuredProviders.filter(id => isCustomProviderId(String(id)));
   const hasModelOverride = !!(modelValue && modelValue !== defaultModel);
 
-  /* ── Render: flyout (right panel) ── */
+  /* ── Render: flyout (right panel) — positioned absolutely via portal ── */
   const renderFlyout = () => {
     if (!hoveredProvider) return null;
-    const preset = PROVIDER_PRESETS[hoveredProvider];
-    return (
+    const isCustom = isCustomProviderId(String(hoveredProvider));
+    const preset = !isCustom ? PROVIDER_PRESETS[hoveredProvider as ProviderId] : null;
+    const customProvider = isCustom ? findCustomProvider(settingsData?.customProviders ?? [], String(hoveredProvider)) : null;
+    const displayName = customProvider?.name || (preset ? (locale === 'zh' ? preset.nameZh : preset.name) : String(hoveredProvider));
+    
+    return createPortal(
       <div
-        className="w-[220px] rounded-lg border border-border bg-card shadow-lg py-1"
+        ref={flyoutRef}
+        style={flyoutStyle}
+        className="w-[220px] rounded-lg border border-border bg-card shadow-lg py-1 animate-in fade-in-0 zoom-in-95 duration-100"
+        onMouseEnter={cancelCloseTimer}
+        onMouseLeave={startCloseTimer}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/40">
           <span className="text-2xs font-medium text-muted-foreground">
-            {locale === 'zh' ? preset?.nameZh : preset?.name}
+            {displayName}
           </span>
           <button
             type="button"
@@ -419,7 +483,8 @@ export default function ProviderModelCapsule({
             );
           })}
         </div>
-      </div>
+      </div>,
+      document.body,
     );
   };
 
@@ -427,15 +492,14 @@ export default function ProviderModelCapsule({
   const dropdown = open ? (
     <div
       ref={containerRef}
-      style={{ ...dropdownStyle, overflow: 'visible' }}
-      className="flex items-start gap-0"
-      onMouseLeave={startCloseTimer}
+      style={dropdownStyle}
     >
-      {/* Left: provider list */}
+      {/* Provider list (sole child — never moves) */}
       <div
+        ref={providerPanelRef}
         role="listbox"
         aria-label={t.ask?.providerCapsule ?? 'Provider'}
-        className="w-[220px] rounded-lg border border-border bg-card shadow-lg py-1 animate-in fade-in-0 zoom-in-95 duration-100 shrink-0"
+        className="w-[220px] rounded-lg border border-border bg-card shadow-lg py-1 animate-in fade-in-0 zoom-in-95 duration-100"
         style={{ maxHeight: '70vh', overflowY: 'auto' }}
       >
         {builtInIds.map((id) => {
@@ -445,12 +509,14 @@ export default function ProviderModelCapsule({
             : settingsData?.ai?.providers?.[id as ProviderId]?.model || preset.defaultModel;
           const isSelected = providerValue === id || (!providerValue && defaultProvider === id);
           const isHovered = hoveredProvider === id;
-          const canExpand = preset.supportsListModels;
+          const canExpand = canProviderExpand(id as ProviderId);
 
           return (
             <div
               key={id}
+              ref={isHovered ? hoveredRowRef : undefined}
               onMouseEnter={() => canExpand ? openFlyout(id as ProviderId) : closeFlyoutImmediate()}
+              onMouseLeave={startCloseTimer}
             >
               <div className={`flex w-full items-center text-xs transition-colors ${isHovered ? 'bg-accent/60' : 'hover:bg-muted/60'}`}>
                 <button
@@ -497,28 +563,52 @@ export default function ProviderModelCapsule({
           const cp = findCustomProvider(settingsData?.customProviders ?? [], String(id));
           if (!cp) return null;
           const isSelected = providerValue === id;
+          const isHovered = hoveredProvider === id;
+          const canExpand = canProviderExpand(id as `cp_${string}`);
+
           return (
-            <button
-              key={id} type="button" role="option" aria-selected={isSelected}
-              onClick={() => handleSelectProvider(id)}
-              onMouseEnter={closeFlyoutImmediate}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-left transition-colors hover:bg-muted/60"
+            <div
+              key={id}
+              ref={isHovered ? hoveredRowRef : undefined}
+              onMouseEnter={() => canExpand ? openFlyout(id as `cp_${string}`) : closeFlyoutImmediate()}
+              onMouseLeave={startCloseTimer}
             >
-              <Zap size={11} className="shrink-0 text-muted-foreground/50" />
-              <div className="flex-1 min-w-0 truncate">
-                <span className={`text-xs ${isSelected ? 'font-medium text-foreground' : 'text-foreground/80'}`}>
-                  {cp.name}
-                </span>
-                <span className="text-2xs text-muted-foreground ml-1.5">{cp.model}</span>
+              <div className={`flex w-full items-center text-xs transition-colors ${isHovered ? 'bg-accent/60' : 'hover:bg-muted/60'}`}>
+                <button
+                  type="button" role="option" aria-selected={isSelected}
+                  onClick={() => handleSelectProvider(id)}
+                  className="flex flex-1 items-center gap-2 px-3 py-1.5 min-w-0"
+                >
+                  <Zap size={11} className="shrink-0 text-muted-foreground/50" />
+                  <div className="flex-1 min-w-0 truncate">
+                    <span className={`text-xs ${isSelected ? 'font-medium text-foreground' : 'text-foreground/80'}`}>
+                      {cp.name}
+                    </span>
+                    <span className="text-2xs text-muted-foreground ml-1.5">{cp.model}</span>
+                  </div>
+                  {isSelected && <Check size={11} className="shrink-0 text-[var(--amber)]" />}
+                </button>
+                {canExpand && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (hoveredProvider === id) closeFlyoutImmediate();
+                      else openFlyout(id as `cp_${string}`);
+                    }}
+                    className={`shrink-0 px-1.5 py-1.5 mr-1 rounded transition-colors ${
+                      isHovered ? 'text-foreground' : 'text-muted-foreground/40 hover:text-muted-foreground'
+                    }`}
+                    title={t.ask?.selectModel ?? 'Select model'}
+                  >
+                    <ChevronRight size={11} />
+                  </button>
+                )}
               </div>
-              {isSelected && <Check size={11} className="shrink-0 text-[var(--amber)]" />}
-            </button>
+            </div>
           );
         })}
       </div>
-
-      {/* Right: flyout model list */}
-      {renderFlyout()}
     </div>
   ) : null;
 
@@ -557,6 +647,7 @@ export default function ProviderModelCapsule({
         <ChevronDown size={10} className="shrink-0 text-muted-foreground" />
       </button>
       {typeof document !== 'undefined' && dropdown && createPortal(dropdown, document.body)}
+      {typeof document !== 'undefined' && open && renderFlyout()}
     </>
   );
 }

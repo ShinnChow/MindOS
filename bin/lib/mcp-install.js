@@ -25,8 +25,27 @@ function copyDirSync(src, dst) {
 }
 
 /**
+ * Determine active skill variant based on user's locale setting.
+ * Respects disabledSkills to detect if user prefers Chinese (mindos-zh).
+ */
+function getActiveSkillName() {
+  try {
+    const content = readFileSync(CONFIG_PATH, 'utf-8');
+    const config = parseJsonc(content);
+    // If 'mindos' is disabled, user prefers Chinese (mindos-zh)
+    if (config.disabledSkills?.includes('mindos')) {
+      return 'mindos-zh';
+    }
+  } catch {
+    // Fall back to English if settings can't be read
+  }
+  return 'mindos';
+}
+
+/**
  * Auto-copy skill folder for agents with mode 'unsupported'.
  * Called after MCP config is written. Best-effort, never throws.
+ * Respects user's locale setting (English mindos / Chinese mindos-zh).
  */
 function autoInstallSkillForAgent(agentKey, skillName) {
   const reg = SKILL_AGENT_REGISTRY[agentKey];
@@ -399,10 +418,11 @@ export async function mcpInstall() {
 
     console.log(`${green('✔')} ${existed ? 'Updated' : 'Installed'} MindOS MCP for ${bold(agent.name)} ${dim(`→ ${absPath}`)}`);
 
-    // Auto-copy skill for unsupported agents
-    const skillResult = autoInstallSkillForAgent(agentKey, 'mindos');
+    // Auto-copy skill for unsupported agents, respecting user's locale setting
+    const activeSkill = getActiveSkillName();
+    const skillResult = autoInstallSkillForAgent(agentKey, activeSkill);
     if (skillResult === 'copied') {
-      console.log(`${green('✔')} Copied MindOS Skill for ${bold(agent.name)}`);
+      console.log(`${green('✔')} Copied MindOS Skill (${activeSkill}) for ${bold(agent.name)}`);
     }
   }
 

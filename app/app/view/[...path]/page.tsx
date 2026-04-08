@@ -5,7 +5,9 @@ import { resolveSafe } from '@/lib/core/security';
 import type { FileNode } from '@/lib/types';
 import ViewPageClient from './ViewPageClient';
 import DirView from '@/components/DirView';
+import InboxView from '@/components/InboxView';
 import Papa from 'papaparse';
+import { INBOX_DIR } from '@/lib/core/inbox';
 
 /** Extensions handled as binary (not read as UTF-8 text) */
 const BINARY_EXTENSIONS = new Set([
@@ -35,6 +37,9 @@ export default async function ViewPage({ params }: PageProps) {
   const filePath = segments.map(decodeURIComponent).join('/');
 
   if (isDirectory(filePath)) {
+    if (filePath === INBOX_DIR) {
+      return <InboxView />;
+    }
     const entries = getDirEntries(filePath);
     const spacePreview = getSpacePreview(filePath);
     return <DirView dirPath={filePath} entries={entries} spacePreview={spacePreview} />;

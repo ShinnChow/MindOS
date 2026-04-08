@@ -170,6 +170,57 @@ describe('Skill directory copy (realistic structure)', () => {
       expect(fs.readFileSync(path.join(target, 'SKILL.md'), 'utf-8')).toBe('shared skill');
     }
   });
+
+  it('copies Chinese skill variant (mindos-zh) when available', () => {
+    // Create both English and Chinese skill variants
+    const skillSrcEn = path.join(tempDir, 'skills', 'mindos');
+    fs.mkdirSync(skillSrcEn, { recursive: true });
+    fs.writeFileSync(path.join(skillSrcEn, 'SKILL.md'), '---\nname: mindos\n---\n# MindOS (English)');
+
+    const skillSrcZh = path.join(tempDir, 'skills', 'mindos-zh');
+    fs.mkdirSync(skillSrcZh, { recursive: true });
+    fs.writeFileSync(path.join(skillSrcZh, 'SKILL.md'), '---\nname: mindos-zh\n---\n# MindOS (中文)');
+
+    // Simulate copying Chinese variant to agent
+    const agentDir = path.join(tempDir, '.copaw');
+    fs.mkdirSync(agentDir);
+    const targetSkillZh = path.join(agentDir, 'skills', 'mindos-zh');
+
+    copyDirSync(skillSrcZh, targetSkillZh);
+
+    expect(fs.existsSync(path.join(targetSkillZh, 'SKILL.md'))).toBe(true);
+    expect(fs.readFileSync(path.join(targetSkillZh, 'SKILL.md'), 'utf-8')).toContain('中文');
+  });
+
+  it('supports both English and Chinese skill variants for all unsupported agents', () => {
+    // Create both skill variants
+    const skillSrcEn = path.join(tempDir, 'skills', 'mindos');
+    fs.mkdirSync(skillSrcEn, { recursive: true });
+    fs.writeFileSync(path.join(skillSrcEn, 'SKILL.md'), 'English version');
+
+    const skillSrcZh = path.join(tempDir, 'skills', 'mindos-zh');
+    fs.mkdirSync(skillSrcZh, { recursive: true });
+    fs.writeFileSync(path.join(skillSrcZh, 'SKILL.md'), '中文版本');
+
+    // Test all unsupported agents
+    const agents = ['workbuddy', 'qclaw', 'lingma', 'copaw'];
+    for (const agent of agents) {
+      const agentDir = path.join(tempDir, `.${agent}`);
+      fs.mkdirSync(agentDir, { recursive: true });
+
+      // English variant
+      const targetEn = path.join(agentDir, 'skills', 'mindos');
+      copyDirSync(skillSrcEn, targetEn);
+      expect(fs.readFileSync(path.join(targetEn, 'SKILL.md'), 'utf-8')).toBe('English version');
+
+      // Chinese variant (reset for next agent)
+      fs.rmSync(agentDir, { recursive: true });
+      fs.mkdirSync(agentDir, { recursive: true });
+      const targetZh = path.join(agentDir, 'skills', 'mindos-zh');
+      copyDirSync(skillSrcZh, targetZh);
+      expect(fs.readFileSync(path.join(targetZh, 'SKILL.md'), 'utf-8')).toBe('中文版本');
+    }
+  });
 });
 
 // ── cpSync cross-platform equivalence ────────────────────────────────────

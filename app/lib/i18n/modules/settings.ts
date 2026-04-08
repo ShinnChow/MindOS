@@ -5,7 +5,7 @@ export const settingsEn = {
     title: 'Settings',
     tabs: { ai: 'AI', appearance: 'Appearance', knowledge: 'General', sync: 'Sync', mcp: 'Connections', plugins: 'Plugins', shortcuts: 'Shortcuts', monitoring: 'Monitoring', agents: 'Agents', update: 'Update', uninstall: 'Uninstall' },
     ai: {
-      provider: 'Provider',
+      provider: 'Model Providers',
       model: 'Model',
       apiKey: 'API Key',
       baseUrl: 'Base URL',
@@ -495,7 +495,7 @@ export const settingsZh = {
     title: '设置',
     tabs: { ai: 'AI', appearance: '外观', knowledge: '通用', sync: '同步', mcp: '连接', plugins: '插件', shortcuts: '快捷键', monitoring: '监控', agents: '智能体', update: '更新', uninstall: '卸载' },
     ai: {
-      provider: '服务商',
+      provider: '模型服务商',
       model: '模型',
       apiKey: 'API 密钥',
       baseUrl: '接口地址',

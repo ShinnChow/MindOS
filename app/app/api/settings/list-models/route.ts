@@ -3,18 +3,55 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getModels as piGetModels } from '@mariozechner/pi-ai';
 import { effectiveAiConfig } from '@/lib/settings';
 import { type ProviderId, isProviderId, PROVIDER_PRESETS, toPiProvider, getDefaultBaseUrl } from '@/lib/agent/providers';
+import { isCustomProviderId, parseCustomProviders } from '@/lib/custom-endpoints';
 
 const TIMEOUT = 10_000;
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { provider, apiKey, baseUrl } = body as {
+    const { provider, customProviderId, apiKey, baseUrl } = body as {
       provider?: string;
+      customProviderId?: string;
       apiKey?: string;
       baseUrl?: string;
     };
 
+    // Handle custom provider
+    if (customProviderId) {
+      if (!isCustomProviderId(customProviderId)) {
+        return NextResponse.json({ ok: false, error: 'Invalid custom provider ID' }, { status: 400 });
+      }
+      
+      // Fetch custom provider from settings
+      const settings = await fetch(new URL('/api/settings', req.url), {
+        headers: req.headers,
+      }).then(r => r.json() as Promise<any>);
+      
+      const customProviders = parseCustomProviders(settings.customProviders);
+      const cp = customProviders.find(p => p.id === customProviderId);
+      if (!cp) {
+        return NextResponse.json({ ok: false, error: 'Custom provider not found' }, { status: 404 });
+      }
+      
+      // Use the custom provider's base provider type to fetch models
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
+      
+      try {
+        const models = await fetchModels(cp.baseProviderId as ProviderId, cp.apiKey, cp.baseUrl, ctrl.signal);
+        return NextResponse.json({ ok: true, models });
+      } catch (e: unknown) {
+        if (e instanceof Error && e.name === 'AbortError') {
+          return NextResponse.json({ ok: false, error: 'Request timed out' });
+        }
+        return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : 'Network error' });
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    // Handle built-in provider
     if (!provider || !isProviderId(provider)) {
       return NextResponse.json({ ok: false, error: 'Invalid provider' }, { status: 400 });
     }

@@ -270,6 +270,16 @@ export const MCP_AGENTS: Record<string, AgentDef> = {
     preferredTransport: 'stdio',
     presenceDirs: ['~/.lingma/'],
   },
+  'copaw': {
+    name: 'CoPaw',
+    project: null,
+    global: '~/.copaw/agent.json',
+    key: 'mcp',
+    globalNestedKey: 'mcp.clients',
+    preferredTransport: 'stdio',
+    presenceCli: 'copaw',
+    presenceDirs: ['~/.copaw/'],
+  },
 };
 
 /**
@@ -300,6 +310,7 @@ export const SKILL_AGENT_REGISTRY: Record<string, SkillAgentRegistration> = {
   'qclaw': { mode: 'unsupported' },
   'workbuddy': { mode: 'unsupported' },
   'lingma': { mode: 'unsupported' },
+  'copaw': { mode: 'unsupported' },
 };
 
 export interface SkillWorkspaceProfile {

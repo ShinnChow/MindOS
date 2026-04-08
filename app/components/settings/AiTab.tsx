@@ -509,9 +509,9 @@ function CustomProviderForm({
   if (!model.trim()) missingFields.push(locale === 'zh' ? '模型' : 'Model');
 
   return (
-    <div className="mt-3 rounded-lg border border-[var(--amber)]/30 bg-[var(--amber-dim)] overflow-hidden">
+    <div className="mt-3 rounded-lg border border-border overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--amber)]/15">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border">
         <span className="text-sm font-medium text-foreground">{formTitle}</span>
         <button
           type="button"
