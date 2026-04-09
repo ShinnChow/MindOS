@@ -72,6 +72,7 @@ export const zh = {
   sshNoConfig: '💡 有 ~/.ssh/config 时将自动列出可选 Host',
   sshNoSsh: '未检测到 SSH',
   sshSelectHost: 'user@hostname 或 SSH Host 别名',
+  cancel: '取消',
   // Toolbar (theme / language)
   themeTooltipLight: '主题：浅色',
   themeTooltipDark: '主题：深色',
