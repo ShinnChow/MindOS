@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo, type CSSProperties } from 'react';
 import { ChevronDown, Loader2 } from 'lucide-react';
 import { Input } from '@/components/settings/Primitives';
 import { type ProviderId, PROVIDER_PRESETS } from '@/lib/agent/providers';
@@ -32,7 +32,9 @@ export default function ModelInput({
   const [focused, setFocused] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRowRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const [dropdownStyle, setDropdownStyle] = useState<CSSProperties>({});
   const fetchedRef = useRef(false);
   const fetchVersionRef = useRef(0);
   const loadingRef = useRef(false);
@@ -107,6 +109,18 @@ export default function ModelInput({
 
   const showDropdown = open || (focused && models !== null && value.trim().length > 0 && filtered.length > 0);
 
+  // Compute fixed position for dropdown so it escapes overflow:auto ancestors
+  useEffect(() => {
+    if (!showDropdown || !inputRowRef.current) return;
+    const rect = inputRowRef.current.getBoundingClientRect();
+    setDropdownStyle({
+      position: 'fixed',
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+    });
+  }, [showDropdown]);
+
   useEffect(() => { setHighlightIdx(-1); }, [filtered]);
 
   useEffect(() => {
@@ -150,7 +164,7 @@ export default function ModelInput({
 
   return (
     <div ref={containerRef} className="relative">
-      <div className="flex gap-1.5">
+      <div ref={inputRowRef} className="flex gap-1.5">
         <Input
           value={value}
           onChange={e => { onChange(e.target.value); if (!open) setFocused(true); }}
@@ -175,7 +189,7 @@ export default function ModelInput({
       </div>
       {error && <p className="text-xs text-error mt-1">{error}</p>}
       {showDropdown && filtered.length > 0 && (
-        <div ref={listRef} className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg">
+        <div ref={listRef} style={dropdownStyle} className="fixed z-[9999] max-h-48 overflow-y-auto rounded-lg border border-border bg-popover shadow-lg">
           {filtered.map((m, i) => {
             const isMatch = !value.trim() || m.toLowerCase().includes(value.toLowerCase());
             return (
@@ -197,7 +211,7 @@ export default function ModelInput({
         </div>
       )}
       {open && filtered.length === 0 && (
-        <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg px-3 py-2 text-xs text-muted-foreground">
+        <div style={dropdownStyle} className="fixed z-[9999] rounded-lg border border-border bg-popover shadow-lg px-3 py-2 text-xs text-muted-foreground">
           {noModelsLabel}
         </div>
       )}

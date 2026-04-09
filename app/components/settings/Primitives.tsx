@@ -225,20 +225,38 @@ export function ApiKeyInput({ value, onChange, placeholder, disabled, labels }: 
     }
     setEditing(false);
     setDraft('');
+    setShowPassword(false);
   }, [draft, onChange]);
 
   const cancelEdit = useCallback(() => {
     setEditing(false);
     setDraft('');
+    setShowPassword(false);
   }, []);
 
   const changeLabel = labels?.change ?? 'Change';
   const cancelLabel = labels?.cancel ?? 'Cancel';
 
-  // Masked state: show dots + "Change" button. No clearing on click.
+  const eyeButton = (
+    <button
+      type="button"
+      onClick={() => setShowPassword(v => !v)}
+      disabled={disabled}
+      className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
+      title={showPassword ? 'Hide' : 'Show'}
+    >
+      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+    </button>
+  );
+
+  /*
+   * State A: Saved key (masked) — not editing
+   * Show: [••••••••] [Change]
+   * No eye icon — server masks the real key, nothing to reveal.
+   */
   if (isMasked && !editing) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <div className="flex-1 px-3 py-2 text-sm bg-muted/50 border border-border rounded-lg text-muted-foreground select-none tracking-widest">
           ••••••••••••
         </div>
@@ -246,6 +264,7 @@ export function ApiKeyInput({ value, onChange, placeholder, disabled, labels }: 
           type="button"
           onClick={() => {
             setDraft('');
+            setShowPassword(false);
             setEditing(true);
             requestAnimationFrame(() => inputRef.current?.focus());
           }}
@@ -258,32 +277,37 @@ export function ApiKeyInput({ value, onChange, placeholder, disabled, labels }: 
     );
   }
 
-  // Edit mode (replacing masked key) — uses local draft, commits on Enter/blur
+  /*
+   * State B: Editing saved key — replacing a masked key
+   * Show: [input] [👁] [Cancel]
+   * Eye lets user verify the new key they're typing.
+   */
   if (editing) {
     return (
-      <div className="flex items-center gap-2">
-        <input
-          ref={inputRef}
-          type={showPassword ? 'text' : 'password'}
-          value={draft}
-          onChange={e => setDraft(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') commitDraft(); }}
-          onBlur={commitDraft}
-          placeholder={placeholder ?? 'sk-...'}
-          disabled={disabled}
-          className="flex-1 px-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
-        />
+      <div className="flex items-center gap-1.5">
+        <div className="flex flex-1 items-center border border-border rounded-lg bg-background focus-within:ring-1 focus-within:ring-ring overflow-hidden">
+          <input
+            ref={inputRef}
+            type={showPassword ? 'text' : 'password'}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') commitDraft(); }}
+            onBlur={e => {
+              // Don't commit if clicking cancel or eye button
+              if (e.relatedTarget?.closest('[data-api-key-action]')) return;
+              commitDraft();
+            }}
+            placeholder={placeholder ?? 'sk-...'}
+            disabled={disabled}
+            className="flex-1 px-3 py-2 text-sm bg-transparent text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50"
+          />
+          <span data-api-key-action>
+            {eyeButton}
+          </span>
+        </div>
         <button
           type="button"
-          onClick={() => setShowPassword(!showPassword)}
-          disabled={disabled}
-          className="shrink-0 p-2 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-          title={showPassword ? 'Hide' : 'Show'}
-        >
-          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-        </button>
-        <button
-          type="button"
+          data-api-key-action
           onMouseDown={e => e.preventDefault()}
           onClick={cancelEdit}
           className="shrink-0 px-3 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
@@ -294,9 +318,13 @@ export function ApiKeyInput({ value, onChange, placeholder, disabled, labels }: 
     );
   }
 
-  // Normal (no masked key) — direct editing
+  /*
+   * State C: No saved key — fresh input
+   * Empty: plain input, no eye (nothing to see).
+   * Has value: [input] [👁] — eye lets user verify before saving.
+   */
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center border border-border rounded-lg bg-background focus-within:ring-1 focus-within:ring-ring overflow-hidden">
       <input
         ref={inputRef}
         type={showPassword ? 'text' : 'password'}
@@ -304,17 +332,9 @@ export function ApiKeyInput({ value, onChange, placeholder, disabled, labels }: 
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder ?? 'sk-...'}
         disabled={disabled}
-        className="flex-1 px-3 py-2 text-sm bg-background border border-border rounded-lg text-foreground placeholder:text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+        className="flex-1 px-3 py-2 text-sm bg-transparent text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50"
       />
-      <button
-        type="button"
-        onClick={() => setShowPassword(!showPassword)}
-        disabled={disabled}
-        className="shrink-0 p-2 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-        title={showPassword ? 'Hide' : 'Show'}
-      >
-        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-      </button>
+      {value && eyeButton}
     </div>
   );
 }

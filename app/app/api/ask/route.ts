@@ -24,6 +24,7 @@ import { isProviderId, type ProviderId, toPiProvider } from '@/lib/agent/provide
 import { getRequestScopedTools, getOrganizeTools, getChatTools, WRITE_TOOLS, truncate } from '@/lib/agent/tools';
 import { isCustomProviderId, findCustomProvider } from '@/lib/custom-endpoints';
 import { AGENT_SYSTEM_PROMPT, ORGANIZE_SYSTEM_PROMPT, CHAT_SYSTEM_PROMPT } from '@/lib/agent/prompt';
+import { estimateStringTokens, getOllamaContextWindow } from '@/lib/agent/context';
 import type { AskModeApi } from '@/lib/types';
 import { toAgentMessages } from '@/lib/agent/to-agent-messages';
 import { logAgentOp } from '@/lib/agent/log';
@@ -38,6 +39,48 @@ import type { AcpSessionUpdate } from '@/lib/acp/types';
 import type { Message as FrontendMessage } from '@/lib/types';
 
 const MAX_DIR_FILES = 30;
+
+/**
+ * Load attached and current files into context parts for the system prompt.
+ * Returns the context parts array and a list of file paths that failed to load.
+ * Deduplicates files and logs failures with the given mode label.
+ */
+function loadAttachedFileContext(
+  attachedFiles: string[] | undefined,
+  currentFile: string | undefined,
+  mode: string,
+): { contextParts: string[]; failedFiles: string[] } {
+  const contextParts: string[] = [];
+  const failedFiles: string[] = [];
+  const seen = new Set<string>();
+
+  if (Array.isArray(attachedFiles) && attachedFiles.length > 0) {
+    for (const filePath of attachedFiles) {
+      if (seen.has(filePath)) continue;
+      seen.add(filePath);
+      try {
+        const content = truncate(getFileContent(filePath));
+        contextParts.push(`## Attached: ${filePath}\n\n${content}`);
+      } catch (err) {
+        console.warn(`[ask] ${mode}: failed to read attached file "${filePath}":`, err instanceof Error ? err.message : err);
+        failedFiles.push(filePath);
+      }
+    }
+  }
+
+  if (currentFile && !seen.has(currentFile)) {
+    seen.add(currentFile);
+    try {
+      const content = truncate(getFileContent(currentFile));
+      contextParts.push(`## Current file: ${currentFile}\n\n${content}`);
+    } catch (err) {
+      console.warn(`[ask] ${mode}: failed to read currentFile "${currentFile}":`, err instanceof Error ? err.message : err);
+      failedFiles.push(currentFile);
+    }
+  }
+
+  return { contextParts, failedFiles };
+}
 
 /** Expand attachedFiles entries: directory paths (trailing /) become individual file paths. */
 function expandAttachedFiles(raw: string[]): string[] {
@@ -1065,6 +1108,59 @@ export async function POST(req: NextRequest) {
       baseUrl: customProviderConfig?.baseUrl,
       hasImages: hasImages(messages),
     });
+
+    // ── Ollama context window guard ──
+    // Ollama silently truncates input that exceeds the model's actual context window.
+    // Detect this and compact the system prompt to prevent attached files from being dropped.
+    if (provider === 'ollama') {
+      const ollamaBase = baseUrl || 'http://localhost:11434/v1';
+      const actualCtx = await getOllamaContextWindow(ollamaBase, modelName);
+      const promptTokens = estimateStringTokens(systemPrompt);
+      // Reserve ~30% of context for conversation history + model output
+      const maxPromptTokens = actualCtx ? Math.floor(actualCtx * 0.7) : undefined;
+
+      if (actualCtx) {
+        console.log(`[ask] Ollama model="${modelName}" context=${actualCtx} promptTokens=${promptTokens} maxPromptTokens=${maxPromptTokens}`);
+      }
+
+      if (maxPromptTokens && promptTokens > maxPromptTokens) {
+        console.warn(`[ask] Ollama context overflow: prompt ${promptTokens} tokens > ${maxPromptTokens} max (${actualCtx} ctx). Compacting...`);
+        // Compact by progressively stripping lower-priority sections from system prompt.
+        // Priority order (keep first, strip last):
+        //   1. Core system prompt (AGENT/CHAT/ORGANIZE base) — must keep
+        //   2. Attached/current file content — user explicitly requested these
+        //   3. KB structure (README.md) — important for navigation
+        //   4. Time context — low priority
+        //   5. SKILL.md + write-supplement — largest sections, can be stripped
+        //   6. bootstrap INSTRUCTION/CONFIG — can be stripped for local models
+
+        // Strategy: strip sections between "---" delimiters from the end,
+        // but preserve sections containing "Attached:" or "Current file:" or "USER-UPLOADED"
+        const sections = systemPrompt.split('\n\n---\n\n');
+        const preserved: string[] = [];
+        let currentTokens = 0;
+
+        for (const section of sections) {
+          const sectionTokens = estimateStringTokens(section);
+          const isAttachment = section.includes('## Attached:') || section.includes('## Current file:') || section.includes('USER-UPLOADED');
+          const isCore = preserved.length === 0; // first section = base system prompt
+
+          if (isCore || isAttachment) {
+            // Always keep core prompt and user attachments
+            preserved.push(section);
+            currentTokens += sectionTokens;
+          } else if (currentTokens + sectionTokens <= maxPromptTokens) {
+            preserved.push(section);
+            currentTokens += sectionTokens;
+          } else {
+            console.log(`[ask] Ollama compact: stripping section (${sectionTokens} tokens): ${section.slice(0, 80)}...`);
+          }
+        }
+
+        systemPrompt = preserved.join('\n\n---\n\n');
+        console.log(`[ask] Ollama compacted: ${promptTokens} → ${estimateStringTokens(systemPrompt)} tokens`);
+      }
+    }
 
     // Convert frontend messages to AgentMessage[]
     const agentMessages = toAgentMessages(messages);
