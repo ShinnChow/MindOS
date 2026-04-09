@@ -16,6 +16,8 @@ interface AskHeaderProps {
   askMode?: 'panel' | 'popup';
   onModeSwitch?: () => void;
   onClose?: () => void;
+  /** Navigate from fullscreen to right-side panel mode */
+  onDockToPanel?: () => void;
   hideTitle?: boolean;
   /** Session switching — inline in header when >=2 sessions */
   sessions?: ChatSession[];
@@ -28,7 +30,7 @@ interface AskHeaderProps {
 
 export default memo(function AskHeader({
   isPanel, showHistory, onToggleHistory, onReset, isLoading,
-  maximized, onMaximize, askMode, onModeSwitch, onClose, hideTitle,
+  maximized, onMaximize, askMode, onModeSwitch, onClose, onDockToPanel, hideTitle,
   sessions, activeSessionId, onLoadSession, onDeleteSession, onRenameSession, onTogglePinSession,
 }: AskHeaderProps) {
   const { t } = useLocale();
@@ -242,6 +244,11 @@ export default memo(function AskHeader({
         {onMaximize && (
           <button type="button" onClick={(e) => { e.stopPropagation(); onMaximize(); }} className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title={maximized ? t.hints.restorePanel : t.hints.maximizePanel}>
             {maximized ? <Minimize2 size={iconSize} /> : <Maximize2 size={iconSize} />}
+          </button>
+        )}
+        {onDockToPanel && (
+          <button type="button" onClick={(e) => { e.stopPropagation(); onDockToPanel(); }} className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title={t.hints.dockToSide ?? 'Dock to side panel'}>
+            <PanelRight size={iconSize} />
           </button>
         )}
         {onModeSwitch && (

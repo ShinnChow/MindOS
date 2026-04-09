@@ -74,9 +74,11 @@ interface AskContentProps {
   askMode?: 'panel' | 'popup';
   /** Switch between panel ↔ popup */
   onModeSwitch?: () => void;
+  /** Navigate from fullscreen to right-side panel mode */
+  onDockToPanel?: () => void;
 }
 
-export default function AskContent({ visible, currentFile, initialMessage, initialAcpAgent, onFirstMessage, variant, onClose, maximized, onMaximize, askMode, onModeSwitch }: AskContentProps) {
+export default function AskContent({ visible, currentFile, initialMessage, initialAcpAgent, onFirstMessage, variant, onClose, maximized, onMaximize, askMode, onModeSwitch, onDockToPanel }: AskContentProps) {
   const isPanel = variant === 'panel';
   const isHome = variant === 'home';
 
@@ -496,6 +498,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
         askMode={isHome ? undefined : askMode}
         onModeSwitch={isHome ? undefined : onModeSwitch}
         onClose={isHome ? undefined : onClose}
+        onDockToPanel={maximized ? onDockToPanel : undefined}
         sessions={session.sessions}
         activeSessionId={session.activeSessionId}
         onLoadSession={handleLoadSession}
@@ -707,8 +710,8 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
           </form>
 
           {/* Mode + Agent + Provider selector row + keyboard hint */}
-          <div className="flex items-center justify-between px-3 pb-2 pt-1.5 border-t border-border/10">
-            <div className="flex items-center gap-2">
+          <div className={cn('flex items-center justify-between border-t border-border/10', isPanel ? 'px-2 pb-1.5 pt-1 gap-1' : 'px-3 pb-2 pt-1.5')}>
+            <div className={cn('flex items-center flex-wrap', isPanel ? 'gap-1' : 'gap-2')}>
               <ModeCapsule mode={chatMode} onChange={setChatMode} disabled={isLoading} />
             {mounted && acpDetection.installedAgents.length > 0 && (
               <AgentSelectorCapsule
@@ -731,10 +734,12 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
               />
             )}
             </div>
-            {/* Keyboard hint */}
-            <span className="hidden md:inline text-2xs text-muted-foreground/40 select-none">
-              <kbd className="font-mono">Enter</kbd> {t.ask.send} · <kbd className="font-mono">Shift+Enter</kbd> {t.ask.newlineHint}
-            </span>
+            {/* Keyboard hint — hidden in panel (too narrow) and home (compact) */}
+            {!isPanel && !isHome && (
+              <span className="hidden md:inline text-2xs text-muted-foreground/40 select-none shrink-0">
+                <kbd className="font-mono">Enter</kbd> {t.ask.send} · <kbd className="font-mono">Shift+Enter</kbd> {t.ask.newlineHint}
+              </span>
+            )}
           </div>
         </div>
       </div>

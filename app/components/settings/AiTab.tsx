@@ -23,8 +23,7 @@ export function AiTab({ data, updateAi, updateAgent, updateCustomProviders, t }:
   const [testResult, setTestResult] = useState<Record<string, TestResult>>({});
   const [customFormOpen, setCustomFormOpen] = useState(false);
   const [customEditingId, setCustomEditingId] = useState<string | null>(null);
-  const [addPanelOpen, setAddPanelOpen] = useState(false);
-  // Pre-fill template when user clicks a built-in provider in the Add panel
+  // Pre-fill template when user clicks Add
   const [customFormTemplate, setCustomFormTemplate] = useState<CustomProvider | undefined>(undefined);
   const okTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const prevProviderRef = useRef(provider);
@@ -176,15 +175,13 @@ export function AiTab({ data, updateAi, updateAgent, updateCustomProviders, t }:
             }
           }}
           compact
-          addPanelOpen={addPanelOpen}
-          onAddPanelToggle={open => { setAddPanelOpen(open); if (open) { setCustomFormOpen(false); setCustomEditingId(null); } }}
           configuredProviders={configuredProviders}
           customProviders={customProviders}
-          onAddCustom={() => { setAddPanelOpen(false); setCustomEditingId(null); setCustomFormTemplate(undefined); setCustomFormOpen(true); }}
-          onAddFromPreset={id => {
-            const p = PROVIDER_PRESETS[id];
+          onAdd={() => {
+            // Open form pre-filled with OpenAI defaults (user can change protocol in the form)
+            const defaultId: ProviderId = 'openai';
+            const p = PROVIDER_PRESETS[defaultId];
             const baseName = locale === 'zh' ? p.nameZh : p.name;
-            // Auto-suffix to avoid duplicate: "OpenAI" → "OpenAI (2)" → "OpenAI (3)"
             const names = new Set(customProviders.map(cp => cp.name.toLowerCase()));
             let finalName = baseName;
             if (names.has(finalName.toLowerCase())) {
@@ -195,13 +192,11 @@ export function AiTab({ data, updateAi, updateAgent, updateCustomProviders, t }:
             setCustomEditingId(null);
             setCustomFormTemplate({
               id: '', name: finalName,
-              baseProviderId: id, apiKey: '', model: p.defaultModel,
-              baseUrl: p.fixedBaseUrl || getDefaultBaseUrl(id) || '',
+              baseProviderId: defaultId, apiKey: '', model: p.defaultModel,
+              baseUrl: p.fixedBaseUrl || getDefaultBaseUrl(defaultId) || '',
             });
             setCustomFormOpen(true);
           }}
-          onEditCustom={id => { setCustomEditingId(id); setCustomFormTemplate(undefined); setCustomFormOpen(true); }}
-          onDeleteCustom={handleDeleteCustom}
         />
 
         {/* Inline custom provider form */}
@@ -219,8 +214,8 @@ export function AiTab({ data, updateAi, updateAgent, updateCustomProviders, t }:
           />
         )}
 
-        {/* Provider configuration fields — hidden when Add panel or custom form is open */}
-        {preset && !customFormOpen && !addPanelOpen && (
+        {/* Provider configuration fields — hidden when custom form is open */}
+        {preset && !customFormOpen && (
           <div className="space-y-3 pt-3 border-t border-border">
             {/* 1. API Key — most essential, enter first */}
             <Field
@@ -293,14 +288,14 @@ export function AiTab({ data, updateAi, updateAgent, updateCustomProviders, t }:
           </div>
         )}
 
-        {/* Inline warnings — hidden when Add panel is open */}
-        {!addPanelOpen && !customFormOpen && missingApiKey && (
+        {/* Inline warnings — hidden when form is open */}
+        {!customFormOpen && missingApiKey && (
           <div className="flex items-start gap-2 text-xs text-destructive/80 bg-destructive/8 border border-destructive/20 rounded-lg px-3 py-2.5">
             <AlertCircle size={13} className="shrink-0 mt-0.5" />
             <span>{t.settings.ai.noApiKey}</span>
           </div>
         )}
-        {!addPanelOpen && !customFormOpen && Object.values(env).some(Boolean) && (
+        {!customFormOpen && Object.values(env).some(Boolean) && (
           <div className="flex items-start gap-2 text-xs text-[var(--amber)] bg-[var(--amber-subtle)] border border-[var(--amber)]/20 rounded-lg px-3 py-2.5">
             <AlertCircle size={13} className="shrink-0 mt-0.5" />
             <span>{t.settings.ai.envHint}</span>

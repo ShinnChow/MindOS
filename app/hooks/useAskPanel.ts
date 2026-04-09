@@ -60,7 +60,21 @@ export function useAskPanel(): AskPanelState {
       }
     };
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+
+    // Listen for "dock to panel" from home page fullscreen
+    const onOpenPanel = () => {
+      setAskPanelOpen(true);
+      if (askMaximizedRef.current) {
+        setAskMaximized(false);
+        setAskPanelWidth(prevWidthRef.current);
+      }
+    };
+    window.addEventListener('mindos:open-ask-panel', onOpenPanel);
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('mindos:open-ask-panel', onOpenPanel);
+    };
   }, []);
 
   // Bridge useAskModal store → right Ask panel or popup
