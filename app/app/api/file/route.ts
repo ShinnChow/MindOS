@@ -37,7 +37,7 @@ function err(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status });
 }
 
-/** Catch unexpected errors and return { error } with proper status. */
+// Alias for consistency with central error handling
 const handleError = handleRouteErrorSimple;
 
 /** Recursively collect all directory paths from the file tree. */
