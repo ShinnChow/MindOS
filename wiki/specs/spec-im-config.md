@@ -106,6 +106,6 @@ export function validatePlatformConfig(platform: IMPlatform, config: unknown): {
 
 ## 安全考虑
 
-1. **文件权限**：写入时设置 `0o600`，只有文件所有者能读写
+1. **文件权限**：非 Windows 平台写入时设置 `0o600`，只有文件所有者能读写。Windows 上 `fs.chmod` 不生效，需在文档中提醒用户自行保护文件
 2. **不在日志中打印凭据**：所有 log 输出用 `***` 掩码处理 token
 3. **原子写入**：先写 `.tmp` 再 `rename`，防止写入中途崩溃导致文件损坏

@@ -47,9 +47,13 @@ async function getAdapter(platform: IMPlatform): Promise<IMAdapter> {
   // 0. 检查配置是否已变更（热更新支持）
   const currentMtime = getIMConfigMtime(); // fs.statSync(...).mtimeMs
   if (currentMtime > configMtime) {
-    // 配置文件被修改，dispose 所有旧 Adapter 并重建
-    await disposeAllAdapters();
+    // 配置文件被修改：标记所有旧 Adapter 为 stale，但不立即 dispose
+    // （正在发送的消息可能还在使用旧 Adapter）
+    const staleAdapters = [...adapterCache.values()];
+    adapterCache.clear();
     configMtime = currentMtime;
+    // 异步 dispose 旧 Adapter（不阻塞当前请求）
+    Promise.allSettled(staleAdapters.map(a => a.dispose())).catch(() => {});
   }
 
   // 1. 检查缓存
@@ -95,6 +99,13 @@ async function getAdapter(platform: IMPlatform): Promise<IMAdapter> {
    - message.text 不能为空
    - message.recipientId 不能为空
    - message.platform 必须是已知平台
+   - **recipientId 格式校验**（防 prompt injection）：
+     - telegram: 匹配 /^-?\d+$/ （数字或负数开头的数字）
+     - discord: 匹配 /^\d{17,20}$/ （Snowflake ID）
+     - feishu: 匹配 /^(oc_|ou_|on_)/ 或 email 格式
+     - slack: 匹配 /^[A-Z0-9]+$/ （Slack channel/user ID）
+     - wecom/dingtalk: 非空字符串即可
+   - 校验失败 → 返回 "Invalid recipient_id format for {platform}"
 
 2. 获取 Adapter
    - getAdapter(message.platform)
@@ -114,8 +125,10 @@ async function getAdapter(platform: IMPlatform): Promise<IMAdapter> {
    - 失败 → { ok: false, error: "人类可读错误", timestamp }
 
 6. 日志
-   - logAgentOp({ tool: 'send_im_message', params: { platform, recipientId }, result, message })
-   - 不记录 message.text 的完整内容（可能含敏感信息），只记录长度
+   - logAgentOp({ tool: 'send_im_message', params: { platform, recipientId: maskId(recipientId) }, result, message })
+   - **不记录 message.text 的完整内容**（可能含敏感信息），只记录长度
+   - **recipientId 做部分掩码**：只显示前3+后3字符，中间用 `***` 替代
+   - **绝不记录 token/secret 的任何部分**
 ```
 
 ## 超时控制
@@ -146,29 +159,55 @@ async function sendWithTimeout(
 
 ## 重试策略
 
+复用 MindOS 已有的 retry 工具（`app/lib/agent/retry.ts` + `app/lib/agent/reconnect.ts`），不引入额外的 `p-retry` 依赖。
+
 ```typescript
-import pRetry from 'p-retry';
+import { retryDelay, sleep } from '@/lib/agent/reconnect';
+
+const MAX_RETRIES = 3;
 
 async function sendWithRetry(
   adapter: IMAdapter,
   message: IMMessage,
   signal?: AbortSignal,
 ): Promise<IMSendResult> {
-  return pRetry(
-    () => sendWithTimeout(adapter, message, signal),
-    {
-      retries: 3,
-      factor: 2,           // 指数退避：1s, 2s, 4s
-      minTimeout: 1000,
-      shouldRetry: (error) => {
-        // 仅对瞬态错误重试
-        if (error.name === 'AbortError') return false;
-        if (error.message.includes('429') || error.message.includes('rate limit')) return true;
-        if (error.message.includes('ECONNRESET') || error.message.includes('ETIMEDOUT')) return true;
-        return false;  // 400/403/404 等不重试
-      },
-    },
-  );
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await sendWithTimeout(adapter, message, signal);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // 不对客户端错误重试
+      if (lastError.name === 'AbortError') throw lastError;
+      if (!isRetryableIMError(lastError)) throw lastError;
+
+      // 最后一次也失败了，不再等待
+      if (attempt === MAX_RETRIES) break;
+
+      // 指数退避：1s, 2s, 4s（复用 retryDelay）
+      const delay = retryDelay(attempt);
+      await sleep(delay, signal);
+    }
+  }
+
+  // 全部重试耗尽
+  return {
+    ok: false,
+    error: `Failed after ${MAX_RETRIES} retries: ${lastError?.message ?? 'unknown error'}`,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+/** 判断 IM 发送错误是否可重试 */
+function isRetryableIMError(error: Error): boolean {
+  const msg = error.message.toLowerCase();
+  // 429 / 5xx / 网络瞬态错误可重试
+  if (msg.includes('429') || msg.includes('rate limit')) return true;
+  if (msg.includes('500') || msg.includes('502') || msg.includes('503') || msg.includes('504')) return true;
+  if (msg.includes('econnreset') || msg.includes('etimedout') || msg.includes('enotfound')) return true;
+  return false; // 400/401/403/404 等不重试
 }
 ```
 

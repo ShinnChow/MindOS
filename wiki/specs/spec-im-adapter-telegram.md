@@ -36,8 +36,11 @@ export class TelegramAdapter implements IMAdapter {
 
 ```
 1. 懒初始化 Bot 实例（首次 send 时创建）
-   - const { Bot } = await import('grammy');  // 动态 import
-   - this.bot = new Bot(this.config.bot_token);
+   - const { Bot } = await import('grammy');
+   - 注意：new Bot(token) 默认会在首次 API 调用时自动 getMe() 验证 token（增加一个 RTT）
+   - 优化：传入 botInfo 参数跳过自动验证（从 verify() 缓存或手动构造）
+   - this.bot = new Bot(this.config.bot_token, { botInfo: this.cachedBotInfo });
+   - 如果没有 cachedBotInfo（首次使用），允许自动 getMe（只慢一次）
 
 2. 格式转换
    - format='text' → sendMessage(chatId, text)
@@ -102,6 +105,11 @@ Telegram MarkdownV2 语法与标准 Markdown 有差异：
 2. 将 `**bold**` 转换为 `*bold*`
 3. 将 `# heading` 转换为 `*heading*`（降级为粗体）
 4. 保留链接、代码块、斜体
+
+**Markdown 容错**：MarkdownV2 转义规则极其严格，是 Telegram bot 开发中最常见的 bug 来源。策略：
+- 如果 sendMessage(parse_mode: 'MarkdownV2') 返回 400 "can't parse entities"
+- **自动 fallback**：以纯文本（无 parse_mode）重新发送一次
+- 记录 warn 日志，提示 markdown 格式异常
 
 ### 消息截断
 

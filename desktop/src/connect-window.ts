@@ -11,7 +11,7 @@ import Store from 'electron-store';
 import { testConnection, normalizeAddress } from './connection-sdk';
 import type { SavedConnection } from './connection-sdk';
 import { getNodePath, getMindosInstallPath, getEnrichedEnv } from './node-detect';
-import { parseSshConfig, isSshAvailable, SshTunnel } from './ssh-tunnel';
+import { parseSshConfig, isSshAvailable, SshTunnel, PASSPHRASE_NEEDED, addKeyToAgent, isSshAgentRunning } from './ssh-tunnel';
 import { findAvailablePort } from './port-finder';
 
 // Active SSH tunnel (shared across windows)
@@ -76,6 +76,25 @@ function removePassword(address: string): void {
     delete passwords[address];
     store.set('encryptedPasswords', passwords);
   } catch { /* ignore */ }
+}
+
+// ── SSH passphrase storage (reuses safeStorage, keyed by host) ──
+
+/** Storage key for an SSH passphrase: `ssh-passphrase://host` */
+function sshPassphraseKey(host: string): string {
+  return `ssh-passphrase://${host}`;
+}
+
+function saveSshPassphrase(host: string, passphrase: string): void {
+  savePassword(sshPassphraseKey(host), passphrase);
+}
+
+function loadSshPassphrase(host: string): string | null {
+  return loadPassword(sshPassphraseKey(host));
+}
+
+function removeSshPassphrase(host: string): void {
+  removePassword(sshPassphraseKey(host));
 }
 
 // ── Storage operations ──

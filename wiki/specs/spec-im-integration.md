@@ -291,8 +291,10 @@ app/lib/im/
 |------|------|---------|
 | SDK 依赖增加包大小 | 中 | lazy import（只在首次 send 时加载），列为 optionalDependencies |
 | 平台 API 变更导致适配器失效 | 中 | 版本锁定 SDK，集成测试自动检测 |
-| 凭据泄露 | 高 | im.json 权限建议 600；不在日志中打印 token |
+| 凭据泄露（im.json 明文存储） | **高** | im.json 权限 0o600（非 Windows）；logAgentOp 中 token 完全不记录；recipientId 做部分掩码；错误消息中不返回 token 任何部分；Phase 4 UI 用 secret input |
 | 消息发送阻塞 Agent 执行 | 中 | send 操作有 10s 超时；使用 AbortSignal 支持取消 |
+| Prompt injection 导致向非预期目标发消息 | 中 | recipientId 格式校验（per-platform regex）；Agent 只能发到已配置平台 |
+| Telegram MarkdownV2 转义失败 | 低 | 自动 fallback 为纯文本重发 |
 
 ## 验收标准
 
