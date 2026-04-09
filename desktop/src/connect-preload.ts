@@ -25,4 +25,6 @@ contextBridge.exposeInMainWorld('mindosConnect', {
   // SSH tunnel
   getSshHosts: () => ipcRenderer.invoke('connect:ssh-hosts'),
   connectSsh: (host: string, remotePort: number) => ipcRenderer.invoke('connect:ssh-connect', host, remotePort),
+  completeSshWithPassword: (sshHost: string, sshRemotePort: number, tunnelUrl: string, password: string) =>
+    ipcRenderer.invoke('connect:ssh-complete', sshHost, sshRemotePort, tunnelUrl, password),
 });

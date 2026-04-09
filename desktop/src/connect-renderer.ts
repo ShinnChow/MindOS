@@ -27,10 +27,12 @@ function getIpc() {
     testConnection: (address: string) => Promise<{ status: 'online' | 'not-mindos' | 'error'; authRequired?: boolean; version?: string; error?: string }>;
     connect: (address: string, password: string | null) => Promise<{ ok: boolean; error?: string }>;
     removeConnection: (address: string) => Promise<void>;
+    getSavedPassword: (address: string) => Promise<string | null>;
     switchToLocal: () => Promise<void>;
     // SSH
     getSshHosts: () => Promise<{ available: boolean; hosts: Array<{ name: string; hostname?: string; user?: string }> }>;
-    connectSsh: (host: string, remotePort: number) => Promise<{ ok: boolean; url?: string; error?: string; authRequired?: boolean }>;
+    connectSsh: (host: string, remotePort: number) => Promise<{ ok: boolean; url?: string; error?: string; authRequired?: boolean; sshHost?: string; sshRemotePort?: number }>;
+    completeSshWithPassword: (sshHost: string, sshRemotePort: number, tunnelUrl: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   } | undefined;
 }
 
@@ -43,6 +45,9 @@ type TestResult = {
 
 let testResult: TestResult | null = null;
 let recentConnections: Array<{ address: string; label?: string }> = [];
+
+// SSH password flow state — when SSH tunnel is established but server needs password
+let sshPendingAuth: { sshHost: string; sshRemotePort: number; tunnelUrl: string } | null = null;
 
 // ── Helpers ──
 function $(id: string): HTMLElement | null { return document.getElementById(id); }
@@ -548,7 +553,15 @@ async function handleTest(): Promise<void> {
 
     if (result.authRequired) {
       pwSection?.classList.remove('hidden');
-      ($('password') as HTMLInputElement)?.focus();
+      const pwInput = $('password') as HTMLInputElement;
+      // Try to auto-fill saved password
+      try {
+        const savedPw = await ipc.getSavedPassword(addr);
+        if (savedPw && pwInput) {
+          pwInput.value = savedPw;
+        }
+      } catch { /* ignore — getSavedPassword may not be available */ }
+      pwInput?.focus();
     } else {
       pwSection?.classList.add('hidden');
     }
@@ -703,6 +716,9 @@ function init(): void {
   $('ssh-port')?.addEventListener('keydown', (e) => {
     if ((e as KeyboardEvent).key === 'Enter') void handleSshConnect();
   });
+  $('ssh-password')?.addEventListener('keydown', (e) => {
+    if ((e as KeyboardEvent).key === 'Enter') void handleSshConnect();
+  });
 
   // SSH connect button
   $('ssh-connect-btn')?.addEventListener('click', () => void handleSshConnect());
@@ -785,19 +801,62 @@ async function handleSshConnect(): Promise<void> {
   const portInput = $('ssh-port') as HTMLInputElement;
   const btn = $('ssh-connect-btn') as HTMLButtonElement;
   const status = $('ssh-status') as HTMLElement;
+  const pwSection = $('ssh-password-section');
+  const pwInput = $('ssh-password') as HTMLInputElement;
 
   const host = hostInput?.value.trim();
   const port = parseInt(portInput?.value || '3456', 10);
   if (!host) { hostInput?.focus(); return; }
 
-  // Switch to "connecting" state with cancel support
+  // If we're in password entry mode (tunnel already established, waiting for password)
+  if (sshPendingAuth) {
+    const password = pwInput?.value;
+    if (!password) { pwInput?.focus(); return; }
+
+    btn.disabled = true;
+    btn.textContent = t('connecting');
+    status.className = 'status-bar info';
+    status.textContent = t('connecting');
+
+    try {
+      const result = await ipc.completeSshWithPassword(
+        sshPendingAuth.sshHost,
+        sshPendingAuth.sshRemotePort,
+        sshPendingAuth.tunnelUrl,
+        password
+      );
+
+      if (result.ok) {
+        status.className = 'status-bar success';
+        status.textContent = t('connected');
+        btn.textContent = t('connected');
+        sshPendingAuth = null;
+        // Window will close automatically
+      } else {
+        status.className = 'status-bar error';
+        status.textContent = result.error || t('incorrectPassword');
+        btn.disabled = false;
+        btn.textContent = t('connect');
+        pwInput?.focus();
+      }
+    } catch (err) {
+      status.className = 'status-bar error';
+      status.textContent = `${t('connectionFailed')}: ${err instanceof Error ? err.message : String(err)}`;
+      btn.disabled = false;
+      btn.textContent = t('connect');
+    }
+    return;
+  }
+
+  // Initial SSH connection — establish tunnel
   let cancelled = false;
   btn.disabled = false;
-  btn.innerHTML = `<span class="spinner"></span> ${t('cancel') || 'Cancel'}`;
+  btn.innerHTML = `<span class="spinner"></span> ${t('cancel')}`;
   btn.onclick = () => { cancelled = true; };
   status.classList.remove('hidden');
   status.className = 'status-bar info';
   status.textContent = t('sshConnecting');
+  pwSection?.classList.add('hidden'); // Hide password section during tunnel establishment
 
   try {
     const result = await ipc.connectSsh(host, port);
@@ -807,28 +866,47 @@ async function handleSshConnect(): Promise<void> {
       status.className = 'status-bar';
       status.textContent = '';
       btn.textContent = t('sshConnect');
-      btn.onclick = () => handleSshConnect();
+      btn.onclick = null;
       return;
     }
 
     if (result.ok) {
-      status.className = 'status-bar success';
-      status.textContent = t('sshSuccess');
-      btn.textContent = t('connected');
-      btn.disabled = true;
-      btn.onclick = null;
-      // Window will close automatically (IPC handler calls resolve + close)
+      if (result.authRequired && result.url) {
+        // Tunnel established but server needs password
+        sshPendingAuth = {
+          sshHost: result.sshHost || host,
+          sshRemotePort: result.sshRemotePort || port,
+          tunnelUrl: result.url,
+        };
+        status.className = 'status-bar success';
+        status.textContent = `${t('sshSuccess')} · ${t('passwordRequired')}`;
+        pwSection?.classList.remove('hidden');
+        pwInput?.focus();
+        btn.textContent = t('connect');
+        btn.disabled = false;
+        btn.onclick = null;
+        // Re-bind the click handler for password submission
+        btn.addEventListener('click', () => void handleSshConnect(), { once: true });
+      } else {
+        // No auth needed — connection complete
+        status.className = 'status-bar success';
+        status.textContent = t('sshSuccess');
+        btn.textContent = t('connected');
+        btn.disabled = true;
+        btn.onclick = null;
+        // Window will close automatically (IPC handler calls resolve + close)
+      }
     } else {
       status.className = 'status-bar error';
       status.textContent = `${t('sshFailed')}: ${result.error}`;
       btn.textContent = t('sshConnect');
-      btn.onclick = () => handleSshConnect();
+      btn.onclick = null;
     }
   } catch (err) {
     status.className = 'status-bar error';
     status.textContent = `${t('sshFailed')}: ${err instanceof Error ? err.message : String(err)}`;
     btn.textContent = t('sshConnect');
-    btn.onclick = () => handleSshConnect();
+    btn.onclick = null;
   }
 }
 

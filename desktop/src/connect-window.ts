@@ -223,6 +223,48 @@ function registerSshHandlers(
     removePassword(address);
   });
 
+  /** Complete SSH connection after user enters password (when authRequired was true) */
+  safeHandle('connect:ssh-complete', async (_: unknown, sshHost: string, sshRemotePort: number, tunnelUrl: string, password: string) => {
+    // Verify tunnel is still alive
+    if (!activeTunnel || !activeTunnel.isAlive()) {
+      return { ok: false, error: 'SSH tunnel is no longer active. Please reconnect.' };
+    }
+
+    // Authenticate with password through the tunnel
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(`${tunnelUrl}/api/auth`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) return { ok: false, error: 'Incorrect password' };
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        return { ok: false, error: 'Auth request timed out' };
+      }
+      return { ok: false, error: `Auth failed: ${err instanceof Error ? err.message : String(err)}` };
+    }
+
+    // Save connection with SSH address format
+    saveConnection({
+      address: `ssh://${sshHost}:${sshRemotePort}`,
+      label: `${sshHost} (SSH)`,
+      lastConnected: new Date().toISOString(),
+      authMethod: 'password',
+    });
+    savePassword(`ssh://${sshHost}:${sshRemotePort}`, password);
+    setActiveRemoteConnection(tunnelUrl);
+
+    resolvedRef.value = true;
+    resolve(resolveOverride ?? tunnelUrl);
+    safeClose();
+    return { ok: true };
+  });
+
   safeHandle('connect:switch-local', () => {
     resolvedRef.value = true;
     resolve(null);
@@ -251,8 +293,15 @@ function registerSshHandlers(
 
           const result = await testConnection(`http://localhost:${localPort}`);
           if (result.status === 'online') {
-            // Success path continues below the retry loop
             const url = `http://localhost:${localPort}`;
+
+            // If auth required, DON'T close window — let renderer handle password flow
+            if (result.authRequired) {
+              // Keep tunnel alive, return info to renderer for password input
+              return { ok: true, url, authRequired: true, sshHost: host, sshRemotePort: remotePort };
+            }
+
+            // No auth needed — save connection and close window
             saveConnection({
               address: `ssh://${host}:${remotePort}`,
               label: `${host} (SSH)`,
@@ -263,7 +312,7 @@ function registerSshHandlers(
             resolvedRef.value = true;
             resolve(resolveOverride ?? url);
             safeClose();
-            return { ok: true, url, authRequired: result.authRequired };
+            return { ok: true, url, authRequired: false };
           }
 
           // MindOS not running on remote
@@ -304,6 +353,7 @@ function registerSshHandlers(
 const REMOTE_CHANNELS = [
   'connect:get-recent', 'connect:get-saved-password', 'connect:test', 'connect:connect',
   'connect:remove', 'connect:switch-local', 'connect:ssh-hosts', 'connect:ssh-connect',
+  'connect:ssh-complete',
 ];
 
 /**
