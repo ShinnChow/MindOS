@@ -1,12 +1,18 @@
 # MindOS 架构改进实施进度 - 2026-04-10
 
 > **日期**: 2026-04-10  
-> **状态**: Phase 1 基础设施完成，导入切换待执行  
-> **进度**: 5 个新模块已创建 + 全部测试通过（107 files, 1,239 tests）
+> **状态**: Phase 1 完成 (ask/route 导入切换✅) + Phase 2 启动 (handleRouteError 推广)  
+> **进度**: ask/route 1,524→1,012 行(-34%) + handleRouteErrorSimple foundation
+
+#### 5️⃣ handleRouteErrorSimple 方案 ✅ 已奠基
+- **文件**: `lib/errors.ts` + `app/api/file/route.ts` 
+- **方案**: 为保留旧响应格式的路由提供 `handleRouteErrorSimple()` 
+- **背景**: 前端需要 `{ error: string }` 或 `{ error: { code, message } }`，两种格式都支持
+- **下一步**: 在 file/sync/changes/git 路由逐个替换 try-catch
 
 ---
 
-## 已完成的工作
+## 已完成的工作 (Phase 1)
 
 ### ✅ 快速胜利 (Quick Wins)
 
