@@ -4,6 +4,8 @@ import { execFileSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { resolveScript } from '@/lib/core/resolve-script';
+import { handleRouteErrorSimple } from '@/lib/errors';
 
 export const runtime = 'nodejs';
 
@@ -27,13 +29,16 @@ function truncateText(text: string): { result: string; truncated: boolean } {
  * avoids the bundler entirely.
  */
 function extractPdf(buf: Buffer): { text: string; pages: number } {
+  const scriptPath = resolveScript('extract-pdf.cjs');
+  if (!scriptPath) {
+    throw new Error(
+      'extract-pdf.cjs not found. Searched: $MINDOS_PROJECT_ROOT/app/scripts/, cwd/scripts/, and standalone fallbacks.'
+    );
+  }
+
   // Write PDF to a temp file so the child script can read it.
   const tmpDir = os.tmpdir();
   const tmpPdf = path.join(tmpDir, `pdf-extract-${Date.now()}.pdf`);
-  const appDir = process.env.MINDOS_PROJECT_ROOT
-    ? path.join(process.env.MINDOS_PROJECT_ROOT, 'app')
-    : process.cwd();
-  const scriptPath = path.join(appDir, 'scripts', 'extract-pdf.cjs');
 
   fs.writeFileSync(tmpPdf, buf);
   try {
@@ -83,9 +88,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error('[extract-pdf] Error:', err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Failed to extract PDF text' },
-      { status: 500 },
-    );
+    return handleRouteErrorSimple(err);
   }
 }

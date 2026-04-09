@@ -4,6 +4,7 @@ import { execSync, execFile } from 'child_process';
 import { existsSync, readFileSync, writeFileSync, unlinkSync, renameSync } from 'fs';
 import { join, resolve } from 'path';
 import { homedir } from 'os';
+import { handleRouteErrorSimple } from '@/lib/errors';
 
 const MINDOS_DIR = join(homedir(), '.mindos');
 const CONFIG_PATH = join(MINDOS_DIR, 'config.json');
@@ -152,8 +153,7 @@ export async function POST(req: NextRequest) {
           await runCli(args, 120000); // git init + remote setup can take 60s+
           return NextResponse.json({ success: true, message: 'Sync initialized' });
         } catch (err: unknown) {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          return NextResponse.json({ error: errMsg }, { status: 400 });
+          return handleRouteErrorSimple(err, 400);
         }
       }
 
@@ -166,8 +166,7 @@ export async function POST(req: NextRequest) {
           await runCli(['sync', 'now'], 120000); // pull + push can take 60s+
           return NextResponse.json({ ok: true });
         } catch (err: unknown) {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          return NextResponse.json({ error: errMsg }, { status: 500 });
+          return handleRouteErrorSimple(err);
         }
       }
 
@@ -244,7 +243,7 @@ export async function POST(req: NextRequest) {
           }
           return NextResponse.json({ ok: true });
         } catch (e) {
-          return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+          return handleRouteErrorSimple(e);
         }
       }
 
@@ -291,7 +290,6 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Unknown action: ${body.action}` }, { status: 400 });
     }
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleRouteErrorSimple(err);
   }
 }

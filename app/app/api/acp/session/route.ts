@@ -13,16 +13,14 @@ import {
   getSession,
   getActiveSessions,
 } from '@/lib/acp/session';
+import { handleRouteErrorSimple } from '@/lib/errors';
 
 export async function GET() {
   try {
     const sessions = getActiveSessions();
     return NextResponse.json({ sessions });
   } catch (err) {
-    return NextResponse.json(
-      { error: (err as Error).message },
-      { status: 500 },
-    );
+    return handleRouteErrorSimple(err);
   }
 }
 
@@ -69,10 +67,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ session, response });
           } catch (promptErr) {
             await closeSession(session.id).catch(() => {});
-            return NextResponse.json(
-              { error: `Prompt failed: ${(promptErr as Error).message}`, session },
-              { status: 500 },
-            );
+            return handleRouteErrorSimple(promptErr);
           }
         }
 
@@ -177,9 +172,6 @@ export async function DELETE(req: Request) {
     await closeSession(sessionId);
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json(
-      { error: (err as Error).message },
-      { status: 500 },
-    );
+    return handleRouteErrorSimple(err);
   }
 }

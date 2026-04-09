@@ -17,8 +17,9 @@ import {
 } from '@/lib/mcp-agents';
 import { getAllAgents, loadCustomAgents, scanCustomAgentSkills, toAgentDef } from '@/lib/custom-agents';
 import { readSettings } from '@/lib/settings';
-import { scanSkillDirs } from '@/lib/pi-integration/skills';
+import { loadSkills } from '@mariozechner/pi-coding-agent';
 import { getMindRoot } from '@/lib/fs';
+import { handleRouteErrorSimple } from '@/lib/errors';
 
 async function enrichMindOsAgent(agent: Record<string, unknown>) {
   agent.present = true;
@@ -35,10 +36,19 @@ async function enrichMindOsAgent(agent: Record<string, unknown>) {
 
   try {
     const projectRoot = process.env.MINDOS_PROJECT_ROOT || path.resolve(process.cwd(), '..');
-    const skills = await scanSkillDirs({ projectRoot, mindRoot: getMindRoot() });
-    const enabledSkills = skills.filter(s => s.enabled);
-    agent.installedSkillNames = enabledSkills.map(s => s.name);
-    agent.installedSkillCount = enabledSkills.length;
+    const mindRoot = getMindRoot();
+    const { skills } = loadSkills({
+      cwd: projectRoot,
+      skillPaths: [
+        path.join(projectRoot, 'app', 'data', 'skills'),
+        path.join(projectRoot, 'skills'),
+        path.join(mindRoot, '.skills'),
+        path.join(os.homedir(), '.mindos', 'skills'),
+      ],
+      includeDefaults: false,
+    });
+    agent.installedSkillNames = skills.map(s => s.name);
+    agent.installedSkillCount = skills.length;
     agent.installedSkillSourcePath = path.join(projectRoot, 'skills');
     agent.skillMode = 'universal';
     agent.skillWorkspacePath = path.join(os.homedir(), '.agents', 'skills');
@@ -252,6 +262,6 @@ export async function GET() {
 
     return NextResponse.json({ agents });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return handleRouteErrorSimple(err);
   }
 }

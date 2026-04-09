@@ -5,6 +5,7 @@ import { exec } from 'child_process';
 import { getAcpAgents } from '@/lib/acp/registry';
 import { getDescriptorBinary, getDescriptorInstallCmd, resolveAgentCommand } from '@/lib/acp/agent-descriptors';
 import { readSettings } from '@/lib/settings';
+import { handleRouteErrorSimple } from '@/lib/errors';
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
 
@@ -115,9 +116,6 @@ export async function GET(req: Request) {
     detectCache = { data, ts: Date.now() };
     return NextResponse.json(data);
   } catch (err) {
-    return NextResponse.json(
-      { error: (err as Error).message, installed: [], notInstalled: [] },
-      { status: 500 },
-    );
+    return handleRouteErrorSimple(err);
   }
 }

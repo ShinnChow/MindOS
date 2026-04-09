@@ -11,12 +11,14 @@ import {
   DefaultResourceLoader,
   ModelRegistry,
   type ToolDefinition,
+  type Skill,
   SessionManager,
   SettingsManager,
   bashTool,
 } from '@mariozechner/pi-coding-agent';
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { getFileContent, getMindRoot, collectAllFiles } from '@/lib/fs';
 import { getModelConfig, hasImages } from '@/lib/agent/model';
@@ -52,9 +54,12 @@ import {
   resolveSkillFile,
   resolveSkillReference,
 } from '@/lib/agent/skill-resolver';
+import { generateSkillsXml } from '@/lib/agent/skills-xml';
 import { runNonStreamingFallback } from '@/lib/agent/non-streaming';
 
 const MAX_DIR_FILES = 30;
+
+// generateSkillsXml is in lib/agent/skills-xml.ts (not inline: Next.js route export constraints)
 
 /**
  * Load attached and current files into context parts for the system prompt.
@@ -619,19 +624,41 @@ export async function POST(req: NextRequest) {
       ...(contextStrategy === 'off' ? { compaction: { enabled: false } } : {}),
     });
 
+    const CORE_SKILL_NAMES = new Set(['mindos', 'mindos-zh', 'mindos-max', 'mindos-max-zh']);
     const resourceLoader = new DefaultResourceLoader({
       cwd: projectRoot,
       settingsManager,
       systemPromptOverride: () => systemPrompt,
       appendSystemPromptOverride: () => [],
+      agentsFilesOverride: () => ({ agentsFiles: [] }),
+      skillsOverride: (result) => ({
+        ...result,
+        skills: result.skills.filter((s) => !CORE_SKILL_NAMES.has(s.name)),
+      }),
       additionalSkillPaths: [
         path.join(projectRoot, 'app', 'data', 'skills'),
         path.join(projectRoot, 'skills'),
         path.join(getMindRoot(), '.skills'),
+        path.join(os.homedir(), '.mindos', 'skills'),
       ],
       additionalExtensionPaths: scanExtensionPaths(),
     });
     await resourceLoader.reload();
+
+    // Inject third-party skill list into system prompt (agent mode only).
+    // Core skills are already injected as full content; third-party skills
+    // get a name+description summary so the LLM can discover and load them.
+    // Must reload() again because the closure captured systemPrompt before mutation.
+    if (askMode === 'agent') {
+      const { skills: discoveredSkills } = resourceLoader.getSkills();
+      const thirdPartySkills = discoveredSkills.filter(
+        (s: Skill) => !s.disableModelInvocation
+      );
+      if (thirdPartySkills.length > 0) {
+        systemPrompt += '\n\n---\n\n' + generateSkillsXml(thirdPartySkills);
+        await resourceLoader.reload();
+      }
+    }
 
     const { session } = await createAgentSession({
       cwd: projectRoot,

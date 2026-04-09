@@ -7,10 +7,12 @@ import {
   moveToTrashFile, renameFile, moveFile, findBacklinks, gitLog, gitShowFile, appendCsvRow,
   getMindRoot,
 } from '@/lib/fs';
-import { readSkillContentByName, scanSkillDirs } from '@/lib/pi-integration/skills';
+import { readSkillContentByName } from '@/lib/pi-integration/skills';
 import { callMcporterTool, createMcporterAgentTools, listMcporterServers, listMcporterTools } from '@/lib/pi-integration/mcporter';
 import { a2aTools } from '@/lib/a2a/a2a-tools';
 import { acpTools } from '@/lib/acp/acp-tools';
+import { getIMTools } from '@/lib/im/tools';
+import { hasAnyIMConfig } from '@/lib/im/config';
 import { buildLineDiff, collapseDiffContext } from '@/components/changes/line-diff';
 import { extractRelevantContent } from '@/lib/agent/paragraph-extract';
 import { computeDiffAsync } from '@/lib/agent/diff-async';
@@ -203,8 +205,6 @@ const CsvAppendParams = Type.Object({
   row: Type.Array(Type.String(), { description: 'Array of cell values for the new row' }),
 });
 
-const ListSkillsParams = Type.Object({});
-
 const LoadSkillParams = Type.Object({
   name: Type.String({ description: 'Skill name, e.g. "mindos" or "context7"' }),
 });
@@ -263,6 +263,12 @@ export function getChatTools(): AgentTool<any>[] {
 
 export async function getRequestScopedTools(): Promise<AgentTool<any>[]> {
   const baseTools = [...knowledgeBaseTools, ...a2aTools, ...acpTools];
+
+  // IM tools: only loaded when at least one platform is configured
+  if (hasAnyIMConfig()) {
+    try { baseTools.push(...getIMTools()); } catch { /* graceful degradation */ }
+  }
+
   try {
     const result = await listMcporterServers();
     const okServers = (result.servers ?? []).filter((server) => server.status === 'ok');
@@ -382,22 +388,9 @@ export const knowledgeBaseTools: AgentTool<any>[] = [
   },
 
   {
-    name: 'list_skills',
-    label: 'List Skills',
-    description: 'List available MindOS skills discovered from app/data/skills, skills, {mindRoot}/.skills, and ~/.mindos/skills. Use this before load_skill when you need a skill by name.',
-    parameters: ListSkillsParams,
-    execute: safeExecute(async () => {
-      const projectRoot = process.env.MINDOS_PROJECT_ROOT || path.resolve(process.cwd(), '..');
-      const skills = await scanSkillDirs({ projectRoot, mindRoot: getMindRoot() });
-      if (skills.length === 0) return textResult('No skills found.');
-      return textResult(skills.map((skill) => `- **${skill.name}** [${skill.origin}]${skill.enabled ? '' : ' (disabled)'} — ${skill.description || 'No description'}\n  Path: ${skill.path}`).join('\n'));
-    }),
-  },
-
-  {
     name: 'load_skill',
     label: 'Load Skill',
-    description: 'Load the full content of a specific skill by name. Use list_skills first if you do not know the exact skill name.',
+    description: 'Load the full content of a specific skill by name. Available skills are listed in the system prompt under <available_skills>.',
     parameters: LoadSkillParams,
     execute: safeExecute(async (_id, params: Static<typeof LoadSkillParams>) => {
       const projectRoot = process.env.MINDOS_PROJECT_ROOT || path.resolve(process.cwd(), '..');

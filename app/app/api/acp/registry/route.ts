@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { fetchAcpRegistry, findAcpAgent } from '@/lib/acp/registry';
+import { handleRouteErrorSimple } from '@/lib/errors';
 
 export async function GET(req: Request) {
   try {
@@ -23,9 +24,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ registry });
   } catch (err) {
-    return NextResponse.json(
-      { error: (err as Error).message },
-      { status: 500 },
-    );
+    return handleRouteErrorSimple(err);
   }
 }
