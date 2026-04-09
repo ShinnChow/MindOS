@@ -169,6 +169,19 @@ export const PLATFORM_LIMITS: Record<IMPlatform, {
 };
 ```
 
+## API 设计
+
+```typescript
+/** 获取指定平台的配置（类型安全重载） */
+export function getPlatformConfig(platform: 'telegram'): TelegramConfig | undefined;
+export function getPlatformConfig(platform: 'feishu'): FeishuConfig | undefined;
+export function getPlatformConfig(platform: 'discord'): DiscordConfig | undefined;
+export function getPlatformConfig(platform: 'slack'): SlackConfig | undefined;
+export function getPlatformConfig(platform: 'wecom'): WeComConfig | undefined;
+export function getPlatformConfig(platform: 'dingtalk'): DingTalkConfig | undefined;
+export function getPlatformConfig(platform: IMPlatform): PlatformConfig | undefined;
+```
+
 ## 设计决策
 
 1. **IMMessage 是平台无关的**：所有平台特定格式转换在 Adapter 内部完成

@@ -1,8 +1,8 @@
 # MindOS 架构改进实施进度 - 2026-04-10
 
 > **日期**: 2026-04-10  
-> **状态**: Phase 1a/1b 进行中  
-> **进度**: 快速胜利 + Phase 1 基础设施 部分完成
+> **状态**: Phase 1 基础设施完成，导入切换待执行  
+> **进度**: 5 个新模块已创建 + 全部测试通过（107 files, 1,239 tests）
 
 ---
 
@@ -57,12 +57,11 @@
 
 ### ⏳ Phase 1 - 进行中
 
-#### 1. 非流式回退逻辑提取 (中优先级)
-- **目标**: 从 ask/route.ts 提取 `reassembleSSE()`, `piMessagesToOpenAI()`, `runNonStreamingFallback()`
-- **目标文件**: `lib/agent/non-streaming.ts`
-- **行数**: ~265 行
-- **风险**: 低（纯数据转换逻辑，无状态）
-- **状态**: Task #10 待启动
+#### 1. 非流式回退逻辑提取 ✅ 已完成
+- **文件**: `lib/agent/non-streaming.ts`
+- **内容**: `reassembleSSE()`, `piMessagesToOpenAI()`, `runNonStreamingFallback()`
+- **行数**: 240 行
+- **TS编译**: ✅ 通过
 
 #### 2. 错误处理统一 (中优先级)
 - **目标**: 推广 `handleRouteError()` 到所有 57 个路由

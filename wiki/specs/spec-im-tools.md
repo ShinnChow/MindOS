@@ -13,31 +13,32 @@
 **用途**：Agent 向 IM 平台发送消息。
 
 ```typescript
-// TypeBox Schema
-const SendIMMessageParams = Type.Object({
-  platform: Type.Union([
-    Type.Literal('telegram'),
-    Type.Literal('discord'),
-    Type.Literal('feishu'),
-    Type.Literal('slack'),
-    Type.Literal('wecom'),
-    Type.Literal('dingtalk'),
-  ], { description: 'Target IM platform' }),
-  recipient_id: Type.String({
-    description: 'Chat/Channel/Group ID on the platform. Use list_im_channels to find available IDs.',
-  }),
-  message: Type.String({
-    description: 'Message content. Supports markdown if the platform allows it.',
-  }),
-  format: Type.Optional(Type.Union([
-    Type.Literal('text'),
-    Type.Literal('markdown'),
-  ], { description: 'Message format. Default: text. Use markdown for rich formatting.' })),
-  thread_id: Type.Optional(Type.String({
-    description: 'Thread/Topic ID for threaded replies (platform-dependent).',
-  })),
-});
+// TypeBox Schema — 动态生成，只包含已配置的平台
+function buildSendIMMessageParams(): TObject {
+  const platforms = getConfiguredPlatforms(); // e.g. ['telegram']
+  return Type.Object({
+    platform: Type.Union(
+      platforms.map(p => Type.Literal(p)),
+      { description: 'Target IM platform (only configured platforms shown)' },
+    ),
+    recipient_id: Type.String({
+      description: 'Chat/Channel/Group ID on the platform. Use list_im_channels to find available IDs.',
+    }),
+    message: Type.String({
+      description: 'Message content. Supports markdown if the platform allows it.',
+    }),
+    format: Type.Optional(Type.Union([
+      Type.Literal('text'),
+      Type.Literal('markdown'),
+    ], { description: 'Message format. Default: text. Use markdown for rich formatting.' })),
+    thread_id: Type.Optional(Type.String({
+      description: 'Thread/Topic ID for threaded replies (platform-dependent).',
+    })),
+  });
+}
 ```
+
+**关键设计**：platform enum 动态生成，只包含 `getConfiguredPlatforms()` 返回的平台。这样 Agent 的 schema 中不会出现未配置的平台选项，减少 Agent 犯错的可能。
 
 **执行逻辑**：
 

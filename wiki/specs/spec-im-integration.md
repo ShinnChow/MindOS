@@ -87,6 +87,48 @@ IMWebhookRouter (app/app/api/im/webhook/[platform]/route.ts)
      └─ providers.dingtalk.client_id + client_secret
 ```
 
+## User Flow
+
+```
+用户目标：让 MindOS Agent 能向自己的 Telegram/飞书等 IM 平台发送消息
+
+前置条件：用户已安装 MindOS，有一个可用的 IM bot（如 Telegram bot token）
+
+Step 1: 用户编辑 ~/.mindos/im.json，添加平台凭据
+  → 系统反馈：无（纯文件编辑）
+  → 状态变化：im.json 文件创建/更新
+
+Step 2: 用户在 MindOS Ask AI 中切换到 Agent 模式
+  → 系统反馈：工具列表自动包含 send_im_message 和 list_im_channels
+  → 状态变化：Agent system prompt 注入 IM 工具定义
+
+Step 3: 用户向 Agent 发送指令："把这条笔记发到我的 Telegram 群"
+  → 系统反馈：Agent 自动调用 list_im_channels 查询可用平台
+  → 状态变化：Agent 获取已配置平台列表
+
+Step 4: Agent 调用 send_im_message 发送消息
+  → 系统反馈：Agent 在对话中显示工具调用过程和结果
+  → 状态变化：Telegram API 被调用，消息送达目标 chat
+
+Step 5: 用户在 Telegram 上收到消息
+  → 系统反馈：Agent 告知用户 "消息已发送到 Telegram chat xxx"
+  → 状态变化：Agent 记录操作日志
+
+成功结果：用户在 Telegram 上看到来自 MindOS bot 的消息
+
+异常分支：
+- 异常 A：凭据无效 → Adapter 返回明确错误 → Agent 告知用户检查 im.json 中的 token
+- 异常 B：bot 被目标用户拉黑 → API 返回 403 → Agent 提示 "bot was blocked by the user"
+- 异常 C：平台 API 不可用 → 重试 3 次后失败 → Agent 提示 "Platform temporarily unavailable"
+- 异常 D：用户未配置任何 IM → Agent 工具列表中无 IM 工具 → Agent 无法发送
+
+边界场景：
+- 消息超长（>4096 字符）→ 自动截断 + 添加 "(truncated)" 后缀
+- im.json 格式损坏 → 静默降级为空配置，不影响其他功能
+- SDK 包未安装 → 动态 import 失败时返回清晰错误提示
+- 配置热更新 → 用户修改 im.json 后，下次 send 自动使用新凭据
+```
+
 ## 方案对比
 
 ### 方案 A：MCP Server 模式（外部进程）
