@@ -480,6 +480,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
   }, []);
 
   const handleLoadSession = useCallback((id: string) => {
+    if (chat.isLoadingRef.current) return; // Don't switch sessions during streaming
     sessionRef.current.loadSession(id);
     setShowHistory(false);
     setInput('');
