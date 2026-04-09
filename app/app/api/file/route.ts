@@ -32,11 +32,12 @@ import { createSpaceFilesystem } from '@/lib/core/create-space';
 import { appendAgentAuditEvent, parseAgentAuditJsonLines } from '@/lib/core/agent-audit-log';
 import { handleRouteErrorSimple } from '@/lib/errors';
 
+/** Return 400 for client validation errors. */
 function err(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status });
 }
 
-// Alias for consistency with central error handling
+/** Catch unexpected errors and return { error } with proper status. */
 const handleError = handleRouteErrorSimple;
 
 /** Recursively collect all directory paths from the file tree. */
@@ -96,7 +97,7 @@ export async function GET(req: NextRequest) {
     try {
       return NextResponse.json({ spaces: listMindSpaces() });
     } catch (e) {
-      return err((e as Error).message, 500);
+      return handleError(e);
     }
   }
 
@@ -104,7 +105,7 @@ export async function GET(req: NextRequest) {
     try {
       return NextResponse.json({ dirs: collectDirectories(getFileTree()) });
     } catch (e) {
-      return err((e as Error).message, 500);
+      return handleError(e);
     }
   }
 
@@ -126,7 +127,7 @@ export async function GET(req: NextRequest) {
       }
       return NextResponse.json({ conflicts });
     } catch (e) {
-      return err((e as Error).message, 500);
+      return handleError(e);
     }
   }
 
@@ -139,7 +140,7 @@ export async function GET(req: NextRequest) {
     // default: read_file
     return NextResponse.json({ content: getFileContent(filePath) });
   } catch (e) {
-    return err((e as Error).message, 500);
+    return handleError(e);
   }
 }
 
@@ -381,13 +382,13 @@ export async function POST(req: NextRequest) {
           };
           resp = NextResponse.json({ ok: true, path: spacePath });
         } catch (e) {
-          const msg = (e as Error).message;
-          const code400 =
+          const msg = e instanceof Error ? e.message : String(e);
+          const isClientError =
             msg.includes('required') ||
             msg.includes('must not contain') ||
             msg.includes('Invalid parent') ||
             msg.includes('already exists');
-          return err(msg, code400 ? 400 : 500);
+          return handleError(e, isClientError ? 400 : 500);
         }
         break;
       }
@@ -445,6 +446,6 @@ export async function POST(req: NextRequest) {
 
     return resp;
   } catch (e) {
-    return err((e as Error).message, 500);
+    return handleError(e);
   }
 }
