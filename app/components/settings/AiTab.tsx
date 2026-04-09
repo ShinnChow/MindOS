@@ -8,7 +8,7 @@ import { useLocale } from '@/lib/stores/locale-store';
 import { type ProviderId, PROVIDER_PRESETS, isProviderId, getApiKeyEnvVar, getDefaultBaseUrl } from '@/lib/agent/providers';
 import ProviderSelect from '@/components/shared/ProviderSelect';
 import ModelInput from '@/components/shared/ModelInput';
-import { type CustomProvider } from '@/lib/custom-endpoints';
+import { type CustomProvider, isCustomProviderId } from '@/lib/custom-endpoints';
 import { useCustomProviderForm, type TestResult } from './useCustomProviderForm';
 import CustomProviderFields from './CustomProviderFields';
 import { TestButton } from './TestButton';
@@ -150,8 +150,15 @@ export function AiTab({ data, updateAi, updateAgent, updateCustomProviders, t }:
           value={provider}
           onChange={id => {
             if (id !== 'skip') updateAi({ provider: id });
-            setCustomFormOpen(false);
-            setCustomEditingId(null);
+            // Custom provider → auto-open edit form so user sees its config
+            if (typeof id === 'string' && isCustomProviderId(id)) {
+              setCustomEditingId(id);
+              setCustomFormTemplate(undefined);
+              setCustomFormOpen(true);
+            } else {
+              setCustomFormOpen(false);
+              setCustomEditingId(null);
+            }
           }}
           compact
           configuredProviders={configuredProviders}
