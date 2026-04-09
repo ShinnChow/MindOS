@@ -70,6 +70,14 @@
 
 - [x] **Inbox Space + Quick Drop + Homepage Section + Batch AI Organize** — 用户可将文件直接拖拽到窗口快速保存到 Inbox，首页显示 Inbox 文件列表，一键触发 AI 整理。核心模块 `lib/core/inbox.ts`（ensureInboxSpace / listInboxFiles / saveToInbox）+ API route `/api/inbox` + `InboxSection` UI + SidebarLayout Quick Drop。21 项测试全覆盖。红队审查修复 3 项：O(n²) base64 编码、文件大小限制、content 校验。FileTree 中 Inbox Space 使用专属图标。
 
+### LLM Wiki 启发功能（Karpathy LLM Wiki Insights）
+
+- [x] **Feature 3: Bootstrap 增强（Smart Index）** — `buildFileIndex` 生成目录树 + 文件数 + 深度限制，`/api/bootstrap` 增加 `file_index` 字段。[spec](./specs/spec-llm-wiki-spike.md)
+- [x] **Feature 1: 查询回流（Save Insight）** — Ask 面板中 AI 回答气泡 hover 出现 Save 按钮，点击展开 inline 保存表单（路径/模式/预览），一键保存到知识库。Provider/Trigger 分离架构，13 个纯逻辑测试。红队修复 4 项。[spec](./specs/spec-save-insight.md)
+- [ ] Feature 2: 知识体检（KB Lint）— P1
+- [ ] Feature 4: 深度摄入（Ingest Ripple）— P2
+- [ ] Feature 5: 知识编译（Space Overview）— P3
+
 ### 🔴 高优先（下一批做）
 
 - [x] **清理生产代码 console.log** — `app/api/ask/route.ts`、`lib/agent/context.ts`、`lib/acp/subprocess.ts` 残留 `[ask]`/`[ACP]` debug 日志。已改为 `NODE_ENV === 'development'` 条件输出
