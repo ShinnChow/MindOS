@@ -391,8 +391,13 @@ export default function ProviderModelCapsule({
   /* ── Guards ── */
   if (!settingsData || configuredProviders.length === 0) return null;
 
-  const modelShort = (displayModel || '').length > 24
-    ? (displayModel || '').slice(0, 22) + '...' : displayModel;
+  const modelShort = (displayModel || '').length > 20
+    ? (displayModel || '').slice(0, 18) + '…' : displayModel;
+  // For built-in providers, use shortLabel; for custom, use truncated name
+  const providerDisplay = isCustomProviderId(String(activeProvider))
+    ? ((displayName || '').length > 10 ? (displayName || '').slice(0, 8) + '…' : displayName)
+    : (activePreset?.shortLabel || displayName);
+  const capsuleTooltip = `${displayName} · ${displayModel}`;
   const builtInIds = configuredProviders.filter(id => !isCustomProviderId(String(id)));
   const customIds = configuredProviders.filter(id => isCustomProviderId(String(id)));
   const hasModelOverride = !!(modelValue && modelValue !== defaultModel);
@@ -620,7 +625,7 @@ export default function ProviderModelCapsule({
         disabled={disabled}
         className={`
           inline-flex items-center gap-1 rounded-full px-2.5 py-0.5
-          text-2xs font-medium transition-colors select-none
+          text-2xs font-medium transition-colors select-none max-w-[220px]
           border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
           disabled:opacity-40 disabled:cursor-not-allowed
           ${providerValue || hasModelOverride
@@ -628,13 +633,13 @@ export default function ProviderModelCapsule({
             : 'bg-muted/50 border-border/50 text-muted-foreground hover:bg-muted hover:text-foreground'
           }
         `}
-        title={t.ask?.providerCapsule ?? 'Provider'}
+        title={capsuleTooltip}
         aria-expanded={open}
         aria-haspopup="listbox"
       >
         <Cpu size={11} className="shrink-0" />
-        <span className="truncate max-w-[160px]">
-          {displayName}
+        <span className="truncate">
+          {providerDisplay}
           <span className="text-muted-foreground"> · </span>
           <span className={hasModelOverride ? 'text-[var(--amber)]' : 'text-muted-foreground'}>{modelShort}</span>
         </span>
