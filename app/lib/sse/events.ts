@@ -25,14 +25,14 @@ export type MessageUpdateEvent = {
 
 export type ToolExecStartEvent = {
   type: 'tool_execution_start';
-  toolCallId?: string;
-  toolName?: string;
-  args?: unknown;
+  toolCallId: string;
+  toolName: string;
+  args: unknown;
 };
 
 export type ToolExecEndEvent = {
   type: 'tool_execution_end';
-  toolCallId?: string;
+  toolCallId: string;
   result?: { content?: Array<{ type: string; text?: string }> };
   isError?: boolean;
 };

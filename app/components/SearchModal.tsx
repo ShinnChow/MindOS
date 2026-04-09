@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, X, FileText, Table, Settings, RotateCcw, Moon, Sun, Bot, Compass, HelpCircle } from 'lucide-react';
+import { Search, X, FileText, Table, Settings, RotateCcw, Moon, Sun, Bot, Compass, HelpCircle, ChevronRight } from 'lucide-react';
 import { SearchResult } from '@/lib/types';
 import { encodePath } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
@@ -32,8 +32,16 @@ function highlightSnippet(snippet: string, query: string): React.ReactNode {
   const pattern = new RegExp(`(${escaped.join('|')})`, 'gi');
   const parts = snippet.split(pattern);
   return parts.map((part, i) =>
-    pattern.test(part) ? <mark key={i} className="bg-yellow-300/40 text-foreground rounded-sm px-0.5">{part}</mark> : part
+    pattern.test(part) ? <mark key={i} className="bg-[var(--amber)]/25 text-foreground rounded-sm px-0.5">{part}</mark> : part
   );
+}
+
+/** Format file path as breadcrumb for cleaner display */
+function formatPath(fullPath: string): { name: string; breadcrumb: string[] } {
+  const parts = fullPath.split('/').filter(Boolean);
+  const name = parts[parts.length - 1];
+  const breadcrumb = parts.slice(0, -1);
+  return { name, breadcrumb };
 }
 
 export default function SearchModal({ open, onClose }: SearchModalProps) {
@@ -43,6 +51,7 @@ export default function SearchModal({ open, onClose }: SearchModalProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [tab, setTab] = useState<PaletteTab>('search');
   const [actionIndex, setActionIndex] = useState(0);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
@@ -51,6 +60,20 @@ export default function SearchModal({ open, onClose }: SearchModalProps) {
   const { t } = useLocale();
 
   const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+
+  // Drag and drop handlers
+  const handleDragStart = useCallback((e: React.DragEvent<HTMLButtonElement>, result: SearchResult) => {
+    e.dataTransfer.effectAllowed = 'copy';
+    // Use the same data format as MindOS knowledge base drag-drop
+    e.dataTransfer.setData('text/mindos-path', result.path);
+    e.dataTransfer.setData('text/mindos-type', 'file');
+    const dragImg = new Image();
+    e.dataTransfer.setDragImage(dragImg, 0, 0);
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedIndex(null);
+  }, []);
 
   const actions: CommandAction[] = useMemo(() => [
     {
@@ -246,23 +269,27 @@ export default function SearchModal({ open, onClose }: SearchModalProps) {
         {/* Search tab */}
         {tab === 'search' && (
           <>
-            {/* Search input */}
+            {/* Search input - IMPROVED */}
             <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-              <Search size={16} className="text-muted-foreground shrink-0" />
+              <Search size={16} className="text-muted-foreground shrink-0 flex-none" />
               <input
                 ref={inputRef}
                 type="text"
                 value={query}
                 onChange={handleChange}
                 placeholder={t.search.placeholder}
-                className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground text-sm outline-none"
+                className="flex-1 bg-transparent text-foreground text-base font-medium placeholder:text-muted-foreground/60 outline-none"
               />
               {loading && (
-                <div className="w-4 h-4 border-2 border-muted-foreground/40 border-t-foreground rounded-full animate-spin shrink-0" />
+                <div className="w-4 h-4 border-2 border-muted-foreground/30 border-t-foreground rounded-full animate-spin shrink-0 flex-none" />
               )}
               {!loading && query && (
-                <button onClick={() => { setQuery(''); setResults([]); inputRef.current?.focus(); }}>
-                  <X size={14} className="text-muted-foreground hover:text-foreground" />
+                <button 
+                  onClick={() => { setQuery(''); setResults([]); inputRef.current?.focus(); }}
+                  className="shrink-0 flex-none p-1 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Clear search"
+                >
+                  <X size={16} />
                 </button>
               )}
               <kbd className="hidden md:inline text-xs text-muted-foreground border border-border rounded px-1.5 py-0.5 font-mono">ESC</kbd>
@@ -270,45 +297,106 @@ export default function SearchModal({ open, onClose }: SearchModalProps) {
 
             {/* Results */}
             <div ref={resultsRef} className="max-h-[50vh] md:max-h-80 overflow-y-auto flex-1">
+              {/* Empty state */}
+              {results.length === 0 && !query && !loading && (
+                <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-muted mb-4">
+                    <Search size={20} className="text-muted-foreground/60" />
+                  </div>
+                  <h3 className="text-sm font-medium text-foreground mb-1">快速查找你的笔记</h3>
+                  <p className="text-xs text-muted-foreground/70">开始输入文件名或内容关键词</p>
+                </div>
+              )}
+
+              {/* No results state */}
               {results.length === 0 && query && !loading && (
-                <div className="px-4 py-8 text-center text-sm text-muted-foreground">{t.search.noResults}</div>
+                <div className="flex flex-col items-center justify-center px-4 py-12 text-center">
+                  <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-muted mb-4">
+                    <Search size={20} className="text-muted-foreground/60" />
+                  </div>
+                  <h3 className="text-sm font-medium text-foreground mb-1">未找到匹配的文件</h3>
+                  <p className="text-xs text-muted-foreground/70">尝试其他关键词</p>
+                </div>
               )}
-              {results.length === 0 && !query && (
-                <div className="px-4 py-8 text-center text-sm text-muted-foreground/60">{t.search.prompt}</div>
+
+              {/* Loading skeleton cards */}
+              {loading && results.length === 0 && (
+                <div className="space-y-2 p-3">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="px-3 py-2.5 space-y-2 animate-pulse">
+                      <div className="h-4 bg-muted rounded-md w-3/4" />
+                      <div className="h-3 bg-muted rounded-md w-1/2" />
+                      <div className="h-3 bg-muted rounded-md w-2/3" />
+                    </div>
+                  ))}
+                </div>
               )}
+
+              {/* Results list - IMPROVED */}
               {results.map((result, i) => {
                 const ext = result.path.endsWith('.csv') ? '.csv' : '.md';
-                const parts = result.path.split('/');
-                const fileName = parts[parts.length - 1];
-                const dirPath = parts.slice(0, -1).join('/');
+                const { name, breadcrumb } = formatPath(result.path);
+                const isSelected = i === selectedIndex;
+                const isDragging = i === draggedIndex;
+
                 return (
                   <button
                     key={result.path}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, result)}
+                    onDragEnd={(e) => handleDragEnd(e)}
+                    onDragEnter={() => setDraggedIndex(i)}
+                    onDragLeave={() => setDraggedIndex(null)}
                     onClick={() => navigate(result)}
                     onMouseEnter={() => setSelectedIndex(i)}
                     className={`
-                      w-full px-4 py-3 flex items-start gap-3 text-left transition-colors duration-75
-                      ${i === selectedIndex ? 'bg-muted' : 'hover:bg-muted/50'}
-                      ${i < results.length - 1 ? 'border-b border-border' : ''}
+                      w-full px-3 py-2.5 flex items-start gap-3 text-left transition-colors duration-100
+                      ${isSelected ? 'bg-[var(--amber-dim)] border-l-2 border-[var(--amber)]' : 'border-l-2 border-transparent'}
+                      ${isDragging ? 'bg-muted/70' : isSelected ? '' : 'hover:bg-muted/60'}
+                      ${i < results.length - 1 ? 'border-b border-border/50' : ''}
                     `}
                   >
-                    {ext === '.csv'
-                      ? <Table size={14} className="text-success shrink-0 mt-0.5" />
-                      : <FileText size={14} className="text-muted-foreground shrink-0 mt-0.5" />
-                    }
+                    {/* File icon */}
+                    <div className="shrink-0 flex-none mt-0.5">
+                      {ext === '.csv'
+                        ? <Table size={14} className="text-success" />
+                        : <FileText size={14} className="text-muted-foreground" />
+                      }
+                    </div>
+
+                    {/* Content */}
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline gap-2 flex-wrap">
-                        <span className="text-sm text-foreground font-medium truncate" title={fileName}>{fileName}</span>
-                        {dirPath && (
-                          <span className="text-xs text-muted-foreground truncate" title={dirPath}>{dirPath}</span>
-                        )}
+                      {/* File name - elevated */}
+                      <div className="text-sm font-semibold text-foreground truncate" title={name}>
+                        {name}
                       </div>
+
+                      {/* Breadcrumb path - muted */}
+                      {breadcrumb.length > 0 && (
+                        <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground/70 truncate">
+                          {breadcrumb.map((part, idx) => (
+                            <span key={idx} className="flex items-center gap-1">
+                              {idx > 0 && <ChevronRight size={10} className="shrink-0 flex-none" />}
+                              <span className="truncate">{part}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Content snippet - muted and small */}
                       {result.snippet && (
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed" title={result.snippet}>
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed" title={result.snippet}>
                           {highlightSnippet(result.snippet, query)}
                         </p>
                       )}
                     </div>
+
+                    {/* Drag hint for mobile/desktop */}
+                    {isSelected && !isDragging && (
+                      <div className="hidden md:flex shrink-0 flex-none text-[10px] text-muted-foreground/50 font-mono pt-0.5">
+                        ⬆ Drag
+                      </div>
+                    )}
                   </button>
                 );
               })}
@@ -316,10 +404,13 @@ export default function SearchModal({ open, onClose }: SearchModalProps) {
 
             {/* Footer — desktop only */}
             {results.length > 0 && (
-              <div className="hidden md:flex px-4 py-2 border-t border-border items-center gap-3 text-xs text-muted-foreground/60">
-                <span><kbd className="font-mono">↑↓</kbd> {t.search.navigate}</span>
-                <span><kbd className="font-mono">↵</kbd> {t.search.open}</span>
-                <span><kbd className="font-mono">ESC</kbd> {t.search.close}</span>
+              <div className="hidden md:flex px-4 py-2 border-t border-border/50 items-center gap-2 text-xs text-muted-foreground/60">
+                <span><kbd className="font-mono text-[10px] px-1 py-0.5 bg-muted/40 rounded">↑↓</kbd> {t.search.navigate}</span>
+                <span><kbd className="font-mono text-[10px] px-1 py-0.5 bg-muted/40 rounded">↵</kbd> {t.search.open}</span>
+                <span className="text-muted-foreground/40 mx-0.5">•</span>
+                <span><kbd className="font-mono text-[10px] px-1 py-0.5 bg-muted/40 rounded">Drag</kbd> to chat</span>
+                <span className="text-muted-foreground/40 mx-0.5">•</span>
+                <span><kbd className="font-mono text-[10px] px-1 py-0.5 bg-muted/40 rounded">ESC</kbd> {t.search.close}</span>
               </div>
             )}
           </>
