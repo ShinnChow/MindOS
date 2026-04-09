@@ -97,7 +97,6 @@ export function AiTab({ data, updateAi, updateAgent, updateCustomProviders, t }:
   const activeApiKey = currentConfig.apiKey;
   const activeEnvKey = envKeyName ? env[envKeyName] : false;
   const hasFallbackKey = !!preset?.apiKeyFallback;
-  const missingApiKey = !activeApiKey && !activeEnvKey && !hasFallbackKey;
 
   const configuredProviders = new Set(
     Object.entries(data.ai.providers ?? {})
@@ -335,13 +334,7 @@ export function AiTab({ data, updateAi, updateAgent, updateCustomProviders, t }:
           </div>
         )}
 
-        {/* Inline warnings — hidden when form is open */}
-        {!customFormOpen && missingApiKey && (
-          <div className="flex items-start gap-2 text-xs text-destructive/80 bg-destructive/8 border border-destructive/20 rounded-lg px-3 py-2.5">
-            <AlertCircle size={13} className="shrink-0 mt-0.5" />
-            <span>{t.settings.ai.noApiKey}</span>
-          </div>
-        )}
+        {/* Env override hint — only when env vars are active */}
         {!customFormOpen && Object.values(env).some(Boolean) && (
           <div className="flex items-start gap-2 text-xs text-[var(--amber)] bg-[var(--amber-subtle)] border border-[var(--amber)]/20 rounded-lg px-3 py-2.5">
             <AlertCircle size={13} className="shrink-0 mt-0.5" />

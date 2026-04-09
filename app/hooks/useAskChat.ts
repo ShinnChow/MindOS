@@ -55,47 +55,63 @@ export function useAskChat({
   const abortRef = useRef<AbortController | null>(null);
   const firstMessageFired = useRef(false);
 
-  // Track the pending message so it can be retracted on stop
+  // Track the pending user message so we can retract it on stop.
+  // `userMessageIndex` is the index of the *user* message inside the messages
+  // array (the assistant placeholder sits at userMessageIndex + 1).
   const pendingMessageRef = useRef<{
-    messageIndex: number;
+    userMessageIndex: number;
     userMessage: Message;
   } | null>(null);
 
+  // When true the AbortError handler in submit() skips its own setMessages
+  // because stop() already cleaned up the messages array.
+  const retractedRef = useRef(false);
+
   const stop = useCallback(() => {
-    abortRef.current?.abort();
-    
-    // Retract the pending message if it hasn't been replied to yet
     const pending = pendingMessageRef.current;
+
+    // Decide whether to retract *before* aborting so we can inspect
+    // the messages array while it is still in its pre-abort state.
+    let shouldRetract = false;
     if (pending) {
+      const msgs = refs.sessionRef.current?.messages;
+      if (msgs) {
+        const assistantMsg = msgs[pending.userMessageIndex + 1];
+        const assistantHasContent = assistantMsg?.role === 'assistant' &&
+          (assistantMsg.content.trim() || (assistantMsg.parts && assistantMsg.parts.length > 0));
+        shouldRetract = !assistantHasContent;
+      }
+    }
+
+    // Now abort the fetch.
+    abortRef.current?.abort();
+
+    if (pending && shouldRetract) {
+      retractedRef.current = true;
+
+      // Remove user message + empty assistant placeholder from the messages array.
       refs.sessionRef.current?.setMessages(prev => {
         const updated = [...prev];
-        
-        // Check if there's an assistant message after the user message
-        const assistantMsgAtIndex = updated[pending.messageIndex + 1];
-        const assistantHasContent = assistantMsgAtIndex?.role === 'assistant' && 
-          (assistantMsgAtIndex.content.trim() || (assistantMsgAtIndex.parts && assistantMsgAtIndex.parts.length > 0));
-        
-        // Only retract if assistant message is empty (no response yet)
-        if (!assistantHasContent) {
-          // Remove the user message at messageIndex
-          if (updated[pending.messageIndex]?.role === 'user') {
-            updated.splice(pending.messageIndex, 1);
-          }
-          // Remove the empty assistant placeholder if it's now at messageIndex
-          if (updated[pending.messageIndex]?.role === 'assistant' && 
-              !updated[pending.messageIndex].content.trim() &&
-              (!updated[pending.messageIndex].parts || updated[pending.messageIndex].parts!.length === 0)) {
-            updated.splice(pending.messageIndex, 1);
-          }
+        const idx = pending.userMessageIndex;
+
+        // Remove assistant placeholder first (it sits at idx + 1).
+        if (updated[idx + 1]?.role === 'assistant' &&
+            !updated[idx + 1].content.trim() &&
+            (!updated[idx + 1].parts || updated[idx + 1].parts!.length === 0)) {
+          updated.splice(idx + 1, 1);
         }
-        
+
+        // Remove the user message.
+        if (updated[idx]?.role === 'user') {
+          updated.splice(idx, 1);
+        }
+
         return updated;
       });
-      
-      // Restore input with the original message content
+
+      // Restore text (+ attachments) back into the input box.
       onRestoreInput?.(pending.userMessage);
-      
-      // Clear pending message ref
+
       pendingMessageRef.current = null;
     }
   }, [refs, onRestoreInput]);
@@ -132,11 +148,16 @@ export function useAskChat({
     };
     img.clearImages();
     const requestMessages = [...sess.messages, userMsg];
-    
-    // Track the message index for potential retraction on stop
-    const messageIndex = requestMessages.length;
-    pendingMessageRef.current = { messageIndex, userMessage: userMsg };
-    
+
+    // Track the user message index for potential retraction on stop.
+    // The user message is at requestMessages.length - 1; the assistant
+    // placeholder we're about to insert will be at requestMessages.length.
+    pendingMessageRef.current = {
+      userMessageIndex: requestMessages.length - 1,
+      userMessage: userMsg,
+    };
+    retractedRef.current = false;
+
     sess.setMessages([...requestMessages, { role: 'assistant', content: '', timestamp: Date.now() }]);
 
     resetInputState();
@@ -248,7 +269,7 @@ export function useAskChat({
               return updated;
             });
           }
-          // Successfully received response, clear pending message
+          // Successfully received response — no longer retractable.
           pendingMessageRef.current = null;
           return;
         } catch (err) {
@@ -261,18 +282,21 @@ export function useAskChat({
       if (lastError) throw lastError;
     } catch (err) {
       if ((err as Error).name === 'AbortError') {
-        refs.sessionRef.current?.setMessages(prev => {
-          const updated = [...prev];
-          const lastIdx = updated.length - 1;
-          if (lastIdx >= 0 && updated[lastIdx].role === 'assistant') {
-            const last = updated[lastIdx];
-            const hasContent = last.content.trim() || (last.parts && last.parts.length > 0);
-            if (!hasContent) {
-              updated[lastIdx] = { role: 'assistant', content: `__error__${errorLabels.stopped}` };
+        // If stop() already retracted the messages, skip writing __error__stopped.
+        if (!retractedRef.current) {
+          refs.sessionRef.current?.setMessages(prev => {
+            const updated = [...prev];
+            const lastIdx = updated.length - 1;
+            if (lastIdx >= 0 && updated[lastIdx].role === 'assistant') {
+              const last = updated[lastIdx];
+              const hasContent = last.content.trim() || (last.parts && last.parts.length > 0);
+              if (!hasContent) {
+                updated[lastIdx] = { role: 'assistant', content: `__error__${errorLabels.stopped}` };
+              }
             }
-          }
-          return updated;
-        });
+            return updated;
+          });
+        }
       } else {
         const errMsg = err instanceof Error ? err.message : 'Something went wrong';
         refs.sessionRef.current?.setMessages(prev => {
@@ -293,6 +317,7 @@ export function useAskChat({
       setIsLoading(false);
       setReconnectAttempt(0);
       abortRef.current = null;
+      pendingMessageRef.current = null;
     }
   }, [currentFile, chatMode, providerOverride, errorLabels.noResponse, errorLabels.stopped, onFirstMessage, refs, resetInputState]);
 
