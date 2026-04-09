@@ -4,7 +4,7 @@ import os from 'os';
 import path from 'path';
 
 import { parseSkillMd, readSkillContentByName } from '@/lib/pi-integration/skills';
-import { generateSkillsXml } from '@/app/api/ask/route';
+import { generateSkillsXml } from '@/lib/agent/skills-xml';
 
 let tempRoot: string;
 let projectRoot: string;

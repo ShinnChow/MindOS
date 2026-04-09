@@ -11,12 +11,14 @@ import {
   DefaultResourceLoader,
   ModelRegistry,
   type ToolDefinition,
+  type Skill,
   SessionManager,
   SettingsManager,
   bashTool,
 } from '@mariozechner/pi-coding-agent';
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { getFileContent, getMindRoot, collectAllFiles } from '@/lib/fs';
 import { getModelConfig, hasImages } from '@/lib/agent/model';
@@ -52,36 +54,12 @@ import {
   resolveSkillFile,
   resolveSkillReference,
 } from '@/lib/agent/skill-resolver';
+import { generateSkillsXml } from '@/lib/agent/skills-xml';
 import { runNonStreamingFallback } from '@/lib/agent/non-streaming';
 
 const MAX_DIR_FILES = 30;
 
-function escapeXml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
-}
-
-/**
- * Generate <available_skills> XML for third-party skills.
- * Instructs the LLM to use `load_skill` (not the framework's `read` tool).
- * Omits <location> since load_skill resolves by name.
- */
-export function generateSkillsXml(skills: Array<{ name: string; description: string }>): string {
-  const lines = [
-    'The following skills provide specialized instructions for specific tasks.',
-    'Use the load_skill tool to load a skill\'s full content when a task matches its description.',
-    '',
-    '<available_skills>',
-  ];
-  for (const skill of skills) {
-    lines.push('  <skill>');
-    lines.push(`    <name>${escapeXml(skill.name)}</name>`);
-    lines.push(`    <description>${escapeXml(skill.description)}</description>`);
-    lines.push('  </skill>');
-  }
-  lines.push('</available_skills>');
-  return lines.join('\n');
-}
+// generateSkillsXml is in lib/agent/skills-xml.ts (not inline: Next.js route export constraints)
 
 /**
  * Load attached and current files into context parts for the system prompt.
@@ -653,14 +631,15 @@ export async function POST(req: NextRequest) {
       systemPromptOverride: () => systemPrompt,
       appendSystemPromptOverride: () => [],
       agentsFilesOverride: () => ({ agentsFiles: [] }),
-      skillsOverride: (result: any) => ({
+      skillsOverride: (result) => ({
         ...result,
-        skills: result.skills.filter((s: any) => !CORE_SKILL_NAMES.has(s.name)),
+        skills: result.skills.filter((s) => !CORE_SKILL_NAMES.has(s.name)),
       }),
       additionalSkillPaths: [
         path.join(projectRoot, 'app', 'data', 'skills'),
         path.join(projectRoot, 'skills'),
         path.join(getMindRoot(), '.skills'),
+        path.join(os.homedir(), '.mindos', 'skills'),
       ],
       additionalExtensionPaths: scanExtensionPaths(),
     });
@@ -669,13 +648,15 @@ export async function POST(req: NextRequest) {
     // Inject third-party skill list into system prompt (agent mode only).
     // Core skills are already injected as full content; third-party skills
     // get a name+description summary so the LLM can discover and load them.
+    // Must reload() again because the closure captured systemPrompt before mutation.
     if (askMode === 'agent') {
       const { skills: discoveredSkills } = resourceLoader.getSkills();
       const thirdPartySkills = discoveredSkills.filter(
-        (s: any) => !s.disableModelInvocation
+        (s: Skill) => !s.disableModelInvocation
       );
       if (thirdPartySkills.length > 0) {
         systemPrompt += '\n\n---\n\n' + generateSkillsXml(thirdPartySkills);
+        await resourceLoader.reload();
       }
     }
 

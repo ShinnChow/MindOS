@@ -30,7 +30,7 @@ export function CsvRenderer({ filePath, content, saveAction }: RendererContext) 
   const view = cfg.activeView;
 
   return (
-    <div className="max-w-[1100px] mx-auto px-0 py-2">
+    <div className="w-full py-2">
       {/* Toolbar */}
       <div className="flex items-center gap-2 mb-4 relative">
         <div className="flex items-center gap-0.5 p-1 rounded-lg" style={{ background: 'var(--muted)' }}>

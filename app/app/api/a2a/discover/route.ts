@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { discoverAgent } from '@/lib/a2a/client';
+import { handleRouteErrorSimple } from '@/lib/errors';
 
 export async function POST(req: Request) {
   try {
@@ -17,9 +18,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ agent });
   } catch (err) {
-    return NextResponse.json(
-      { error: (err as Error).message, agent: null },
-      { status: 500 },
-    );
+    return handleRouteErrorSimple(err);
   }
 }

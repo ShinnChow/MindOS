@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextResponse } from 'next/server';
 import { exec } from 'child_process';
+import { handleRouteErrorSimple } from '@/lib/errors';
 
 interface InstallRequest {
   agentId: string;
@@ -43,9 +44,5 @@ export async function POST(request: Request) {
       packageName: body.packageName,
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: (err as Error).message },
-      { status: 500 },
-    );
+    return handleRouteErrorSimple(err);
   }
-}
