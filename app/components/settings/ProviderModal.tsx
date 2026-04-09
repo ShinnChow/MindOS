@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { X, AlertCircle, Loader2 } from 'lucide-react';
+import { X, AlertCircle, Loader2, Check } from 'lucide-react';
 import { useLocale } from '@/lib/stores/locale-store';
 import { type Messages } from '@/lib/i18n';
 import { type CustomProvider, generateCustomProviderId } from '@/lib/custom-endpoints';
 import { PROVIDER_PRESETS, type ProviderId, groupedProviders } from '@/lib/agent/providers';
-import { Field, Input, Select } from './Primitives';
+import { Field, Input, Select, PasswordInput } from './Primitives';
 import ProviderSelect from '@/components/shared/ProviderSelect';
 import ModelInput from '@/components/shared/ModelInput';
 
@@ -33,7 +33,6 @@ export default function ProviderModal({
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
   const [testState, setTestState] = useState<TestState>('idle');
   const [testError, setTestError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -70,12 +69,11 @@ export default function ProviderModal({
       const res = await fetch('/api/settings/test-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: initialProvider?.id ?? baseProviderId,
-          apiKey,
-          model,
-          baseUrl,
-        }),
+        body: JSON.stringify(
+          initialProvider?.id
+            ? { provider: initialProvider.id, apiKey, model, baseUrl }
+            : { baseProviderId, apiKey, model, baseUrl },
+        ),
       });
 
       const json = await res.json();
@@ -188,21 +186,11 @@ export default function ProviderModal({
             label={t.settings?.customProviders?.modal?.fieldApiKey ?? 'API Key'}
             hint={t.settings?.customProviders?.modal?.fieldApiKeyHint}
           >
-            <div className="flex gap-2 items-center">
-              <Input
-                type={showApiKey ? 'text' : 'password'}
-                value={apiKey}
-                onChange={e => setApiKey(e.target.value)}
-                placeholder="••••••••"
-              />
-              <button
-                type="button"
-                onClick={() => setShowApiKey(!showApiKey)}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1"
-              >
-                {showApiKey ? 'Hide' : 'Show'}
-              </button>
-            </div>
+            <PasswordInput
+              value={apiKey}
+              onChange={setApiKey}
+              placeholder="sk-..."
+            />
           </Field>
 
           {/* Model */}
@@ -229,13 +217,6 @@ export default function ProviderModal({
               <span>{testError}</span>
             </div>
           )}
-
-          {/* Success message */}
-          {testState === 'ok' && (
-            <div className="flex items-center gap-2 text-xs text-success bg-success/10 border border-success/20 rounded-lg px-3 py-2">
-              <span>✓ {t.settings?.customProviders?.modal?.success ?? 'Connected'}</span>
-            </div>
-          )}
         </div>
 
         {/* Buttons */}
@@ -252,12 +233,20 @@ export default function ProviderModal({
             type="button"
             onClick={handleTest}
             disabled={isSaving || testState === 'testing'}
-            className="flex-1 px-3 py-2 text-sm rounded border border-border text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors disabled:opacity-40 inline-flex items-center justify-center gap-1"
+            className={`flex-1 px-3 py-2 text-sm rounded inline-flex items-center justify-center gap-1 transition-all duration-200 ${
+              testState === 'ok'
+                ? 'bg-success/10 text-success border border-success/20'
+                : 'border border-border text-muted-foreground hover:text-foreground hover:border-foreground/20 disabled:opacity-40'
+            }`}
           >
-            {testState === 'testing' && <Loader2 size={12} className="animate-spin" />}
+            {testState === 'testing' ? <Loader2 size={12} className="animate-spin" />
+              : testState === 'ok' ? <Check size={13} />
+              : null}
             {testState === 'testing'
               ? (t.settings?.customProviders?.modal?.validating ?? 'Testing...')
-              : (t.settings?.customProviders?.modal?.buttonSave ?? 'Save & Test')}
+              : testState === 'ok'
+                ? (t.settings?.customProviders?.modal?.success ?? 'Connected')
+                : (t.settings?.customProviders?.modal?.buttonSave ?? 'Save & Test')}
           </button>
           <button
             type="button"

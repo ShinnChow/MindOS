@@ -26,6 +26,51 @@ export function Input({ className = '', ...props }: React.InputHTMLAttributes<HT
   );
 }
 
+/**
+ * Password/secret input with inline eye toggle.
+ * Eye only shows when input has content. Icon sits inside the border.
+ */
+export function PasswordInput({ value, onChange, placeholder, disabled, className = '', size = 'md' }: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  className?: string;
+  size?: 'sm' | 'md';
+}) {
+  const [show, setShow] = useState(false);
+  const sm = size === 'sm';
+  return (
+    <div className={`flex items-center border border-border rounded-lg bg-background focus-within:ring-1 focus-within:ring-ring overflow-hidden ${className}`}>
+      <input
+        type={show ? 'text' : 'password'}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder ?? '••••••••'}
+        disabled={disabled}
+        className={`flex-1 bg-transparent text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50 ${
+          sm ? 'px-2.5 py-1.5 text-xs font-mono' : 'px-3 py-2 text-sm'
+        }`}
+      />
+      {!!value && (
+        <button
+          type="button"
+          tabIndex={-1}
+          onMouseDown={e => e.preventDefault()}
+          onClick={() => setShow(v => !v)}
+          disabled={disabled}
+          className={`shrink-0 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 ${
+            sm ? 'p-1.5' : 'p-2'
+          }`}
+          title={show ? 'Hide' : 'Show'}
+        >
+          {show ? <EyeOff size={sm ? 14 : 16} /> : <Eye size={sm ? 14 : 16} />}
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface SelectOption { value: string; label: string }
 
 export function Select({ value, onChange, children, className = '', disabled }: {

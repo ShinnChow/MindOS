@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { AlertCircle, Loader2, Sparkles, Bot, Monitor, ExternalLink, RotateCcw, Check, Zap, X, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Loader2, Sparkles, Bot, Monitor, ExternalLink, RotateCcw, Check, Zap, X } from 'lucide-react';
 import type { AiSettings, AgentSettings, ProviderConfig, SettingsData, AiTabProps } from './types';
-import { Field, Select, Input, EnvBadge, ApiKeyInput, Toggle, SettingCard, SettingRow } from './Primitives';
+import { Field, Select, Input, PasswordInput, EnvBadge, ApiKeyInput, Toggle, SettingCard, SettingRow } from './Primitives';
 import { useLocale } from '@/lib/stores/locale-store';
 import { type ProviderId, PROVIDER_PRESETS, isProviderId, getApiKeyEnvVar, getDefaultBaseUrl } from '@/lib/agent/providers';
 import ProviderSelect from '@/components/shared/ProviderSelect';
@@ -461,7 +461,6 @@ function CustomProviderForm({
   const [apiKey, setApiKey] = useState(initial?.apiKey === '***set***' ? '' : initial?.apiKey ?? '');
   const [model, setModel] = useState(initial?.model ?? '');
   const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? '');
-  const [showApiKey, setShowApiKey] = useState(false);
   const [testState, setTestState] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
   const [testError, setTestError] = useState('');
 
@@ -476,7 +475,11 @@ function CustomProviderForm({
       const res = await fetch('/api/settings/test-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: initial?.id ?? baseProviderId, apiKey, model, baseUrl }),
+        body: JSON.stringify(
+          initial?.id
+            ? { provider: initial.id, apiKey, model, baseUrl }
+            : { baseProviderId, apiKey, model, baseUrl },
+        ),
       });
       const json = await res.json();
       if (json.ok) setTestState('ok');
@@ -567,23 +570,11 @@ function CustomProviderForm({
         <Field
           label={<>{t.settings?.customProviders?.modal?.fieldApiKey ?? 'API Key'} <span className="text-muted-foreground/50 font-normal">{locale === 'zh' ? '(可选)' : '(optional)'}</span></>}
         >
-          <div className="flex items-center gap-2">
-            <Input
-              type={showApiKey ? 'text' : 'password'}
-              value={apiKey}
-              onChange={e => setApiKey(e.target.value)}
-              placeholder="sk-..."
-              className="flex-1"
-            />
-            <button
-              type="button"
-              onClick={() => setShowApiKey(!showApiKey)}
-              className="shrink-0 p-2 text-muted-foreground hover:text-foreground transition-colors"
-              title={showApiKey ? 'Hide' : 'Show'}
-            >
-              {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
+          <PasswordInput
+            value={apiKey}
+            onChange={setApiKey}
+            placeholder="sk-..."
+          />
         </Field>
 
         {/* Model */}
@@ -602,17 +593,11 @@ function CustomProviderForm({
           />
         </Field>
 
-        {/* Feedback */}
+        {/* Feedback — error only, success is shown in test button */}
         {testError && testState !== 'ok' && (
           <div className="flex items-start gap-2 text-xs text-destructive/80 bg-destructive/8 border border-destructive/20 rounded-lg px-3 py-2">
             <AlertCircle size={13} className="shrink-0 mt-0.5" />
             <span>{testError}</span>
-          </div>
-        )}
-        {testState === 'ok' && (
-          <div className="flex items-center gap-2 text-xs text-success bg-success/10 border border-success/20 rounded-lg px-3 py-2">
-            <Check size={13} />
-            <span>{t.settings?.customProviders?.modal?.success ?? 'Connected'}</span>
           </div>
         )}
 
@@ -622,10 +607,20 @@ function CustomProviderForm({
             type="button"
             onClick={handleTest}
             disabled={!canSave || testState === 'testing'}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-border text-muted-foreground hover:text-foreground hover:border-foreground/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-all duration-200 disabled:cursor-not-allowed ${
+              testState === 'ok'
+                ? 'bg-success/10 text-success border border-success/20'
+                : 'border border-border text-muted-foreground hover:text-foreground hover:border-foreground/20 disabled:opacity-40'
+            }`}
           >
-            {testState === 'testing' ? <Loader2 size={12} className="animate-spin" /> : <Zap size={13} />}
-            {testState === 'testing' ? t.settings.ai.testKeyTesting : t.settings.ai.testKey}
+            {testState === 'testing' ? <Loader2 size={12} className="animate-spin" />
+              : testState === 'ok' ? <Check size={13} />
+              : <Zap size={13} />}
+            {testState === 'testing'
+              ? t.settings.ai.testKeyTesting
+              : testState === 'ok'
+                ? (t.settings?.customProviders?.modal?.success ?? 'Connected')
+                : t.settings.ai.testKey}
           </button>
 
           <div className="flex-1">

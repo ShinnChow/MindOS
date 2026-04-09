@@ -40,12 +40,46 @@ function classifyPiAiError(err: unknown): { code: ErrorCode; error: string } {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { provider, apiKey, model, baseUrl } = body as {
+    const { provider, apiKey, model, baseUrl, baseProviderId } = body as {
       provider?: string;
       apiKey?: string;
       model?: string;
       baseUrl?: string;
+      /** When set, run an inline test using only the supplied params (no settings fallback). */
+      baseProviderId?: string;
     };
+
+    // Inline test for unsaved custom providers — uses only the supplied params.
+    if (baseProviderId && isProviderId(baseProviderId)) {
+      if (!apiKey) {
+        return NextResponse.json({ ok: false, code: 'auth_error', error: 'No API key configured' });
+      }
+      if (!model) {
+        return NextResponse.json({ ok: false, code: 'unknown', error: 'Model is required' }, { status: 400 });
+      }
+      const start = Date.now();
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), TIMEOUT);
+      try {
+        const { model: piModel } = getModelConfig({
+          provider: baseProviderId as ProviderId,
+          apiKey,
+          model,
+          baseUrl: baseUrl || undefined,
+        });
+        await complete(piModel, {
+          messages: [{ role: 'user', content: 'hi', timestamp: Date.now() }],
+        }, {
+          apiKey,
+          signal: ctrl.signal,
+        });
+        return NextResponse.json({ ok: true, latency: Date.now() - start });
+      } catch (e) {
+        return NextResponse.json({ ok: false, ...classifyPiAiError(e) });
+      } finally {
+        clearTimeout(timer);
+      }
+    }
 
     // Support custom provider IDs (cp_*)
     if (provider && isCustomProviderId(provider)) {
