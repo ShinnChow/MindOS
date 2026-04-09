@@ -46,7 +46,7 @@ export async function aggregateDailyData(
     try {
       const changesRes = await apiFetch<{
         events: ContentChangeEvent[];
-      }>('/api/changes', {
+      }>('/api/changes?op=list&limit=1000', {
         method: 'GET',
         timeout: 5000,
       });
