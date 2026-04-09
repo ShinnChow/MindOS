@@ -195,146 +195,92 @@ export function Toggle({ checked, onChange, size = 'md', disabled, title, onClic
   );
 }
 
-export function ApiKeyInput({ value, onChange, placeholder, disabled, labels }: {
+export function ApiKeyInput({ value, onChange, placeholder, disabled }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   disabled?: boolean;
-  labels?: { change?: string; cancel?: string };
+  labels?: { change?: string; cancel?: string }; // kept for backward compat, ignored
 }) {
   const isMasked = value === '***set***';
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [localValue, setLocalValue] = useState('');
+  const [editing, setEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const prevValueRef = useRef(value);
 
-  // Reset editing when the masked value identity changes (e.g. provider switch)
+  // Reset when external value changes (e.g. provider switch)
   useEffect(() => {
     if (prevValueRef.current !== value) {
       prevValueRef.current = value;
       setEditing(false);
-      setDraft('');
+      setLocalValue('');
       setShowPassword(false);
     }
   }, [value]);
 
-  const commitDraft = useCallback(() => {
-    if (draft.trim()) {
-      onChange(draft);
+  const displayValue = editing ? localValue : (isMasked ? '' : value);
+  const displayPlaceholder = isMasked && !editing ? '••••••••••••' : (placeholder ?? 'sk-...');
+  const hasContent = isMasked || !!value || (editing && !!localValue);
+
+  const handleFocus = () => {
+    if (isMasked && !editing) {
+      // User clicked into a masked field — enter edit mode but keep it empty
+      // so they can type a new key. The old key is preserved on server until they save.
+      setEditing(true);
+      setLocalValue('');
     }
-    setEditing(false);
-    setDraft('');
-    setShowPassword(false);
-  }, [draft, onChange]);
+  };
 
-  const cancelEdit = useCallback(() => {
-    setEditing(false);
-    setDraft('');
-    setShowPassword(false);
-  }, []);
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    if (isMasked || editing) {
+      setEditing(true);
+      setLocalValue(v);
+      if (v.trim()) {
+        onChange(v);
+      }
+    } else {
+      onChange(v);
+    }
+  };
 
-  const changeLabel = labels?.change ?? 'Change';
-  const cancelLabel = labels?.cancel ?? 'Cancel';
+  const handleBlur = () => {
+    // If user focused a masked field but typed nothing, exit edit mode
+    if (editing && !localValue.trim()) {
+      setEditing(false);
+      setLocalValue('');
+      setShowPassword(false);
+    }
+  };
 
-  const eyeButton = (
-    <button
-      type="button"
-      onClick={() => setShowPassword(v => !v)}
-      disabled={disabled}
-      className="shrink-0 p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors disabled:opacity-50"
-      title={showPassword ? 'Hide' : 'Show'}
-    >
-      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-    </button>
-  );
-
-  /*
-   * State A: Saved key (masked) — not editing
-   * Show: [••••••••] [Change]
-   * No eye icon — server masks the real key, nothing to reveal.
-   */
-  if (isMasked && !editing) {
-    return (
-      <div className="flex items-center gap-1.5">
-        <div className="flex-1 px-3 py-2 text-sm bg-muted/50 border border-border rounded-lg text-muted-foreground select-none tracking-widest">
-          ••••••••••••
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setDraft('');
-            setShowPassword(false);
-            setEditing(true);
-            requestAnimationFrame(() => inputRef.current?.focus());
-          }}
-          disabled={disabled}
-          className="shrink-0 px-3 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
-        >
-          {changeLabel}
-        </button>
-      </div>
-    );
-  }
-
-  /*
-   * State B: Editing saved key — replacing a masked key
-   * Show: [input] [👁] [Cancel]
-   * Eye lets user verify the new key they're typing.
-   */
-  if (editing) {
-    return (
-      <div className="flex items-center gap-1.5">
-        <div className="flex flex-1 items-center border border-border rounded-lg bg-background focus-within:ring-1 focus-within:ring-ring overflow-hidden">
-          <input
-            ref={inputRef}
-            type={showPassword ? 'text' : 'password'}
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') commitDraft(); }}
-            onBlur={e => {
-              // Don't commit if clicking cancel or eye button
-              if (e.relatedTarget?.closest('[data-api-key-action]')) return;
-              commitDraft();
-            }}
-            placeholder={placeholder ?? 'sk-...'}
-            disabled={disabled}
-            className="flex-1 px-3 py-2 text-sm bg-transparent text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50"
-          />
-          <span data-api-key-action>
-            {eyeButton}
-          </span>
-        </div>
-        <button
-          type="button"
-          data-api-key-action
-          onMouseDown={e => e.preventDefault()}
-          onClick={cancelEdit}
-          className="shrink-0 px-3 py-2 text-xs font-medium rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-        >
-          {cancelLabel}
-        </button>
-      </div>
-    );
-  }
-
-  /*
-   * State C: No saved key — fresh input
-   * Empty: plain input, no eye (nothing to see).
-   * Has value: [input] [👁] — eye lets user verify before saving.
-   */
   return (
     <div className="flex items-center border border-border rounded-lg bg-background focus-within:ring-1 focus-within:ring-ring overflow-hidden">
       <input
         ref={inputRef}
         type={showPassword ? 'text' : 'password'}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder ?? 'sk-...'}
+        value={displayValue}
+        onChange={handleChange}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        placeholder={displayPlaceholder}
         disabled={disabled}
-        className="flex-1 px-3 py-2 text-sm bg-transparent text-foreground placeholder:text-muted-foreground outline-none disabled:opacity-50"
+        className={`flex-1 px-3 py-2 text-sm bg-transparent text-foreground outline-none disabled:opacity-50 ${
+          isMasked && !editing ? 'placeholder:text-muted-foreground placeholder:tracking-widest' : 'placeholder:text-muted-foreground'
+        }`}
       />
-      {value && eyeButton}
+      {hasContent && (
+        <button
+          type="button"
+          onMouseDown={e => e.preventDefault()}
+          onClick={() => setShowPassword(v => !v)}
+          disabled={disabled}
+          className="shrink-0 p-2 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+          title={showPassword ? 'Hide' : 'Show'}
+        >
+          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      )}
     </div>
   );
 }

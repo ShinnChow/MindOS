@@ -196,7 +196,6 @@ export function AiTab({ data, updateAi, updateAgent, updateCustomProviders, t }:
               <ApiKeyInput
                 value={currentConfig.apiKey}
                 onChange={v => patchProvider(provider, { apiKey: v })}
-                labels={{ change: t.settings.ai.keyChange, cancel: t.settings.ai.keyCancel }}
               />
               {preset.signupUrl && !currentConfig.apiKey && !activeEnvKey && (
                 <a
@@ -477,7 +476,7 @@ function CustomProviderForm({
       const res = await fetch('/api/settings/test-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, model, baseUrl, baseProviderId }),
+        body: JSON.stringify({ provider: initial?.id ?? baseProviderId, apiKey, model, baseUrl }),
       });
       const json = await res.json();
       if (json.ok) setTestState('ok');

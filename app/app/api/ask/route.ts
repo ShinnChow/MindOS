@@ -818,31 +818,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Include attached KB files (@ mentions) — same pattern as chat/agent modes
-    const contextParts: string[] = [];
-    const seen = new Set<string>();
-    if (Array.isArray(attachedFiles) && attachedFiles.length > 0) {
-      for (const filePath of attachedFiles!) {
-        if (seen.has(filePath)) continue;
-        seen.add(filePath);
-        try {
-          const content = truncate(getFileContent(filePath));
-          contextParts.push(`## Attached: ${filePath}\n\n${content}`);
-        } catch (err) {
-          console.warn(`[ask] organize: failed to read attached file "${filePath}":`, err instanceof Error ? err.message : err);
-        }
-      }
-    }
-    if (currentFile && !seen.has(currentFile)) {
-      seen.add(currentFile);
-      try {
-        const content = truncate(getFileContent(currentFile));
-        contextParts.push(`## Current file: ${currentFile}\n\n${content}`);
-      } catch (err) {
-        console.warn(`[ask] organize: failed to read currentFile "${currentFile}":`, err instanceof Error ? err.message : err);
-      }
-    }
+    const { contextParts, failedFiles } = loadAttachedFileContext(attachedFiles, currentFile, 'organize');
     if (contextParts.length > 0) {
       promptParts.push(`---\n\nThe user is currently viewing these files:\n\n${contextParts.join('\n\n---\n\n')}`);
+    }
+    if (failedFiles.length > 0) {
+      promptParts.push(`---\n\n⚠️ The following attached files could not be read: ${failedFiles.join(', ')}. Inform the user that these files were not loaded.`);
     }
 
     if (uploadedParts.length > 0) {
@@ -870,31 +851,12 @@ export async function POST(req: NextRequest) {
     const now = new Date();
     promptParts.push(`---\n\n## Current Time Context\n- Current UTC Time: ${now.toISOString()}\n- System Local Time: ${new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeStyle: 'long' }).format(now)}`);
 
-    const contextParts: string[] = [];
-    const seen = new Set<string>();
-    if (Array.isArray(attachedFiles) && attachedFiles.length > 0) {
-      for (const filePath of attachedFiles!) {
-        if (seen.has(filePath)) continue;
-        seen.add(filePath);
-        try {
-          const content = truncate(getFileContent(filePath));
-          contextParts.push(`## Attached: ${filePath}\n\n${content}`);
-        } catch (err) {
-          console.warn(`[ask] chat: failed to read attached file "${filePath}":`, err instanceof Error ? err.message : err);
-        }
-      }
-    }
-    if (currentFile && !seen.has(currentFile)) {
-      seen.add(currentFile);
-      try {
-        const content = truncate(getFileContent(currentFile));
-        contextParts.push(`## Current file: ${currentFile}\n\n${content}`);
-      } catch (err) {
-        console.warn(`[ask] chat: failed to read currentFile "${currentFile}":`, err instanceof Error ? err.message : err);
-      }
-    }
+    const { contextParts, failedFiles } = loadAttachedFileContext(attachedFiles, currentFile, 'chat');
     if (contextParts.length > 0) {
       promptParts.push(`---\n\nThe user is currently viewing these files:\n\n${contextParts.join('\n\n---\n\n')}`);
+    }
+    if (failedFiles.length > 0) {
+      promptParts.push(`---\n\n⚠️ The following attached files could not be read: ${failedFiles.join(', ')}. Inform the user that these files were not loaded.`);
     }
 
     if (uploadedParts.length > 0) {
@@ -1007,32 +969,7 @@ export async function POST(req: NextRequest) {
     if (bootstrap.target_config_json?.ok) initContextBlocks.push(`## bootstrap_target_config_json\n\n${bootstrap.target_config_json.content}`);
 
     // Build initial context from attached/current files
-    const contextParts: string[] = [];
-    const seen = new Set<string>();
-    const hasAttached = Array.isArray(attachedFiles) && attachedFiles.length > 0;
-
-    if (hasAttached) {
-      for (const filePath of attachedFiles!) {
-        if (seen.has(filePath)) continue;
-        seen.add(filePath);
-        try {
-          const content = truncate(getFileContent(filePath));
-          contextParts.push(`## Attached: ${filePath}\n\n${content}`);
-        } catch (err) {
-          console.warn(`[ask] agent: failed to read attached file "${filePath}":`, err instanceof Error ? err.message : err);
-        }
-      }
-    }
-
-    if (currentFile && !seen.has(currentFile)) {
-      seen.add(currentFile);
-      try {
-        const content = truncate(getFileContent(currentFile));
-        contextParts.push(`## Current file: ${currentFile}\n\n${content}`);
-      } catch (err) {
-        console.warn(`[ask] agent: failed to read currentFile "${currentFile}":`, err instanceof Error ? err.message : err);
-      }
-    }
+    const { contextParts, failedFiles } = loadAttachedFileContext(attachedFiles, currentFile, 'agent');
 
     const now = new Date();
     const timeContext = `## Current Time Context
@@ -1056,6 +993,9 @@ export async function POST(req: NextRequest) {
 
     if (contextParts.length > 0) {
       promptParts.push(`---\n\nThe user is currently viewing these files:\n\n${contextParts.join('\n\n---\n\n')}`);
+    }
+    if (failedFiles.length > 0) {
+      promptParts.push(`---\n\n⚠️ The following attached files could not be read: ${failedFiles.join(', ')}. Inform the user that these files were not loaded.`);
     }
 
     if (uploadedParts.length > 0) {
