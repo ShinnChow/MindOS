@@ -111,8 +111,13 @@ export function handleRouteError(err: unknown): NextResponse<ApiErrorResponse> {
  * Legacy: catch an unknown error and return simple { error: string } response.
  * Used for backwards-compatible routes that haven't migrated to structured errors.
  * New routes should use handleRouteError() instead.
+ *
+ * @param err The error to convert to string
+ * @param status HTTP status code (default 500)
+ * @returns NextResponse with { error: string } envelope
+ * @note Messages are truncated to 256 chars to avoid exposing stack traces
  */
 export function handleRouteErrorSimple(err: unknown, status = 500): NextResponse<{ error: string }> {
-  const message = toErrorMessage(err);
+  const message = toErrorMessage(err).slice(0, 256);
   return NextResponse.json({ error: message }, { status });
 }
