@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { isGitRepo, gitLog, gitShowFile } from '@/lib/fs';
+import { handleRouteErrorSimple } from '@/lib/errors';
 
 function err(msg: string, status = 400) {
   return NextResponse.json({ error: msg }, { status });
@@ -38,6 +39,6 @@ export async function GET(req: NextRequest) {
         return err(`unknown op: ${op}`);
     }
   } catch (e) {
-    return err((e as Error).message, 500);
+    return handleRouteErrorSimple(e);
   }
 }
