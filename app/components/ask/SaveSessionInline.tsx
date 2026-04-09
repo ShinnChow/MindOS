@@ -185,7 +185,7 @@ function ArchiveForm({ messages, dirPaths, onBack, onClose, ask }: {
 }) {
   const now = new Date();
   const defaultFn = `session-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}.md`;
-  const [targetDir, setTargetDir] = useState('Inbox');
+  const [targetDir, setTargetDir] = useState('');
   const [filename, setFilename] = useState(defaultFn);
   const [format, setFormat] = useState<SessionSaveFormat>('full');
   const [showPreview, setShowPreview] = useState(false);
@@ -277,7 +277,7 @@ function ArchiveForm({ messages, dirPaths, onBack, onClose, ask }: {
   );
 }
 
-/* ── Step 2b: Digest Form ── */
+/* ── Step 2b: Digest Form — AI summarizes conversation into a note ── */
 
 function DigestForm({ messages, dirPaths, onBack, onClose, ask }: {
   messages: Message[];
@@ -288,13 +288,14 @@ function DigestForm({ messages, dirPaths, onBack, onClose, ask }: {
 }) {
   const now = new Date();
   const defaultFn = `note-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}.md`;
-  const [targetDir, setTargetDir] = useState('Inbox');
+  const [targetDir, setTargetDir] = useState('');
   const [filename, setFilename] = useState(defaultFn);
   const [phase, setPhase] = useState<'generating' | 'done' | 'error'>('generating');
   const [digest, setDigest] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const abortRef = useRef<AbortController | null>(null);
 
   const safePath = (() => {
     const fn = filename.trim() || defaultFn;
@@ -303,26 +304,40 @@ function DigestForm({ messages, dirPaths, onBack, onClose, ask }: {
   })();
 
   const generate = useCallback(async () => {
-    setPhase('generating'); setErrorMsg('');
+    setPhase('generating'); setErrorMsg(''); setDigest('');
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
     try {
-      const text = formatSessionContent(messages, 'full').slice(0, 15000);
-      const res = await apiFetch<{ text: string }>('/api/ask/quick', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: `Summarize this conversation into a concise note. Extract key insights, decisions, and action items. Write in the same language as the conversation. Output only Markdown.\n\n---\n\n${text}` }),
-      });
-      setDigest(res.text); setPhase('done');
+      const sessionText = formatSessionContent(messages, 'full').slice(0, 12000);
+      const { askLLMText } = await import('@/lib/daily-echo/ask-llm');
+      const result = await askLLMText(
+        `You are a note-taking assistant. Summarize the following conversation into a concise, well-structured Markdown note. Extract key insights, decisions, action items, and important details. Write in the same language as the conversation. Output ONLY the note content, no preamble.\n\n---\n\n${sessionText}`,
+        ac.signal,
+      );
+      if (!ac.signal.aborted) {
+        setDigest(result); setPhase('done');
+      }
     } catch (err: any) {
-      setErrorMsg(err?.message ?? 'Failed'); setPhase('error');
+      if (!ac.signal.aborted) {
+        setErrorMsg(err?.message ?? 'Failed to generate'); setPhase('error');
+      }
     }
   }, [messages]);
 
-  useEffect(() => { generate(); }, [generate]);
+  useEffect(() => {
+    generate();
+    return () => { abortRef.current?.abort(); };
+  }, [generate]);
 
   const handleSave = useCallback(async () => {
     if (!digest) return;
     setSaving(true); setErrorMsg('');
     try {
-      const header = `> Organized from conversation · ${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const header = `> Organized from conversation · ${yyyy}-${mm}-${dd}`;
       await apiFetch('/api/file', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: safePath, op: 'create_file', content: `${header}\n\n${digest}`, source: 'user' }),
@@ -330,8 +345,9 @@ function DigestForm({ messages, dirPaths, onBack, onClose, ask }: {
       setSaved(true);
       toast.success(ask?.savedToKB?.replace('{path}', safePath.split('/').pop()) ?? 'Saved');
       setTimeout(onClose, 1000);
-    } catch (err: any) { setErrorMsg(err?.message ?? 'Failed'); }
-    finally { setSaving(false); }
+    } catch (err: any) {
+      setErrorMsg(err?.message?.includes('exist') ? (ask?.fileExistsSwitch ?? 'File exists') : (err?.message ?? 'Failed'));
+    } finally { setSaving(false); }
   }, [digest, safePath, ask, onClose, now]);
 
   return (
@@ -342,24 +358,27 @@ function DigestForm({ messages, dirPaths, onBack, onClose, ask }: {
         <span className="text-xs font-semibold">{ask?.organizeToNote ?? 'Organize to note'}</span>
       </div>
 
+      {/* Generating state */}
       {phase === 'generating' && (
-        <div className="flex items-center gap-2 px-2.5 py-2 bg-muted/30 rounded-md">
-          <Loader2 size={11} className="animate-spin text-[var(--amber)]" />
-          <span className="text-2xs text-muted-foreground">{ask?.generating ?? 'Generating...'}</span>
+        <div className="flex items-center gap-2 px-2.5 py-3 bg-muted/30 rounded-md">
+          <Loader2 size={12} className="animate-spin text-[var(--amber)]" />
+          <span className="text-2xs text-muted-foreground">{ask?.generating ?? 'AI is summarizing...'}</span>
         </div>
       )}
 
+      {/* Error state */}
       {phase === 'error' && (
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <div className="flex items-center gap-1 text-2xs text-error"><AlertCircle size={10} />{errorMsg}</div>
           <button type="button" onClick={generate} className="text-2xs text-[var(--amber)] hover:underline">{ask?.retry ?? 'Retry'}</button>
         </div>
       )}
 
+      {/* Done — show preview + save options */}
       {phase === 'done' && digest && (
         <>
-          <pre className="px-2 py-1.5 text-[10px] text-foreground bg-muted/20 border border-border/50 rounded-md max-h-32 overflow-auto whitespace-pre-wrap font-mono leading-relaxed">
-            {digest.slice(0, 500)}{digest.length > 500 ? '...' : ''}
+          <pre className="px-2 py-1.5 text-[10px] text-foreground bg-muted/20 border border-border/50 rounded-md max-h-28 overflow-auto whitespace-pre-wrap font-mono leading-relaxed">
+            {digest.slice(0, 400)}{digest.length > 400 ? '...' : ''}
           </pre>
           <div>
             <label className="text-2xs text-muted-foreground mb-0.5 block">{ask?.targetFolder ?? 'Folder'}</label>
