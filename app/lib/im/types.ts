@@ -1,0 +1,126 @@
+// ─── IM Platform Types ────────────────────────────────────────────────────────
+// Core type definitions for the cross-platform IM integration system.
+// All platform-specific format conversion happens inside each Adapter.
+
+export type IMPlatform =
+  | 'telegram'
+  | 'discord'
+  | 'feishu'
+  | 'slack'
+  | 'wecom'
+  | 'dingtalk';
+
+export type IMMessageFormat = 'text' | 'markdown' | 'html';
+
+export interface IMAttachment {
+  type: 'image' | 'file' | 'audio' | 'video';
+  /** URL or local file path */
+  url: string;
+  filename?: string;
+  mimeType?: string;
+}
+
+export interface IMMessage {
+  platform: IMPlatform;
+  /** Chat/Channel/Group ID on the platform */
+  recipientId: string;
+  text: string;
+  format?: IMMessageFormat;
+  /** Thread/Topic ID for threaded replies */
+  threadId?: string;
+  attachments?: IMAttachment[];
+}
+
+export interface IMSendResult {
+  ok: boolean;
+  /** Platform-specific message ID */
+  messageId?: string;
+  error?: string;
+  timestamp: string;
+}
+
+export interface IMAdapter {
+  readonly platform: IMPlatform;
+  send(message: IMMessage, signal?: AbortSignal): Promise<IMSendResult>;
+  /** Verify credentials are valid */
+  verify(): Promise<boolean>;
+  dispose(): Promise<void>;
+}
+
+// ─── Per-Platform Config Types ────────────────────────────────────────────────
+
+export interface TelegramConfig {
+  bot_token: string;
+}
+
+export interface FeishuConfig {
+  app_id: string;
+  app_secret: string;
+}
+
+export interface DiscordConfig {
+  bot_token: string;
+}
+
+export interface SlackConfig {
+  bot_token: string;
+  signing_secret?: string;
+}
+
+export interface WeComConfig {
+  webhook_key?: string;
+  corp_id?: string;
+  corp_secret?: string;
+}
+
+export interface DingTalkConfig {
+  client_id?: string;
+  client_secret?: string;
+  webhook_url?: string;
+  webhook_secret?: string;
+}
+
+export interface IMConfig {
+  providers: Partial<{
+    telegram: TelegramConfig;
+    feishu: FeishuConfig;
+    discord: DiscordConfig;
+    slack: SlackConfig;
+    wecom: WeComConfig;
+    dingtalk: DingTalkConfig;
+  }>;
+}
+
+// ─── Platform Feature Limits ──────────────────────────────────────────────────
+
+export interface PlatformLimits {
+  maxTextLength: number;
+  supportsMarkdown: boolean;
+  supportsHtml: boolean;
+  supportsThreads: boolean;
+  supportsAttachments: boolean;
+}
+
+export const PLATFORM_LIMITS: Record<IMPlatform, PlatformLimits> = {
+  telegram:  { maxTextLength: 4096,  supportsMarkdown: true,  supportsHtml: true,  supportsThreads: true,  supportsAttachments: true },
+  discord:   { maxTextLength: 2000,  supportsMarkdown: true,  supportsHtml: false, supportsThreads: true,  supportsAttachments: true },
+  feishu:    { maxTextLength: 30000, supportsMarkdown: true,  supportsHtml: false, supportsThreads: true,  supportsAttachments: true },
+  slack:     { maxTextLength: 4000,  supportsMarkdown: true,  supportsHtml: false, supportsThreads: true,  supportsAttachments: true },
+  wecom:     { maxTextLength: 2048,  supportsMarkdown: true,  supportsHtml: false, supportsThreads: false, supportsAttachments: true },
+  dingtalk:  { maxTextLength: 20000, supportsMarkdown: true,  supportsHtml: false, supportsThreads: false, supportsAttachments: true },
+};
+
+// ─── Recipient ID Validation ──────────────────────────────────────────────────
+
+const RECIPIENT_ID_PATTERNS: Record<IMPlatform, RegExp> = {
+  telegram:  /^-?\d+$/,                          // numeric chat ID
+  discord:   /^\d{17,20}$/,                       // Snowflake ID
+  feishu:    /^(oc_|ou_|on_|[\w.+-]+@[\w.-]+)/, // chat_id / open_id / union_id / email
+  slack:     /^[A-Z0-9]{9,12}$/,                  // Slack channel/user ID
+  wecom:     /^.{1,256}$/,                         // non-empty
+  dingtalk:  /^.{1,256}$/,                         // non-empty
+};
+
+export function isValidRecipientId(platform: IMPlatform, recipientId: string): boolean {
+  return RECIPIENT_ID_PATTERNS[platform].test(recipientId);
+}
