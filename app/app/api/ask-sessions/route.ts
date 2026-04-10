@@ -3,20 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { NextRequest, NextResponse } from 'next/server';
-
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
-interface ChatSession {
-  id: string;
-  title?: string;
-  currentFile?: string;
-  createdAt: number;
-  updatedAt: number;
-  messages: Message[];
-}
+import type { ChatSession } from '@/lib/types';
 
 const STORE_PATH = path.resolve(os.homedir(), '.mindos', 'sessions.json');
 const MAX_SESSIONS = 30;

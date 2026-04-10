@@ -58,6 +58,11 @@ export interface ImagePart {
 
 export type MessagePart = TextPart | ToolCallPart | ReasoningPart | ImagePart;
 
+export interface AgentIdentity {
+  id: string;
+  name: string;
+}
+
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
@@ -73,6 +78,9 @@ export interface Message {
   attachedFiles?: string[];
   /** Names of uploaded files (PDFs etc.) sent with this message */
   uploadedFileNames?: string[];
+  /** Agent attribution for this message when routed via ACP or rendered by MindOS */
+  agentId?: string;
+  agentName?: string;
 }
 
 export interface LocalAttachment {
@@ -104,4 +112,6 @@ export interface ChatSession {
   updatedAt: number;
   messages: Message[];
   pinned?: boolean;
+  /** Session-level ACP agent selection restored when the session becomes active */
+  defaultAcpAgent?: AgentIdentity | null;
 }

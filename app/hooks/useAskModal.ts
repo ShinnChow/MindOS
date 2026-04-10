@@ -1,6 +1,7 @@
 'use client';
 
 import { useSyncExternalStore, useCallback } from 'react';
+import type { AgentIdentity } from '@/lib/types';
 
 /**
  * Lightweight pub/sub store for cross-component AskModal control.
@@ -8,10 +9,7 @@ import { useSyncExternalStore, useCallback } from 'react';
  * No external dependencies (no zustand needed).
  */
 
-export interface AcpAgentSelection {
-  id: string;
-  name: string;
-}
+export type AcpAgentSelection = AgentIdentity;
 
 interface AskModalState {
   open: boolean;
