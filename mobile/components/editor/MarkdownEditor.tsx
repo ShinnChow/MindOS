@@ -38,6 +38,7 @@ interface MarkdownEditorProps {
   initialContent: string;
   initialMtime?: number;
   onSaved?: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }
 
 export default function MarkdownEditor({
@@ -45,11 +46,16 @@ export default function MarkdownEditor({
   initialContent,
   initialMtime,
   onSaved,
+  onDirtyChange,
 }: MarkdownEditorProps) {
   const [content, setContent] = useState(initialContent);
   const [mode, setMode] = useState<'edit' | 'preview'>('edit');
   const [saving, setSaving] = useState(false);
-  const [dirty, setDirty] = useState(false);
+  const [dirty, _setDirty] = useState(false);
+  const setDirty = useCallback((val: boolean) => {
+    _setDirty(val);
+    onDirtyChange?.(val);
+  }, [onDirtyChange]);
   const [lastMtime, setLastMtime] = useState(initialMtime);
   const [saveError, setSaveError] = useState('');
 

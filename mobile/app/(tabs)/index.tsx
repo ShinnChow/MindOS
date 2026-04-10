@@ -138,8 +138,15 @@ export default function HomeScreen() {
             <Ionicons name="archive-outline" size={48} color="#44403c" />
             <Text style={styles.emptyTitle}>Your mind is empty</Text>
             <Text style={styles.emptyText}>
-              Start writing on desktop, and it will show up here.
+              Create your first note or start writing on desktop.
             </Text>
+            <Pressable
+              style={styles.createBtn}
+              onPress={() => router.push('/(tabs)/files' as any)}
+            >
+              <Ionicons name="add-circle-outline" size={18} color="#fff" />
+              <Text style={styles.createBtnText}>Create a Note</Text>
+            </Pressable>
           </View>
         }
       />
@@ -222,6 +229,17 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 18, fontWeight: '600', color: '#a8a29e' },
   emptyText: { fontSize: 14, color: '#78716c', textAlign: 'center', paddingHorizontal: 40 },
+  createBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#c8873a',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  createBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',

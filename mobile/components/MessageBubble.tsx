@@ -2,7 +2,8 @@
  * MessageBubble — Renders a single chat message with Markdown and tool calls.
  */
 
-import { View, Text as RNText, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text as RNText, StyleSheet, ActivityIndicator, Pressable, Alert } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import Markdown from 'react-native-markdown-display';
 import { Ionicons } from '@expo/vector-icons';
 import type { Message, ToolCallPart } from '@/lib/types';
@@ -15,8 +16,18 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const toolCalls = message.parts?.filter((p) => p.type === 'tool-call') as ToolCallPart[] | undefined;
 
+  const handleLongPress = () => {
+    if (!message.content) return;
+    Clipboard.setStringAsync(message.content).then(() => {
+      Alert.alert('Copied', 'Message copied to clipboard');
+    });
+  };
+
   return (
-    <View style={[styles.bubbleContainer, isUser && styles.bubbleContainerUser]}>
+    <Pressable
+      onLongPress={handleLongPress}
+      style={[styles.bubbleContainer, isUser && styles.bubbleContainerUser]}
+    >
       <View style={[styles.bubble, isUser && styles.bubbleUser]}>
         {/* Main content */}
         {message.content ? (
@@ -58,7 +69,7 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
           </View>
         )}
       </View>
-    </View>
+    </Pressable>
   );
 }
 

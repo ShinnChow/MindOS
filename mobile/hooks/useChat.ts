@@ -1,33 +1,87 @@
 /**
- * useChat — React hook for AI conversation with streaming support.
+ * useChat — React hook for AI conversation with streaming + persistence.
+ *
+ * P0 fixes:
+ * - Persist messages to AsyncStorage (survives app restart)
+ * - Persist sessionId (survives component remount)
+ * - Retry button: stores lastFailedMessage for re-send
+ * - Finalize partial messages on error/cancel
  */
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useConnectionStore } from '@/lib/connection-store';
 import { streamChat, MessageBuilder } from '@/lib/sse-client';
 import type { Message, AskMode } from '@/lib/types';
 
+const CHAT_STORAGE_KEY = 'mindos_chat_messages';
+const SESSION_STORAGE_KEY = 'mindos_chat_session';
+
 export interface UseChatOptions {
-  sessionId: string;
   mode?: AskMode;
 }
 
-export function useChat({ sessionId, mode = 'chat' }: UseChatOptions) {
+export function useChat({ mode = 'chat' }: UseChatOptions = {}) {
   const baseUrl = useConnectionStore((s) => s.serverUrl);
 
+  const [sessionId, setSessionId] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState('');
+  const [lastFailedMessage, setLastFailedMessage] = useState('');
+  const [loaded, setLoaded] = useState(false);
 
   const cancelRef = useRef<(() => void) | null>(null);
   const builderRef = useRef<MessageBuilder | null>(null);
-  // Use a ref to always have latest messages in the closure
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
 
+  // --- Load session + messages from storage ---
+  useEffect(() => {
+    (async () => {
+      try {
+        const [savedSession, savedMessages] = await Promise.all([
+          AsyncStorage.getItem(SESSION_STORAGE_KEY),
+          AsyncStorage.getItem(CHAT_STORAGE_KEY),
+        ]);
+        if (savedSession) {
+          setSessionId(savedSession);
+        } else {
+          const newId = `s-${Date.now()}`;
+          setSessionId(newId);
+          await AsyncStorage.setItem(SESSION_STORAGE_KEY, newId);
+        }
+        if (savedMessages) {
+          try {
+            const parsed = JSON.parse(savedMessages);
+            if (Array.isArray(parsed)) setMessages(parsed);
+          } catch { /* corrupt data, start fresh */ }
+        }
+      } catch { /* storage error, start fresh */ }
+      setLoaded(true);
+    })();
+  }, []);
+
+  // --- Persist messages after each change (debounced) ---
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!loaded || isStreaming) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      // Only persist non-empty conversations; trim to last 200 messages for storage
+      const toSave = messages.slice(-200);
+      AsyncStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(toSave)).catch(() => {});
+    }, 500);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [messages, loaded, isStreaming]);
+
+  // --- Send message ---
   const send = useCallback(
     (userMessage: string, attachedFilePaths?: string[]) => {
+      if (!baseUrl || !sessionId) return;
+
       setError('');
+      setLastFailedMessage('');
       setIsStreaming(true);
 
       const userMsg: Message = {
@@ -47,7 +101,6 @@ export function useChat({ sessionId, mode = 'chat' }: UseChatOptions) {
 
       builderRef.current = new MessageBuilder();
 
-      // streamChat is synchronous — returns cancel fn immediately
       cancelRef.current = streamChat(
         baseUrl,
         {
@@ -76,12 +129,12 @@ export function useChat({ sessionId, mode = 'chat' }: UseChatOptions) {
                 break;
               case 'error':
                 setError(event.message || 'Unknown error');
+                setLastFailedMessage(userMessage);
                 break;
               case 'done':
                 break;
             }
 
-            // Update UI with latest snapshot
             const snapshot = builder.build();
             setMessages((prev) => {
               const updated = [...prev];
@@ -90,7 +143,6 @@ export function useChat({ sessionId, mode = 'chat' }: UseChatOptions) {
             });
           },
           onError: (err) => {
-            // Finalize partial message
             if (builderRef.current) {
               const final = builderRef.current.finalize();
               setMessages((prev) => {
@@ -100,6 +152,7 @@ export function useChat({ sessionId, mode = 'chat' }: UseChatOptions) {
               });
             }
             setError(err.message);
+            setLastFailedMessage(userMessage);
             setIsStreaming(false);
           },
           onComplete: () => {
@@ -119,6 +172,16 @@ export function useChat({ sessionId, mode = 'chat' }: UseChatOptions) {
     [baseUrl, mode, sessionId],
   );
 
+  // --- Retry last failed message ---
+  const retry = useCallback(() => {
+    if (lastFailedMessage) {
+      // Remove the failed assistant message + user message
+      setMessages((prev) => prev.slice(0, -2));
+      send(lastFailedMessage);
+    }
+  }, [lastFailedMessage, send]);
+
+  // --- Cancel streaming ---
   const cancel = useCallback(() => {
     cancelRef.current?.();
     cancelRef.current = null;
@@ -133,11 +196,28 @@ export function useChat({ sessionId, mode = 'chat' }: UseChatOptions) {
     setIsStreaming(false);
   }, []);
 
-  const clear = useCallback(() => {
+  // --- New chat (with session reset) ---
+  const newChat = useCallback(async () => {
     cancel();
     setMessages([]);
     setError('');
+    setLastFailedMessage('');
+    const newId = `s-${Date.now()}`;
+    setSessionId(newId);
+    await AsyncStorage.setItem(SESSION_STORAGE_KEY, newId);
+    await AsyncStorage.removeItem(CHAT_STORAGE_KEY);
   }, [cancel]);
 
-  return { messages, isStreaming, error, send, cancel, clear };
+  return {
+    messages,
+    isStreaming,
+    error,
+    lastFailedMessage,
+    loaded,
+    sessionId,
+    send,
+    retry,
+    cancel,
+    newChat,
+  };
 }

@@ -12,6 +12,7 @@ import type {
 } from './types';
 
 const STORAGE_KEY = 'mindos_server_url';
+const TREE_CACHE_KEY = 'mindos_file_tree_cache';
 const DEFAULT_TIMEOUT = 15_000;
 
 class MindOSClient {
@@ -80,12 +81,39 @@ class MindOSClient {
   // ---------------------------------------------------------------------------
 
   async getFileTree(): Promise<FileNode[]> {
-    const res = await this.fetchWithTimeout('/api/files');
-    if (!res.ok) throw new ApiError(res.status, 'Failed to load files');
-    const data = await res.json();
-    const tree = data.tree ?? data;
-    if (!Array.isArray(tree)) throw new ApiError(500, 'Invalid response format');
-    return tree;
+    try {
+      const res = await this.fetchWithTimeout('/api/files');
+      if (!res.ok) throw new ApiError(res.status, 'Failed to load files');
+      const data = await res.json();
+      const tree = data.tree ?? data;
+      if (!Array.isArray(tree)) throw new ApiError(500, 'Invalid response format');
+      // Cache for offline use
+      AsyncStorage.setItem(TREE_CACHE_KEY, JSON.stringify(tree)).catch(() => {});
+      return tree;
+    } catch (e) {
+      // Fallback to cached tree when offline
+      const cached = await AsyncStorage.getItem(TREE_CACHE_KEY).catch(() => null);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) return parsed;
+        } catch { /* corrupt cache */ }
+      }
+      throw e;
+    }
+  }
+
+  /** Check if a file exists (returns true/false, never throws). */
+  async fileExists(filePath: string): Promise<boolean> {
+    try {
+      const res = await this.fetchWithTimeout(
+        `/api/file?path=${enc(filePath)}&op=read_file`,
+        { timeout: 5000 },
+      );
+      return res.ok;
+    } catch {
+      return false;
+    }
   }
 
   async getFileContent(

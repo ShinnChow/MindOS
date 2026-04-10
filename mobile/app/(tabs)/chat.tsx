@@ -1,5 +1,5 @@
 /**
- * Chat tab — AI conversation with session management.
+ * Chat tab — AI conversation with persistence, retry, and confirmation.
  */
 import { useCallback, useRef, useState } from 'react';
 import {
@@ -11,6 +11,7 @@ import {
   Pressable,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,27 +22,46 @@ import type { AskMode } from '@/lib/types';
 
 export default function ChatScreen() {
   const [mode, setMode] = useState<AskMode>('chat');
-  const [sessionId, setSessionId] = useState(() => `s-${Date.now()}`);
   const listRef = useRef<FlatList>(null);
-
-  const { messages, isStreaming, error, send, cancel, clear } = useChat({
-    sessionId,
-    mode,
-  });
-
   const [inputText, setInputText] = useState('');
+
+  const {
+    messages, isStreaming, error, lastFailedMessage,
+    loaded, send, retry, cancel, newChat,
+  } = useChat({ mode });
 
   const handleSend = useCallback((message: string) => {
     send(message);
-    // Scroll to bottom after a tick
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
   }, [send]);
 
   const handleNewChat = useCallback(() => {
-    clear();
-    setSessionId(`s-${Date.now()}`);
-    setInputText('');
-  }, [clear]);
+    if (messages.length === 0) return;
+    Alert.alert(
+      'New Chat',
+      'Start a new conversation? Current messages will be cleared.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'New Chat',
+          style: 'destructive',
+          onPress: () => {
+            newChat();
+            setInputText('');
+          },
+        },
+      ],
+    );
+  }, [messages.length, newChat]);
+
+  // Don't render until storage is loaded
+  if (!loaded) {
+    return (
+      <SafeAreaView style={styles.container} edges={['left', 'right']}>
+        <ActivityIndicator color="#c8873a" style={{ marginTop: 40 }} />
+      </SafeAreaView>
+    );
+  }
 
   // --- Empty state ---
   if (!messages.length && !isStreaming && !error) {
@@ -64,7 +84,7 @@ export default function ChatScreen() {
                 <Pressable
                   key={s}
                   style={styles.suggestionChip}
-                  onPress={() => { setInputText(s); }}
+                  onPress={() => setInputText(s)}
                 >
                   <Text style={styles.suggestionText} numberOfLines={1}>{s}</Text>
                 </Pressable>
@@ -91,17 +111,15 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container} edges={['left', 'right']}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={90}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        {/* Header with New Chat button */}
+        {/* Header */}
         <View style={styles.chatHeader}>
-          <Text style={styles.chatHeaderTitle}>
-            {messages.length > 0
-              ? truncate(messages[0].content, 30)
-              : 'New Chat'}
+          <Text style={styles.chatHeaderTitle} numberOfLines={1}>
+            {messages.length > 0 ? truncate(messages[0].content, 30) : 'New Chat'}
           </Text>
-          <Pressable onPress={handleNewChat} style={styles.newChatBtn}>
+          <Pressable onPress={handleNewChat} style={styles.newChatBtn} hitSlop={8}>
             <Ionicons name="add-circle-outline" size={22} color="#c8873a" />
           </Pressable>
         </View>
@@ -110,10 +128,9 @@ export default function ChatScreen() {
           ref={listRef}
           data={messages}
           keyExtractor={(_, index) => String(index)}
-          renderItem={({ item }) => (
-            <MessageBubble message={item} />
-          )}
+          renderItem={({ item }) => <MessageBubble message={item} />}
           contentContainerStyle={styles.messageList}
+          keyboardDismissMode="on-drag"
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
           ListFooterComponent={
             <>
@@ -127,6 +144,12 @@ export default function ChatScreen() {
                 <View style={styles.errorBox}>
                   <Ionicons name="warning-outline" size={14} color="#fca5a5" />
                   <Text style={styles.errorText}>{error}</Text>
+                  {lastFailedMessage ? (
+                    <Pressable onPress={retry} style={styles.retryBtn} hitSlop={8}>
+                      <Ionicons name="refresh-outline" size={14} color="#c8873a" />
+                      <Text style={styles.retryText}>Retry</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               ) : null}
             </>
@@ -172,45 +195,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#292524',
   },
-  chatHeaderTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#d6d3d1',
-    flex: 1,
-  },
-  newChatBtn: {
-    padding: 4,
-  },
-  messageList: {
-    paddingVertical: 8,
-  },
-  emptyCenter: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 32,
-  },
-  emptyIcon: {
-    fontSize: 32,
-    color: '#c8873a',
-    marginBottom: 8,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fafaf9',
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#a8a29e',
-    textAlign: 'center',
-  },
-  suggestionsBox: {
-    marginTop: 24,
-    gap: 8,
-    width: '100%',
-  },
+  chatHeaderTitle: { fontSize: 15, fontWeight: '600', color: '#d6d3d1', flex: 1 },
+  newChatBtn: { padding: 4 },
+  messageList: { paddingVertical: 8 },
+  emptyCenter: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, paddingHorizontal: 32 },
+  emptyIcon: { fontSize: 32, color: '#c8873a', marginBottom: 8 },
+  emptyTitle: { fontSize: 20, fontWeight: '700', color: '#fafaf9' },
+  emptySubtitle: { fontSize: 14, color: '#a8a29e', textAlign: 'center' },
+  suggestionsBox: { marginTop: 24, gap: 8, width: '100%' },
   suggestionChip: {
     backgroundColor: '#292524',
     borderRadius: 10,
@@ -219,10 +211,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#44403c',
   },
-  suggestionText: {
-    fontSize: 14,
-    color: '#d6d3d1',
-  },
+  suggestionText: { fontSize: 14, color: '#d6d3d1' },
   thinkingBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -234,10 +223,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(200, 135, 58, 0.08)',
     borderRadius: 8,
   },
-  thinkingText: {
-    fontSize: 12,
-    color: '#c8873a',
-  },
+  thinkingText: { fontSize: 12, color: '#c8873a' },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -251,9 +237,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.2)',
   },
-  errorText: {
-    fontSize: 12,
-    color: '#fca5a5',
-    flex: 1,
+  errorText: { fontSize: 12, color: '#fca5a5', flex: 1 },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(200, 135, 58, 0.15)',
   },
+  retryText: { fontSize: 12, color: '#c8873a', fontWeight: '600' },
 });

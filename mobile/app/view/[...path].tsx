@@ -1,13 +1,15 @@
 /**
  * File/directory view — renders Markdown preview, directory listing, or Markdown editor.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
   ScrollView,
   FlatList,
   Pressable,
+  Alert,
+  Share,
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
@@ -32,6 +34,22 @@ export default function ViewScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(false);
+  const dirtyRef = useRef(false);
+
+  const handleExitEditor = useCallback(() => {
+    if (dirtyRef.current) {
+      Alert.alert(
+        'Unsaved Changes',
+        'You have unsaved changes. Discard them?',
+        [
+          { text: 'Keep Editing', style: 'cancel' },
+          { text: 'Discard', style: 'destructive', onPress: () => { dirtyRef.current = false; setEditing(false); } },
+        ],
+      );
+    } else {
+      setEditing(false);
+    }
+  }, []);
 
   const requestIdRef = useRef(0);
 
@@ -55,7 +73,13 @@ export default function ViewScreen() {
           if (currentId !== requestIdRef.current) return;
           const node = findNode(tree, filePath);
           if (node?.children) {
-            setChildren(node.children);
+            // Sort: directories first, then alphabetically
+            const sorted = [...node.children].sort((a, b) => {
+              if (a.type === 'directory' && b.type !== 'directory') return -1;
+              if (a.type !== 'directory' && b.type === 'directory') return 1;
+              return a.name.localeCompare(b.name);
+            });
+            setChildren(sorted);
             setIsDir(true);
           } else {
             setError('File not found');
@@ -143,7 +167,7 @@ export default function ViewScreen() {
           options={{
             title: fileName,
             headerLeft: () => (
-              <Pressable onPress={() => setEditing(false)} style={styles.headerBtn}>
+              <Pressable onPress={handleExitEditor} style={styles.headerBtn}>
                 <Ionicons name="close" size={22} color="#fafaf9" />
               </Pressable>
             ),
@@ -153,7 +177,9 @@ export default function ViewScreen() {
           filePath={filePath}
           initialContent={content}
           initialMtime={mtime}
+          onDirtyChange={(d) => { dirtyRef.current = d; }}
           onSaved={() => {
+            dirtyRef.current = false;
             setEditing(false);
             loadContent();
           }}
@@ -168,13 +194,18 @@ export default function ViewScreen() {
       <Stack.Screen
         options={{
           title: fileName,
-          headerRight: isMarkdown
-            ? () => (
-                <Pressable onPress={() => setEditing(true)} style={styles.headerBtn}>
-                  <Ionicons name="create-outline" size={22} color="#c8873a" />
-                </Pressable>
-              )
-            : undefined,
+          headerRight: () => (
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable onPress={() => Share.share({ message: content, title: fileName })} style={styles.headerBtn}>
+                    <Ionicons name="share-outline" size={20} color="#a8a29e" />
+                  </Pressable>
+                  {isMarkdown && (
+                    <Pressable onPress={() => setEditing(true)} style={styles.headerBtn}>
+                      <Ionicons name="create-outline" size={22} color="#c8873a" />
+                    </Pressable>
+                  )}
+                </View>
+              ),
         }}
       />
       <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>

@@ -54,11 +54,30 @@ export default function FilesScreen() {
     const fileName = name.endsWith('.md') ? name : `${name}.md`;
     setCreating(true);
     try {
+      // Check if file already exists
+      const exists = await mindosClient.fileExists(fileName);
+      if (exists) {
+        Alert.alert(
+          'File Exists',
+          `"${fileName}" already exists. Open it instead?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Open',
+              onPress: () => {
+                setShowNewFile(false);
+                setNewFileName('');
+                router.push(`/view/${fileName}` as any);
+              },
+            },
+          ],
+        );
+        return;
+      }
       await mindosClient.saveFile(fileName, `# ${name.replace(/\.md$/, '')}\n\n`);
       setShowNewFile(false);
       setNewFileName('');
       await load();
-      // Navigate to the new file
       router.push(`/view/${fileName}` as any);
     } catch (e) {
       Alert.alert('Error', (e as Error).message);
@@ -130,6 +149,7 @@ export default function FilesScreen() {
           <Pressable
             style={styles.row}
             onPress={() => router.push(`/view/${item.path}` as any)}
+            onLongPress={() => Alert.alert(item.name, `Path: ${item.path}`)}
           >
             <Ionicons
               name={iconForNode(item) as any}
@@ -158,7 +178,10 @@ export default function FilesScreen() {
 
       {/* FAB: New file */}
       {!showNewFile && (
-        <Pressable style={styles.fab} onPress={() => setShowNewFile(true)}>
+        <Pressable
+          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+          onPress={() => setShowNewFile(true)}
+        >
           <Ionicons name="add" size={24} color="#fff" />
         </Pressable>
       )}
@@ -241,5 +264,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
+  },
+  fabPressed: {
+    transform: [{ scale: 0.9 }],
+    opacity: 0.8,
   },
 });
