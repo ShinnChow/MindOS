@@ -45,6 +45,12 @@ review/
 my-mind/
 landing/
 docs/
+activities/
+browser-extension/
+local-scripts/
+packages/
+startup/
+tests/
 *.md
 !README.md
 !README_zh.md
