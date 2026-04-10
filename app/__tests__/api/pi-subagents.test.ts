@@ -8,6 +8,7 @@
 import { describe, expect, it, beforeAll } from 'vitest';
 import fs from 'fs';
 import path from 'path';
+import { DefaultResourceLoader, SettingsManager } from '@mariozechner/pi-coding-agent';
 
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 
@@ -76,6 +77,71 @@ describe('pi-subagents built-in extension', () => {
       expect(content).toContain('pi.registerTool');
       // Should have tool definition for 'subagent'
       expect(content).toMatch(/name:\s*['"]subagent['"]/);
+    });
+  });
+
+  describe('runtime extension loading (integration)', () => {
+    it('DefaultResourceLoader loads pi-subagents and exposes subagent tools', async () => {
+      // This test mirrors the actual loading path used by /api/ask
+      const settingsManager = SettingsManager.inMemory();
+      const piSubagentsPath = path.join(PROJECT_ROOT, 'node_modules', 'pi-subagents', 'index.ts');
+
+      const loader = new DefaultResourceLoader({
+        cwd: PROJECT_ROOT,
+        settingsManager,
+        systemPromptOverride: () => '',
+        appendSystemPromptOverride: () => [],
+        additionalSkillPaths: [],
+        additionalExtensionPaths: [piSubagentsPath],
+      });
+
+      await loader.reload();
+      const { extensions } = loader.getExtensions();
+
+      // Find the pi-subagents extension
+      const subagentsExt = extensions.find((ext) =>
+        ext.path.includes('pi-subagents') || ext.resolvedPath?.includes('pi-subagents')
+      );
+
+      expect(subagentsExt).toBeDefined();
+
+      // Verify tools are registered
+      const toolNames = [...subagentsExt!.tools.keys()];
+      expect(toolNames).toContain('subagent');
+      expect(toolNames).toContain('subagent_status');
+    });
+
+    it('subagent tool is registered and available', async () => {
+      const settingsManager = SettingsManager.inMemory();
+      const piSubagentsPath = path.join(PROJECT_ROOT, 'node_modules', 'pi-subagents', 'index.ts');
+
+      const loader = new DefaultResourceLoader({
+        cwd: PROJECT_ROOT,
+        settingsManager,
+        systemPromptOverride: () => '',
+        appendSystemPromptOverride: () => [],
+        additionalSkillPaths: [],
+        additionalExtensionPaths: [piSubagentsPath],
+      });
+
+      await loader.reload();
+      const { extensions } = loader.getExtensions();
+      const subagentsExt = extensions.find((ext) =>
+        ext.path.includes('pi-subagents') || ext.resolvedPath?.includes('pi-subagents')
+      );
+
+      expect(subagentsExt).toBeDefined();
+
+      // Both tools should be registered in the tools Map
+      const subagentTool = subagentsExt!.tools.get('subagent');
+      const statusTool = subagentsExt!.tools.get('subagent_status');
+
+      expect(subagentTool).toBeDefined();
+      expect(statusTool).toBeDefined();
+
+      // The tool objects exist - the actual structure depends on pi-coding-agent internals
+      // What matters is that the extension successfully registered both tools
+      expect(subagentsExt!.tools.size).toBeGreaterThanOrEqual(2);
     });
   });
 });

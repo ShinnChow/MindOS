@@ -188,6 +188,53 @@ describe('AgentsContentChannelDetail redesign', () => {
     });
   });
 
+  it('renders long connection guidance without requiring webhook url', async () => {
+    vi.stubGlobal('fetch', vi.fn((url: string) => {
+      if (url.includes('/api/im/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            platforms: [{
+              platform: 'feishu',
+              connected: true,
+              botName: 'MindOS Bot',
+              capabilities: ['text', 'markdown'],
+              webhook: {
+                state: 'pending',
+                lastError: 'Start the Feishu long connection client to receive events locally.',
+                transport: 'long_connection',
+              },
+            }],
+          }),
+        });
+      }
+      if (url.includes('/api/im/activity')) {
+        return Promise.resolve({ ok: true, json: async () => ({ activities: [] }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    }));
+
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+
+    await act(async () => {
+      root.render(<AgentsContentChannelDetail platformId="feishu" />);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(host.textContent).toContain('Waiting for verification');
+    expect(host.textContent).toContain('Start the Feishu long connection client to receive events locally.');
+    expect(host.textContent).not.toContain('Webhook URL');
+    expect(host.textContent).not.toContain('Public base URL');
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
   it('renders an unconfigured channel as setup flow instead of activity page', async () => {
     vi.stubGlobal('fetch', vi.fn((url: string) => {
       if (url.includes('/api/im/status')) {

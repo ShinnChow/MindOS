@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
-import { bold, cyan, dim, red } from '../lib/colors.js';
+import { bold, dim, red } from '../lib/colors.js';
 
 export const meta = {
   name: 'feishu-ws',
@@ -13,16 +13,16 @@ export const meta = {
 };
 
 export async function run() {
-  const scriptPath = resolve(process.cwd(), 'app/scripts/feishu-long-connection.ts');
+  const appCwd = resolve(process.cwd(), 'app');
 
   console.log();
   console.log(bold('Starting Feishu long connection'));
   console.log(dim('This keeps a WSClient process running for local event validation.'));
-  console.log(dim(`Script: ${scriptPath}`));
+  console.log(dim(`App cwd: ${appCwd}`));
   console.log();
 
-  const child = spawn('npx', ['tsx', scriptPath], {
-    cwd: process.cwd(),
+  const child = spawn('npx', ['tsx', 'scripts/feishu-long-connection.ts'], {
+    cwd: appCwd,
     stdio: 'inherit',
     env: process.env,
   });
@@ -33,7 +33,6 @@ export async function run() {
 
   child.on('error', (error) => {
     console.error(red(`Failed to start Feishu long connection: ${error.message}`));
-    console.error(cyan('Try running:'), dim(`npx tsx ${scriptPath}`));
     process.exit(1);
   });
 }

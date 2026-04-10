@@ -1,7 +1,7 @@
 /**
  * TextInputModal — Simple modal with text input for Android (replaces Alert.prompt).
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -38,10 +38,13 @@ export default function TextInputModal({
 }: TextInputModalProps) {
   const [value, setValue] = useState(defaultValue);
 
+  useEffect(() => {
+    setValue(defaultValue);
+  }, [defaultValue, visible]);
+
   const handleSubmit = () => {
     if (value.trim()) {
       onSubmit(value.trim());
-      setValue('');
     }
   };
 

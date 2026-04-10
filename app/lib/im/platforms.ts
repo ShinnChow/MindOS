@@ -30,6 +30,7 @@ export type PlatformStatus = {
   capabilities: string[];
   webhook?: {
     state: 'disabled' | 'pending' | 'ready' | 'error';
+    transport?: 'webhook' | 'long_connection';
     webhookUrl?: string;
     publicBaseUrl?: string;
     lastError?: string;

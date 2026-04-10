@@ -7,7 +7,7 @@
 - [x] Obsidian compat Spike 文档链路
   - 总体方案、API shim、兼容矩阵、生态调研、Spike 计划、Spike 实施规约
 - [x] Obsidian compat 最小宿主骨架
-  - loader、plugin-manager、vault、metadata-cache、plugin、ui、settings、obsidian export surface
+  - loader、plugin-manager、compatibility-report、vault、metadata-cache、plugin、ui、settings、obsidian export surface
 - [x] Obsidian compat 测试覆盖
   - manifest、loader、vault、component、plugin、command-registry、integration、plugin-manager、ui
 - [x] Obsidian compat 关键健壮性修复
@@ -25,10 +25,18 @@
   - 抽取共享 markdown-styles presentation module（document / bubble）
   - 消除 3 处重复 flattenFiles + 3 处重复 markdownStyles
   - 新增 10 条领域层测试覆盖
+- [x] Mobile Files Tab Feedback and Rename Reliability
+  - Files tab 加载失败时显示可恢复 inline error banner
+  - Android TextInputModal defaultValue 同步 fix
+  - 新增 8 条 files-tab-state 测试
 - [x] Feishu conversation SDK-first ingress refactor
   - 用 `@larksuiteoapi/node-sdk` 接管 challenge / 验签 / decrypt
   - 保留 MindOS 业务层：过滤、标准化、会话历史、Agent 编排
   - 新增 dispatcher 测试，收敛 API route 到 SDK wrapper
+- [x] Feishu dual transport support
+  - 支持 `webhook` / `long_connection` 两种 conversation transport
+  - 新增长连接管理器与 `mindos feishu-ws` 本地验证入口
+  - 渠道详情页支持 transport 切换并按模式展示字段
 - [x] 内置 pi-subagents 扩展
   - 添加 `pi-subagents` 到 dependencies
   - 在 `additionalExtensionPaths` 注册扩展入口

@@ -208,6 +208,7 @@ export type IMWebhookState = 'disabled' | 'pending' | 'ready' | 'error';
 export interface IMWebhookStatus {
   platform: IMPlatform;
   state: IMWebhookState;
+  transport?: FeishuConversationTransport;
   webhookUrl?: string;
   publicBaseUrl?: string;
   lastVerifiedAt?: string;

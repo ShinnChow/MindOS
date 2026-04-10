@@ -42,6 +42,7 @@ describe('Feishu webhook helpers', () => {
     expect(buildFeishuWebhookStatus(config)).toEqual({
       platform: 'feishu',
       state: 'pending',
+      transport: 'webhook',
       publicBaseUrl: undefined,
       webhookUrl: undefined,
       lastError: 'Public base URL is required for Feishu event callbacks.',
@@ -63,6 +64,7 @@ describe('Feishu webhook helpers', () => {
     expect(buildFeishuWebhookStatus(config)).toEqual({
       platform: 'feishu',
       state: 'ready',
+      transport: 'webhook',
       publicBaseUrl: 'https://mindos.example.com',
       webhookUrl: 'https://mindos.example.com/api/im/webhook/feishu',
       lastError: undefined,

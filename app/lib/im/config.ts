@@ -113,7 +113,7 @@ export function validatePlatformConfig(
 
   switch (platform) {
     case 'telegram':
-      return checkFields(c, ['bot_token'], (f) => f === 'bot_token' ? typeof c.bot_token === 'string' && /^\d+:[A-Za-z0-9_-]{25,}$/.test(c.bot_token) : true);
+      return checkFields(c, ['bot_token'], (f) => f === 'bot_token' ? typeof c.bot_token === 'string' && c.bot_token.includes(':') : true);
     case 'feishu':
       return checkFields(c, ['app_id', 'app_secret']);
     case 'discord':

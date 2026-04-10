@@ -33,7 +33,12 @@ describe('PluginManager', () => {
     const plugins = await manager.discover();
 
     expect(plugins).toHaveLength(1);
-    expect(plugins[0]).toMatchObject({ id: 'alpha-plugin', enabled: false, loaded: false });
+    expect(plugins[0]).toMatchObject({
+      id: 'alpha-plugin',
+      enabled: false,
+      loaded: false,
+      compatibilityLevel: 'compatible',
+    });
   });
 
   it('persists enabled state across manager instances', async () => {
@@ -77,6 +82,7 @@ describe('PluginManager', () => {
     writePlugin('good-plugin', `const { Plugin } = require('obsidian'); module.exports = class GoodPlugin extends Plugin {};`);
     writePlugin('bad-plugin', `
       const { Plugin } = require('obsidian');
+      const electron = require('electron');
       module.exports = class BadPlugin extends Plugin {
         onload() {
           throw new Error('boom');
@@ -94,7 +100,9 @@ describe('PluginManager', () => {
     expect(result.failed).toContain('bad-plugin');
 
     const bad = manager.list().find((item) => item.id === 'bad-plugin');
-    expect(bad?.lastError).toMatch(/boom/);
+    expect(bad?.compatibilityLevel).toBe('blocked');
+    expect(bad?.compatibility?.nodeModules).toContain('electron');
+    expect(bad?.lastError).toMatch(/Unsupported module: electron|boom/);
   });
 
   it('disables and unloads a loaded plugin', async () => {

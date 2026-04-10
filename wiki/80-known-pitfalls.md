@@ -266,6 +266,7 @@ rootcause: app/api/ask/route.ts:143 直接传递 llmHistoryMessages（pi-ai Mess
   1. **SDK 接入层**：challenge / 验签 / decrypt / event dispatch
   2. **MindOS 业务层**：@mention 过滤、标准化、会话历史、Agent 编排、回复发送
 - **修复：** 将 `/api/im/webhook/feishu` 改为委托 `app/lib/im/feishu-dispatcher.ts`，保留 `app/lib/im/webhook/feishu.ts` 作为业务层
+- **补充：** 本地验证时优先用飞书 **Long Connection**。MindOS 现在同时支持 `webhook` 和 `long_connection` 两种 transport；本地开发若还选 webhook，通常会误以为“功能坏了”，本质上只是缺公网可达地址。
 - **文件参考：** `app/components/agents/AgentsContentChannelDetail.tsx`, `app/lib/im/platforms.ts`, `app/lib/im/activity.ts`
 
 ### Secret 输入框不能用占位符回写真实值（2026-04-11）

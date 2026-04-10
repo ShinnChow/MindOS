@@ -19,6 +19,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { mindosClient } from '@/lib/api-client';
 import TextInputModal from '@/components/TextInputModal';
+import FilesErrorBanner from '@/components/files/FilesErrorBanner';
+import { getFilesErrorMessage, getFilesTabViewState, getRenameInputDefaultValue } from '@/lib/files-tab-state';
 import type { FileNode } from '@/lib/types';
 
 export default function FilesScreen() {
@@ -26,6 +28,7 @@ export default function FilesScreen() {
   const [tree, setTree] = useState<FileNode[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
   const [showNewFile, setShowNewFile] = useState(false);
   const [newFileName, setNewFileName] = useState('');
   const [creating, setCreating] = useState(false);
@@ -38,8 +41,9 @@ export default function FilesScreen() {
     try {
       const files = await mindosClient.getFileTree();
       setTree(files);
-    } catch {
-      // handled by connection store
+      setError('');
+    } catch (e) {
+      setError(getFilesErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -92,6 +96,8 @@ export default function FilesScreen() {
     }
   }, [newFileName, load, router]);
 
+  const viewState = getFilesTabViewState(tree, error);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -135,7 +141,7 @@ export default function FilesScreen() {
                 },
               ],
               'plain-text',
-              item.name.replace(/\.md$/, ''),
+              getRenameInputDefaultValue(item.name),
             );
           } else {
             // Android: use custom TextInputModal
@@ -195,14 +201,15 @@ export default function FilesScreen() {
 
   const handleRenameSubmit = useCallback(async (newName: string) => {
     if (!renameTarget) return;
+    const target = renameTarget;
     setRenameModalVisible(false);
     try {
-      await mindosClient.renameFile(renameTarget.path, newName);
+      await mindosClient.renameFile(target.path, newName);
       await load();
+      setRenameTarget(null);
     } catch (e) {
       Alert.alert('Error', (e as Error).message);
     }
-    setRenameTarget(null);
   }, [renameTarget, load]);
 
   function iconForNode(node: FileNode) {
@@ -251,11 +258,12 @@ export default function FilesScreen() {
       )}
 
       <FlatList
-        data={tree}
+        data={viewState.tree}
         keyExtractor={(item) => item.path}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#c8873a" />
         }
+        ListHeaderComponent={viewState.banner ? <FilesErrorBanner banner={viewState.banner} onRetry={load} /> : null}
         renderItem={({ item }) => (
           <Pressable
             style={styles.row}
@@ -273,7 +281,7 @@ export default function FilesScreen() {
             )}
           </Pressable>
         )}
-        ListEmptyComponent={
+        ListEmptyComponent={viewState.showEmptyState ? (
           <View style={styles.empty}>
             <Ionicons name="document-text-outline" size={48} color="#44403c" />
             <Text style={styles.emptyText}>No files yet</Text>
@@ -284,7 +292,7 @@ export default function FilesScreen() {
               <Text style={styles.createFirstText}>Create your first note</Text>
             </Pressable>
           </View>
-        }
+        ) : null}
       />
 
       {/* FAB: New file */}
@@ -303,7 +311,7 @@ export default function FilesScreen() {
         title="Rename File"
         message={`Enter new name for "${renameTarget?.name ?? ''}"`}
         placeholder="New file name"
-        defaultValue={renameTarget?.name.replace(/\.md$/, '') ?? ''}
+        defaultValue={getRenameInputDefaultValue(renameTarget?.name ?? '')}
         onSubmit={handleRenameSubmit}
         onCancel={() => { setRenameModalVisible(false); setRenameTarget(null); }}
         submitText="Rename"

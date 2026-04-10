@@ -107,6 +107,7 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
   const [saveResult, setSaveResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [conversationEnabled, setConversationEnabled] = useState(false);
+  const [conversationTransport, setConversationTransport] = useState<'webhook' | 'long_connection'>('webhook');
   const [conversationEncryptKey, setConversationEncryptKey] = useState('');
   const [conversationVerificationToken, setConversationVerificationToken] = useState('');
   const [conversationPublicBaseUrl, setConversationPublicBaseUrl] = useState('');
@@ -146,6 +147,7 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
       setActivities(nextActivities);
       if (platformId === 'feishu') {
         setConversationEnabled(nextStatus?.webhook?.state !== 'disabled');
+        setConversationTransport(nextStatus?.webhook?.transport ?? 'webhook');
         setConversationPublicBaseUrl(nextStatus?.webhook?.publicBaseUrl ?? '');
       }
       setLoadState('ready');
@@ -264,6 +266,7 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
   const recipientExample = locale === 'zh' ? (platform.recipientExampleZh ?? platform.recipientExample) : platform.recipientExample;
   const recipientHint = recipientExample ? `${im.recipientHint} ${recipientExample}` : im.recipientHint;
 
+  const isLongConnection = conversationTransport === 'long_connection';
   const webhookStateLabel = webhookState === 'ready'
     ? im.conversationReady
     : webhookState === 'pending'
@@ -283,9 +286,10 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
           platform: 'feishu',
           conversation: {
             enabled: conversationEnabled,
+            transport: conversationTransport,
             encrypt_key: conversationEncryptKey.trim() || undefined,
             verification_token: conversationVerificationToken.trim() || undefined,
-            public_base_url: conversationPublicBaseUrl || undefined,
+            public_base_url: isLongConnection ? undefined : (conversationPublicBaseUrl || undefined),
             allow_group_mentions: conversationAllowMentions,
           },
         }),
@@ -418,16 +422,32 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
 
                     <div className="grid gap-3 sm:grid-cols-3">
                       <div>
-                        <label className="text-xs font-medium text-muted-foreground block mb-1.5">{im.conversationPublicBaseUrl}</label>
-                        <input
-                          type="url"
-                          placeholder="https://mindos.example.com"
-                          value={conversationPublicBaseUrl}
-                          onChange={e => setConversationPublicBaseUrl(e.target.value)}
+                        <label className="text-xs font-medium text-muted-foreground block mb-1.5">Transport</label>
+                        <select
+                          value={conversationTransport}
+                          onChange={e => setConversationTransport(e.target.value as 'webhook' | 'long_connection')}
                           className="h-11 w-full px-3 text-sm bg-background border border-border rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1.5 leading-5">{im.conversationReachabilityHint}</p>
+                        >
+                          <option value="webhook">Webhook</option>
+                          <option value="long_connection">Long Connection</option>
+                        </select>
+                        <p className="text-xs text-muted-foreground mt-1.5 leading-5">
+                          {isLongConnection ? 'Use long connection for local validation without a public URL.' : im.conversationReachabilityHint}
+                        </p>
                       </div>
+                      {!isLongConnection && (
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground block mb-1.5">{im.conversationPublicBaseUrl}</label>
+                          <input
+                            type="url"
+                            placeholder="https://mindos.example.com"
+                            value={conversationPublicBaseUrl}
+                            onChange={e => setConversationPublicBaseUrl(e.target.value)}
+                            className="h-11 w-full px-3 text-sm bg-background border border-border rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1.5 leading-5">{im.conversationReachabilityHint}</p>
+                        </div>
+                      )}
                       <div>
                         <label className="text-xs font-medium text-muted-foreground block mb-1.5">{im.conversationEncryptKey}</label>
                         <input
@@ -437,19 +457,21 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
                           onChange={e => setConversationEncryptKey(e.target.value)}
                           className="h-11 w-full px-3 text-sm font-mono bg-background border border-border rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                         />
-                        <p className="text-xs text-muted-foreground mt-1.5 leading-5">{im.conversationConfigHint}</p>
+                        <p className="text-xs text-muted-foreground mt-1.5 leading-5">{isLongConnection ? 'Optional for long connection. WebSocket delivery does not require webhook decrypt settings.' : im.conversationConfigHint}</p>
                       </div>
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground block mb-1.5">{im.conversationVerificationToken}</label>
-                        <input
-                          type={showSecrets ? 'text' : 'password'}
-                          placeholder={im.conversationSecretPlaceholder}
-                          value={conversationVerificationToken}
-                          onChange={e => setConversationVerificationToken(e.target.value)}
-                          className="h-11 w-full px-3 text-sm font-mono bg-background border border-border rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1.5 leading-5">{im.conversationVerificationTokenHint}</p>
-                      </div>
+                      {!isLongConnection && (
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground block mb-1.5">{im.conversationVerificationToken}</label>
+                          <input
+                            type={showSecrets ? 'text' : 'password'}
+                            placeholder={im.conversationSecretPlaceholder}
+                            value={conversationVerificationToken}
+                            onChange={e => setConversationVerificationToken(e.target.value)}
+                            className="h-11 w-full px-3 text-sm font-mono bg-background border border-border rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1.5 leading-5">{im.conversationVerificationTokenHint}</p>
+                        </div>
+                      )}
                     </div>
 
                     <label className="flex items-start gap-3 rounded-md border border-border/70 px-3 py-3">
@@ -465,16 +487,18 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
                       </span>
                     </label>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className={`grid gap-3 ${isLongConnection ? 'sm:grid-cols-1' : 'sm:grid-cols-2'}`}>
                       <div className="rounded-md bg-muted/40 px-3 py-3">
                         <p className="text-xs font-medium text-muted-foreground mb-1">{im.conversationStatus}</p>
                         <p className="text-sm text-foreground">{webhookStateLabel}</p>
                         {status?.webhook?.lastError && <p className="text-xs text-error mt-1 leading-5">{status.webhook.lastError}</p>}
                       </div>
-                      <div className="rounded-md bg-muted/40 px-3 py-3">
-                        <p className="text-xs font-medium text-muted-foreground mb-1">{im.conversationWebhookUrl}</p>
-                        <p className="text-sm font-mono text-foreground break-all">{status?.webhook?.webhookUrl ?? im.notAvailable}</p>
-                      </div>
+                      {!isLongConnection && (
+                        <div className="rounded-md bg-muted/40 px-3 py-3">
+                          <p className="text-xs font-medium text-muted-foreground mb-1">{im.conversationWebhookUrl}</p>
+                          <p className="text-sm font-mono text-foreground break-all">{status?.webhook?.webhookUrl ?? im.notAvailable}</p>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-3 pt-1">

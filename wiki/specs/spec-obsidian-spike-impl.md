@@ -39,6 +39,7 @@
 |---|---|---|
 | **Loader** | `app/lib/obsidian-compat/loader.ts` | 扫描、manifest 校验、执行 main.js |
 | **Plugin Manager** | `app/lib/obsidian-compat/plugin-manager.ts` | enabled/disabled 状态持久化、批量加载、错误摘要 |
+| **Compatibility Report** | `app/lib/obsidian-compat/compatibility-report.ts` | 静态分析插件依赖的 Obsidian API / Node 模块，生成迁移兼容摘要 |
 | **Runtime** | `app/lib/obsidian-compat/runtime.ts` | 插件生命周期、Component/Events 基类 |
 | **Plugin Shim** | `app/lib/obsidian-compat/shims/plugin.ts` | Plugin 基类 + onload/onunload 钩子 |
 | **Vault Shim** | `app/lib/obsidian-compat/shims/vault.ts` | 文件读写、事件发射 |
@@ -300,6 +301,7 @@ MindOS Adapters
 - `obsidian` 导出面最小壳：`Plugin` / `Component` / `Events` / `Notice` / `Modal` / `PluginSettingTab` / `Setting` / `TFile` / `TFolder` / `TAbstractFile`
 - `PluginLoader` 支持：插件发现、manifest 校验、模块注入、路径逃逸拦截、异步 `onload()` / `onunload()` 等待
 - `PluginManager` 支持：enabled/disabled 状态持久化、批量加载、错误摘要
+- `CompatibilityReport` 支持：静态识别高频 Obsidian API、Node/Electron 依赖、partial/blocker 分类，供生态迁移评估使用
 - `Vault` 支持：create/read/modify/append/delete/rename/copy、事件发射、路径安全、跳过 `.plugins/` 私有文件
 - `MetadataCache` 支持：frontmatter / tags / headings / wikilinks / 相对 markdown links 的最小提取
 - `Plugin` 支持：`loadData/saveData`、命令委托、setting tab 收集、非浏览器环境安全的 UI stub

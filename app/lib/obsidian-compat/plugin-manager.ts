@@ -5,6 +5,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { analyzePluginCompatibility, getCompatibilityLevel, type CompatibilityLevel, type PluginCompatibilityReport } from './compatibility-report';
 import { PluginLoader } from './loader';
 import type { PluginManifest } from './types';
 
@@ -18,6 +19,8 @@ export interface ManagedPlugin {
   version: string;
   enabled: boolean;
   loaded: boolean;
+  compatibility: PluginCompatibilityReport;
+  compatibilityLevel: CompatibilityLevel;
   lastError?: string;
 }
 
@@ -102,12 +105,19 @@ export class PluginManager {
 
   private toManagedPlugin(manifest: PluginManifest, state: PluginManagerState): ManagedPlugin {
     const loaded = this.loader.getLoadedPlugins().some((plugin) => plugin.manifest.id === manifest.id);
+    const pluginDir = path.join(this.mindRoot, '.plugins', manifest.id);
+    const mainPath = path.join(pluginDir, 'main.js');
+    const code = fs.existsSync(mainPath) ? fs.readFileSync(mainPath, 'utf-8') : '';
+    const compatibility = analyzePluginCompatibility(code);
+
     return {
       id: manifest.id,
       name: manifest.name,
       version: manifest.version,
       enabled: state.enabled[manifest.id] === true,
       loaded,
+      compatibility,
+      compatibilityLevel: getCompatibilityLevel(compatibility),
     };
   }
 

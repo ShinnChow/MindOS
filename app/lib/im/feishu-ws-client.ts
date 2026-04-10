@@ -1,6 +1,5 @@
 import * as Lark from '@larksuiteoapi/node-sdk';
 import type { FeishuConfig, FeishuSdkMessageEvent } from './types';
-import { handleFeishuMessageReceiveEvent } from './webhook/feishu';
 
 type FeishuWSRuntime = {
   client: Lark.WSClient;
@@ -18,7 +17,10 @@ function assertFeishuWSConfig(config: FeishuConfig): void {
 
 function createDispatcher(): Lark.EventDispatcher {
   return new Lark.EventDispatcher({}).register({
-    'im.message.receive_v1': (event: unknown) => handleFeishuMessageReceiveEvent(event as FeishuSdkMessageEvent),
+    'im.message.receive_v1': async (event: unknown) => {
+      const { handleFeishuMessageReceiveEvent } = await import('./webhook/feishu');
+      return handleFeishuMessageReceiveEvent(event as FeishuSdkMessageEvent);
+    },
   });
 }
 

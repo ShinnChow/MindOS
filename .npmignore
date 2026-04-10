@@ -64,4 +64,4 @@ tests/
 .DS_Store
 *.log
 *.tgz
-node_modules/
+/node_modules/

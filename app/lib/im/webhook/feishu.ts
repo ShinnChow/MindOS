@@ -46,6 +46,7 @@ export function buildFeishuWebhookStatus(config?: FeishuConfig): IMWebhookStatus
     return {
       platform: 'feishu',
       state: 'disabled',
+      transport,
       publicBaseUrl: normalizedBaseUrl,
       webhookUrl,
     };
@@ -57,6 +58,7 @@ export function buildFeishuWebhookStatus(config?: FeishuConfig): IMWebhookStatus
       return {
         platform: 'feishu',
         state: 'error',
+        transport,
         lastError: 'Feishu App ID and App Secret are required for long connection mode.',
       };
     }
@@ -64,6 +66,7 @@ export function buildFeishuWebhookStatus(config?: FeishuConfig): IMWebhookStatus
     return {
       platform: 'feishu',
       state: wsStatus.running ? 'ready' : 'pending',
+      transport,
       lastError: wsStatus.running ? undefined : (wsStatus.lastError ?? 'Start the Feishu long connection client to receive events locally.'),
     };
   }
@@ -72,6 +75,7 @@ export function buildFeishuWebhookStatus(config?: FeishuConfig): IMWebhookStatus
     return {
       platform: 'feishu',
       state: 'error',
+      transport,
       publicBaseUrl: normalizedBaseUrl,
       webhookUrl,
       lastError: 'Encrypt Key is required to enable Feishu conversations.',
@@ -82,6 +86,7 @@ export function buildFeishuWebhookStatus(config?: FeishuConfig): IMWebhookStatus
     return {
       platform: 'feishu',
       state: 'pending',
+      transport,
       publicBaseUrl: undefined,
       webhookUrl: undefined,
       lastError: 'Public base URL is required for Feishu event callbacks.',
@@ -91,6 +96,7 @@ export function buildFeishuWebhookStatus(config?: FeishuConfig): IMWebhookStatus
   return {
     platform: 'feishu',
     state: 'ready',
+    transport,
     publicBaseUrl: normalizedBaseUrl,
     webhookUrl,
     lastError: undefined,
