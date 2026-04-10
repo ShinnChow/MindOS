@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build a minimal MindOS runtime archive for Desktop Core Hot Update.
-# Output: /tmp/mindos-runtime-{VERSION}.tar.gz (pre-built, ~32MB)
+# Output: /tmp/mindos-runtime-{VERSION}.tar.gz (pre-built, ~30-40MB)
 #
 # Directory structure matches what ProcessManager + analyzeMindOsLayout expect:
 #   app/.next/standalone/server.js
@@ -26,7 +26,13 @@ echo "📦 Building MindOS runtime v${VERSION}..."
 echo "  Copying standalone..."
 mkdir -p "$WORK/app/.next"
 # Copy the entire standalone tree (server.js + node_modules + .next/server + .next/static + public)
-cp -r app/.next/standalone "$WORK/app/.next/standalone"
+# IMPORTANT: --no-dereference preserves symlinks as-is instead of following them.
+# Next.js standalone creates node_modules/node_modules -> ../../node_modules symlinks
+# that cause infinite recursion with plain cp -r (blowing up from ~30MB to 2GB+).
+cp -r --no-dereference app/.next/standalone "$WORK/app/.next/standalone"
+# Remove symlinks inside node_modules — they point to paths outside standalone
+# and are not needed at runtime (standalone has all traced deps already).
+find "$WORK/app/.next/standalone/node_modules" -type l -delete 2>/dev/null || true
 # Remove dev artifacts that sneak into standalone
 rm -rf "$WORK/app/.next/standalone/.next/cache" \
        "$WORK/app/.next/standalone/.next/dev" \
@@ -57,6 +63,10 @@ if [ -d "$STANDALONE_NM" ]; then
   find "$STANDALONE_NM" -name 'LICENSE.md' -delete
   # Empty directories left after deletion
   find "$STANDALONE_NM" -type d -empty -delete 2>/dev/null || true
+  # Remove packages not needed at runtime
+  rm -rf "$STANDALONE_NM/typescript"       # Only needed for type-checking, not runtime
+  rm -rf "$STANDALONE_NM/@types"           # TypeScript type definitions
+  rm -rf "$STANDALONE_NM/caniuse-lite"     # Browser compat data, not needed server-side
 fi
 # Copy static assets at top level (isBundledRuntimeIntact checks app/.next/static/)
 cp -r app/.next/static "$WORK/app/.next/static"

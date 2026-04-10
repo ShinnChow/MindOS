@@ -15,9 +15,25 @@ const nextConfig: NextConfig = {
     // when the project is inside node_modules (global npm install).
     ...(inNodeModules ? ['@geminilight/mindos'] : []),
   ],
-  serverExternalPackages: ['chokidar', 'openai', 'discord.js', '@mariozechner/pi-ai', '@mariozechner/pi-agent-core', '@mariozechner/pi-coding-agent', 'pi-mcp-adapter'],
+  serverExternalPackages: [
+    'chokidar', 'openai', 'discord.js',
+    '@mariozechner/pi-ai', '@mariozechner/pi-agent-core', '@mariozechner/pi-coding-agent', 'pi-mcp-adapter',
+    // Heavy packages excluded from bundle — dynamically imported at runtime.
+    '@huggingface/transformers', 'onnxruntime-node',
+    'sharp', '@img/sharp-linux-x64', '@img/sharp-darwin-arm64', '@img/sharp-win32-x64',
+  ],
   output: 'standalone',
   outputFileTracingRoot: projectDir,
+  // Exclude heavy native packages from standalone trace to reduce runtime archive.
+  // onnxruntime-node (355MB) is only needed for local embedding and will be
+  // installed on-demand. @img/sharp-* (33MB) is optional for image processing.
+  outputFileTracingExcludes: {
+    '*': [
+      './node_modules/onnxruntime-node/**',
+      './node_modules/@img/**',
+      './node_modules/sharp/**',
+    ],
+  },
   outputFileTracingIncludes: {
     // extract-pdf.cjs is spawned at runtime (not bundled) — ensure it's
     // copied into .next/standalone/scripts/ so standalone builds work.
