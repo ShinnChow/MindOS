@@ -14,7 +14,7 @@ vi.mock('@/lib/stores/locale-store', () => ({
     t: {
       panels: {
         im: {
-          emptyDesc: 'Connect messaging platforms to let MindOS Agent send messages on your behalf.',
+          emptyDesc: 'Connect messaging platforms to let MindOS send messages on your behalf.',
           backToChannels: 'Back to Channels',
           statusConnected: 'Connected',
           notConfigured: 'Set up',
@@ -42,6 +42,9 @@ vi.mock('@/lib/stores/locale-store', () => ({
           conversationOpenPlatform: 'Open Feishu console',
           conversationPublicBaseUrl: 'Public base URL',
           conversationEncryptKey: 'Encrypt Key',
+          conversationVerificationToken: 'Verification Token',
+          conversationVerificationTokenHint: 'Used for Feishu webhook challenge verification. Leave blank to keep the saved value.',
+          conversationSecretPlaceholder: 'Leave blank to keep saved value',
           conversationGroupMentions: 'Only reply when mentioned in groups',
           conversationSaved: 'Conversation settings saved',
           conversationSave: 'Save conversation settings',
@@ -144,6 +147,41 @@ describe('AgentsContentChannelDetail redesign', () => {
     expect(host.textContent).toContain('Send sample notification');
     expect(host.textContent).toContain('Settings');
     expect(host.textContent).toContain('This is a delivery channel, not a chat inbox.');
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it('renders a verification token field for Feishu conversation setup', async () => {
+    vi.stubGlobal('fetch', vi.fn((url: string) => {
+      if (url.includes('/api/im/status')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            platforms: [{ platform: 'feishu', connected: true, botName: 'MindOS Bot', capabilities: ['text', 'markdown'], webhook: { state: 'ready', webhookUrl: 'https://mindos.example.com/api/im/webhook/feishu', publicBaseUrl: 'https://mindos.example.com' } }],
+          }),
+        });
+      }
+      if (url.includes('/api/im/activity')) {
+        return Promise.resolve({ ok: true, json: async () => ({ activities: [] }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    }));
+
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const root = createRoot(host);
+
+    await act(async () => {
+      root.render(<AgentsContentChannelDetail platformId="feishu" />);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(host.textContent).toContain('Verification Token');
+    expect(host.textContent).toContain('Leave blank to keep the saved value');
 
     await act(async () => {
       root.unmount();

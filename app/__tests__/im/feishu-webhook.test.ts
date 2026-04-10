@@ -47,6 +47,26 @@ describe('Feishu webhook helpers', () => {
     });
   });
 
+  it('rejects challenge with wrong verification token', async () => {
+    const { handleFeishuWebhook } = await import('@/lib/im/webhook/feishu');
+    const result = await handleFeishuWebhook({
+      config: {
+        app_id: 'cli_xxx',
+        app_secret: 'secret',
+        conversation: {
+          enabled: true,
+          encrypt_key: 'encrypt',
+          public_base_url: 'https://mindos.example.com',
+          verification_token: 'expected-token',
+        },
+      },
+      body: { challenge: 'challenge-token', token: 'wrong-token' },
+    });
+
+    expect(result.status).toBe(401);
+    expect(result.body).toEqual({ ok: false, error: 'Invalid verification token' });
+  });
+
   it('normalizes a dm text message into the shared incoming message shape', () => {
     const payload: FeishuWebhookEventEnvelope = {
       header: {
@@ -104,5 +124,36 @@ describe('Feishu webhook helpers', () => {
     };
 
     expect(shouldProcessFeishuEvent(payload)).toEqual({ ok: false, reason: 'group_without_mention' });
+  });
+
+  it('ignores events with empty text after normalization', async () => {
+    const { handleFeishuWebhook } = await import('@/lib/im/webhook/feishu');
+    const result = await handleFeishuWebhook({
+      config: {
+        app_id: 'cli_xxx',
+        app_secret: 'secret',
+        conversation: {
+          enabled: true,
+          encrypt_key: 'encrypt',
+          public_base_url: 'https://mindos.example.com',
+        },
+      },
+      body: {
+        event: {
+          message: {
+            chat_type: 'p2p',
+            chat_id: 'oc_chat_001',
+            message_id: 'om_001',
+            content: JSON.stringify({ text: '   ' }),
+          },
+          sender: {
+            sender_id: { open_id: 'ou_sender_1' },
+          },
+        },
+      },
+    });
+
+    expect(result.status).toBe(202);
+    expect(result.body).toEqual({ ok: true, ignored: true, reason: 'empty_text' });
   });
 });

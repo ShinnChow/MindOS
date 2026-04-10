@@ -108,6 +108,7 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [conversationEnabled, setConversationEnabled] = useState(false);
   const [conversationEncryptKey, setConversationEncryptKey] = useState('');
+  const [conversationVerificationToken, setConversationVerificationToken] = useState('');
   const [conversationPublicBaseUrl, setConversationPublicBaseUrl] = useState('');
   const [conversationAllowMentions, setConversationAllowMentions] = useState(true);
   const [conversationSaving, setConversationSaving] = useState(false);
@@ -282,7 +283,8 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
           platform: 'feishu',
           conversation: {
             enabled: conversationEnabled,
-            encrypt_key: conversationEncryptKey || undefined,
+            encrypt_key: conversationEncryptKey.trim() || undefined,
+            verification_token: conversationVerificationToken.trim() || undefined,
             public_base_url: conversationPublicBaseUrl || undefined,
             allow_group_mentions: conversationAllowMentions,
           },
@@ -291,6 +293,8 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
       const data = await res.json();
       if (data.ok) {
         setConversationResult({ ok: true, msg: im.conversationSaved });
+        setConversationEncryptKey('');
+        setConversationVerificationToken('');
         await fetchDetail();
       } else {
         setConversationResult({ ok: false, msg: data.error || 'Failed' });
@@ -369,7 +373,7 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
                   <span className="text-xs font-medium text-muted-foreground">{im.currentMode}</span>
                   <span className="inline-flex items-center rounded-md bg-[var(--amber-dim)] px-2 py-1 text-xs font-medium text-[var(--amber)]">{conversationModeLabel}</span>
                 </div>
-                <p className="text-sm text-muted-foreground leading-6 max-w-prose">{im.workInMindosHint}</p>
+                <p className="text-sm text-muted-foreground leading-6 max-w-prose">{isFeishu && webhookState === 'ready' ? im.conversationHint : im.workInMindosHint}</p>
               </div>
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 <p className="text-xs text-muted-foreground">{im.thisIsNotChat}</p>
@@ -412,7 +416,7 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
                       </label>
                     </div>
 
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-3">
                       <div>
                         <label className="text-xs font-medium text-muted-foreground block mb-1.5">{im.conversationPublicBaseUrl}</label>
                         <input
@@ -428,12 +432,23 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
                         <label className="text-xs font-medium text-muted-foreground block mb-1.5">{im.conversationEncryptKey}</label>
                         <input
                           type={showSecrets ? 'text' : 'password'}
-                          placeholder="Encrypt Key"
+                          placeholder={im.conversationSecretPlaceholder}
                           value={conversationEncryptKey}
                           onChange={e => setConversationEncryptKey(e.target.value)}
                           className="h-11 w-full px-3 text-sm font-mono bg-background border border-border rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                         />
                         <p className="text-xs text-muted-foreground mt-1.5 leading-5">{im.conversationConfigHint}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground block mb-1.5">{im.conversationVerificationToken}</label>
+                        <input
+                          type={showSecrets ? 'text' : 'password'}
+                          placeholder={im.conversationSecretPlaceholder}
+                          value={conversationVerificationToken}
+                          onChange={e => setConversationVerificationToken(e.target.value)}
+                          className="h-11 w-full px-3 text-sm font-mono bg-background border border-border rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1.5 leading-5">{im.conversationVerificationTokenHint}</p>
                       </div>
                     </div>
 

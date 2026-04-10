@@ -12,6 +12,28 @@
 
 ---
 
+## 需求澄清
+
+### Why?
+
+用户已经能把 MindOS 结果发到飞书，但还不能在飞书里直接提问，这会迫使用户来回切上下文。对独立开发者/创始人来说，真正高频的是“人在飞书里时顺手问一句”，不是每次都切回 MindOS。
+
+### Simpler?
+
+最简单的方案是继续只做通知，不做入站。但这无法满足“在飞书里直接问”的核心目标。
+
+本期选择的最小可用范围是：
+- 只支持文本消息
+- 私聊直接处理
+- 群聊仅在 @ 机器人时处理
+- 先复用轻量 headless runner，不复刻整条 `/api/ask` HTTP/SSE 链
+
+### 关键假设
+
+- 用户愿意先配置公网可达 webhook，再开启飞书对话
+- 本期只要求“能对话”，不要求与前端 Ask 完全共享所有会话元数据
+- 当 Agent 失败时，发送清晰兜底回复比静默失败更符合用户体验
+
 ## 现状分析
 
 ### 当前架构
@@ -213,6 +235,48 @@ Step 3: 飞书用户发消息
 ```
 
 ---
+
+## 方案对比
+
+### 方案 A：Webhook 内部直接 HTTP 调 `/api/ask`
+- 用户体验质量：⭐⭐⭐
+- 实现复杂度：中
+- 可维护性：低
+- 风险：自调用 HTTP、SSE 解析、鉴权/超时链重复，错误面更大
+
+### 方案 B：抽 headless runner，Webhook 异步直接跑 Agent
+- 用户体验质量：⭐⭐⭐⭐⭐
+- 实现复杂度：中
+- 可维护性：高
+- 风险：需要维护一份与 ask runtime 同步的最小初始化逻辑
+
+### 方案 C：只做 webhook 收消息，不真正回复
+- 用户体验质量：⭐
+- 实现复杂度：低
+- 可维护性：中
+- 风险：用户会误以为功能可用，实际没有价值
+
+### UI 方案对比
+
+```text
+方案 A：Conversation 内联卡片             方案 B：折叠到 Settings
+┌─────────────────────────────┐        ┌─────────────────────────────┐
+│ Conversation                │        │ Settings                    │
+│ [开关] [Webhook 状态]       │        │ ▼ 更多设置                  │
+│ Public URL / Encrypt Key    │        │   App ID / Secret           │
+│ [保存] [打开飞书后台]       │        │   Encrypt Key / URL         │
+└─────────────────────────────┘        └─────────────────────────────┘
+UX：状态与动作靠近 ⭐⭐⭐⭐⭐                UX：入口更深，心智更弱 ⭐⭐⭐
+```
+
+### 选择
+
+选择 **方案 B（headless runner） + UI 内联 Conversation 卡片**。
+
+原因：
+1. 它给用户的是完整可用体验，而不是“看起来开启了，其实不会回复”的半成品。
+2. 它避免 `/api/ask` 自调用，减少超时和调试复杂度。
+3. Conversation 是这个页面的新核心能力，应该直接露出，不应再次埋进 Settings。
 
 ## UI 线框图
 
@@ -500,8 +564,9 @@ MindOS ──定时 GET──▶ 飞书 API（不存在这个 API）
 | 文件 | 改动类型 | 说明 |
 |------|---------|------|
 | `app/lib/im/types.ts` | 扩展 | IncomingMessage, IMSession, WebhookStatus |
-| `app/lib/im/webhook/feishu.ts` | **新增** | 签名验证、解密、消息标准化 |
-| `app/lib/im/session.ts` | **新增** | IM 会话管理器 |
+| `app/lib/im/webhook/feishu.ts` | **新增** | challenge/token 校验、消息标准化、异步回复调度 |
+| `app/lib/im/conversation-store.ts` | **新增** | 轻量 IM 会话历史存储 |
+| `app/lib/agent/headless.ts` | **新增** | Headless agent runner |
 | `app/app/api/im/webhook/feishu/route.ts` | **新增** | Webhook 入口 |
 | `app/app/api/im/webhook-status/route.ts` | **新增** | Webhook 状态查询 |
 | `app/lib/im/activity.ts` | 扩展 | 支持 'conversation' 类型 |
@@ -514,9 +579,9 @@ MindOS ──定时 GET──▶ 飞书 API（不存在这个 API）
 
 | 模块 | 影响 | 说明 |
 |------|------|------|
-| `/api/ask` | 无直接修改 | Webhook 内部调用现有 Agent 入口 |
-| Activity 系统 | 兼容扩展 | 新增 'conversation' 活动类型 |
-| 凭证存储 | 兼容扩展 | 新增 encrypt_key, conversation_enabled 字段 |
+| `/api/ask` | 无直接修改 | 保持现有 HTTP/SSE 入口；Webhook 改为复用独立 headless runner |
+| Activity 系统 | 兼容扩展 | 新增 `conversation_inbound` / `conversation_reply` 活动类型 |
+| 凭证存储 | 兼容扩展 | 新增 `conversation` 嵌套配置字段 |
 
 ### 破坏性变更
 
@@ -533,7 +598,7 @@ MindOS ──定时 GET──▶ 飞书 API（不存在这个 API）
 | 消息超长（>4096 字符）| 截断到 4000 字符，回复提示"消息已截断处理" |
 | 并发消息（同用户快速发多条）| 排队处理，按时间戳顺序回复 |
 | Agent 处理超时（>30s）| 回复"处理时间较长，请稍后重试"，记录错误活动 |
-| 无效签名 | 返回 401，不处理，记录安全日志 |
+| challenge token 不匹配 | 返回 401，不处理 challenge |
 | challenge 请求 | 立即返回 challenge 值，不进入消息处理流程 |
 | 群聊非 @bot 消息 | 忽略，不处理，不记录活动 |
 | 用户未配置 conversation_enabled | Webhook 仍接收消息，但不处理，返回 200（避免飞书重试） |
@@ -544,10 +609,10 @@ MindOS ──定时 GET──▶ 飞书 API（不存在这个 API）
 
 | 风险 | 影响 | Mitigation |
 |------|------|------------|
-| 签名验证实现错误 | 安全漏洞 | 严格按飞书文档实现，增加测试覆盖 |
-| 会话泄露 | 隐私问题 | 会话按 (platform, chatId) 隔离，30 分钟超时清理 |
-| DoS 攻击 | 服务不可用 | 速率限制 + 签名验证前置 |
-| Agent 处理 OOM | 服务崩溃 | 超时保护 + 内存限制 |
+| 尚未实现完整签名/AES 验证 | 安全边界不足 | 下一个迭代补齐 Feishu 正式签名与解密流程；当前仅用于受控测试 |
+| 会话泄露 | 隐私问题 | 会话按 `(platform, chatId)` 隔离，仅保留少量最近消息 |
+| DoS 攻击 | 服务不可用 | 后续补请求体限制、签名前置校验、速率限制 |
+| Agent 处理失败 | 用户无响应 | 发送清晰兜底回复，并记录 reply activity |
 
 ---
 
@@ -557,16 +622,16 @@ MindOS ──定时 GET──▶ 飞书 API（不存在这个 API）
 
 - [ ] 用户可在 Channel 详情页开启/关闭飞书对话
 - [ ] 开启后显示 Webhook URL，用户可复制
-- [ ] 飞书 challenge 验证成功后状态变为"已就绪"
-- [ ] 飞书私聊机器人发消息，MindOS 在 <5s 内回复
-- [ ] 飞书群聊 @机器人发消息，MindOS 在 <5s 内回复
+- [ ] 飞书 challenge 验证请求可被正确响应
+- [ ] 飞书私聊机器人发消息，MindOS 异步生成并回发回复
+- [ ] 飞书群聊 @机器人发消息，MindOS 异步生成并回发回复
 - [ ] 群聊非 @bot 消息不触发回复
 - [ ] 关闭对话后，飞书消息不再触发回复
 - [ ] Recent activity 显示入站对话记录（← 入站）和回复记录
 
 ### 安全验收
 
-- [ ] 无效签名请求返回 401，不处理消息
+- [ ] challenge token 不匹配时返回 401，不处理 challenge
 - [ ] Encrypt Key 存储在 `~/.mindos/im.json`，权限 0600
 - [ ] 会话数据不跨用户泄露
 
@@ -593,12 +658,12 @@ MindOS ──定时 GET──▶ 飞书 API（不存在这个 API）
    - 如果不成立：Webhook 不会收到消息，UI 显示"等待验证"
 3. **决策**：群聊只响应 @机器人 的消息
    - 原因：降噪，避免打扰群聊
-4. **决策**：会话 30 分钟无活动自动清理
-   - 原因：平衡上下文保持和资源占用
+4. **决策**：会话先采用轻量最近消息窗口，而不是复杂 TTL 清理器
+   - 原因：先稳定对话体验，避免在第一期引入额外后台清理复杂度
 5. **决策**：群聊默认只响应 @机器人的文本消息，不处理图片/文件/语音
    - 原因：先把文本对话链路做稳定，避免多模态输入扩大范围
-6. **决策**：本期不直接从 Webhook 内部调用 `/api/ask` HTTP，而是复用 ask runtime 的共享入口函数
-   - 原因：避免自调用 HTTP 带来的超时、SSE 解析和身份传递复杂度
+6. **决策**：本期不直接从 Webhook 内部调用 `/api/ask` HTTP，而是复用 ask runtime 的 headless runner
+   - 原因：避免自调用 HTTP 带来的超时、SSE 解析和身份传递复杂度，同时让 IM webhook 能直接拿到最终文本结果
 7. **决策**：若当前实例没有公网 URL，则 UI 不允许把会话状态标成“Ready”
    - 原因：避免用户误以为飞书可达，结果配置后永远收不到 challenge
 8. **决策**：本期不实现"飞书里查看 MindOS 知识库"功能
@@ -629,7 +694,7 @@ MindOS ──定时 GET──▶ 飞书 API（不存在这个 API）
 发现的问题：
 
 1. **问题：如果直接让 webhook route 发 HTTP 请求到 `/api/ask`，会出现自调用、SSE 解析、鉴权链重复问题。**
-   - 修正：抽出共享 `runAskTurn()` / `runAgentConversationTurn()` 内部函数，由 Webhook 和 Ask API 共用。
+   - 修正：抽出共享 headless runner，由 Webhook 直接复用 ask runtime 的 session 初始化与文本聚合逻辑。
 
 2. **问题：恶意用户可以向 webhook 发超大 body 或伪造事件刷服务。**
    - 修正：增加 body 大小限制、签名前不做昂贵计算、签名失败直接 401、消息文本标准化前先裁剪。

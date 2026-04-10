@@ -196,6 +196,11 @@ rootcause: app/api/ask/route.ts:143 直接传递 llmHistoryMessages（pi-ai Mess
 - **原因：** `AskContent` 在 `isLoading` 时给 input/textarea 加了 `disabled`，把“发送中”与“不可输入”错误耦合
 - **解决：** 执行中仍允许输入；仅阻止并发 submit，不阻断草拟。并在 footer 提示“可先输入下一步”，降低等待焦虑并提升连续操作体验
 
+### 移动端 Chat 重试不能丢附件上下文（2026-04-10）
+- **现象：** 用户给消息附加知识库文件后发送失败，点 Retry 只重发文本，不再带附件路径，导致 AI 第二次看到的上下文和第一次不一致
+- **原因：** `useChat` 只记录 `lastFailedMessage`，没有同时记录 `lastFailedAttachments`；UI 层在发送开始后会清空附件 chips，更放大了这个问题
+- **解决：** `useChat` 同时持久化 `lastFailedAttachments` 并在 `retry()` 时一并传回 `send()`；发送链路里不要假设“重试只需要文本”
+
 ## CLI
 
 ### npm 全局安装缺 node_modules
@@ -241,6 +246,12 @@ rootcause: app/api/ask/route.ts:143 直接传递 llmHistoryMessages（pi-ai Mess
   3. 增加 `Recent activity`，让用户知道系统真的在工作
   4. 把凭证维护下沉到 `Settings`，不要让配置表单成为页面主角
 - **文件参考：** `app/components/agents/AgentsContentChannelDetail.tsx`, `app/lib/im/platforms.ts`, `app/lib/im/activity.ts`
+
+### Secret 输入框不能用占位符回写真实值（2026-04-11）
+- **现象：** 用户打开已配置的 secret 字段（如 Feishu Encrypt Key / Verification Token），输入框里若显示 `••••••••` 之类的占位符，点击保存后可能把占位符本身写回配置文件
+- **原因：** 前端把“已隐藏的展示占位符”当成真实值保存在 state 中，提交时又原样发送给 API
+- **解决：** secret 字段默认保持空值；UI 只通过 placeholder / hint 表示“已保存值存在”；提交时只有用户真的输入了新值才发送，空值必须走 `undefined` 保持后端原值
+- **文件参考：** `app/components/agents/AgentsContentChannelDetail.tsx`, `app/app/api/im/config/route.ts`
 
 ### Emoji Hydration Mismatch（Twemoji 浏览器扩展）
 - **现象：** SSR 渲染的 emoji 文本（如 `🎯`、`🚀`）在客户端被 Twemoji 等浏览器扩展替换为 `<img>` 元素，触发 React hydration error：`Hydration failed because the server rendered text didn't match the client`
@@ -547,6 +558,23 @@ rootcause: app/api/ask/route.ts:143 直接传递 llmHistoryMessages（pi-ai Mess
 - **现象：** AI SDK 用 `toolCallId` / `toolName` / `input`，pi-agent-core 用 `id` / `name` / `arguments`
 - **解决：** `toAgentMessages()` 中做字段映射（`type: 'toolCall', id: part.toolCallId, name: part.toolName, arguments: part.input`）
 - **规则：** 跨 SDK 迁移时逐字段对比类型定义，不要假设字段名相同
+
+## 架构 & 设计模式
+
+### 插件兼容 / runtime 层的假绿陷阱（2026-04-10）
+- **现象：** 插件 compat 骨架测试初看通过，但一补集成测试就暴露出 3 类问题：`../` 路径穿越、`onload()` 异步未等待、`.plugins/` 私有文件混入用户 vault 文件列表
+- **原因：** 纯骨架实现容易只验证 happy path；如果没有更贴近用户流的集成测试，很多问题会“假绿”——尤其是 async 生命周期、路径边界、私有目录隔离这三类
+- **解决：** compat/runtime 层默认做三件事：
+  1. 所有文件路径统一走 `resolveSafe()`
+  2. 生命周期 `load()/unload()` 设计为 async，并在 loader 中 `await`
+  3. 文件扫描显式排除私有运行时目录（如 `.plugins/`）
+- **规则：** 任何“宿主适配层 / 插件 runtime / loader”类模块，测试必须至少覆盖：
+  - 正常加载
+  - 异步生命周期
+  - 路径逃逸
+  - 私有目录污染
+  - 配置损坏而非缺失
+  - 设置 DSL 只收集声明，不要假装已经接到真实宿主 UI
 
 ## 进程生命周期
 
@@ -1520,4 +1548,29 @@ rootcause: app/api/ask/route.ts:143 直接传递 llmHistoryMessages（pi-ai Mess
   3. 添加 systemPrompt 尺寸日志便于诊断 context truncation
 - **文件：** `app/app/api/ask/route.ts`
 - **规则：** 不要用空 `catch {}` 吞掉可能有用的错误信息；三路分支（organize/chat/agent）修改时要对齐检查
+
+### 首条消息自我介绍抢答任务 + 上传附件处理中被静默排除
+
+- **严重等级：** 🟠 High — 用户明明发了具体任务，AI 却先念模板式自我介绍；刚上传的附录文件也可能没进上下文
+- **现象 1：** 新对话第一条消息如果同时包含问候 + 具体任务，AI 按 system prompt 先自我介绍，导致回复机械、偏题
+- **现象 2：** 用户刚上传 PDF 等附录文件就立刻发送，UI 显示附件 chip，但请求里把 `status === 'loading'` 的附件过滤掉，模型拿不到文件内容
+- **根因 1：** `prompt.ts` 把“新对话第一条消息”也当成自我介绍触发条件，范围过宽
+- **根因 2：** `useAskChat.ts` 发送请求时直接过滤 loading 附件，但未阻止提交，也没有明确提示用户等待处理完成
+- **解决：**
+  1. 自我介绍只在**纯问候 / 纯身份询问**时触发；同一条消息里有具体任务就直接做事
+  2. 发送前检测 loading 附件；若仍在处理中，则禁用发送并显示明确提示，避免“看起来已附加，实际没进 context”
+- **文件：** `app/lib/agent/prompt.ts`、`app/hooks/useAskChat.ts`、`app/components/ask/AskContent.tsx`
+- **规则：** “首条消息”不是有效的意图信号；凡是会被注入 prompt 的上下文素材，只要尚未准备好，就不能静默跳过，必须阻止提交或显式告知
+
+### 只改 prompt 不改 UI/skill，导致 MindOS 身份文案分裂
+
+- **严重等级：** 🟡 Medium — 用户在不同入口看到不同的人格和命名，信任感被稀释
+- **现象：** 聊天行为里已经不再自称“第二大脑操作员”，但 Ask 标题、默认 Agent 名称、Onboarding、Skill 描述仍沿用旧表述或 `MindOS Agent`
+- **根因：** 身份文案分散在共享 prompt、i18n、默认 Agent 常量、skills/ 与 app/data/skills/ 多份副本里，只改一层会留下半套体验
+- **解决：**
+  1. 先定义统一原则：产品名 `MindOS`，描述语 `local knowledge assistant / 本地知识助手`
+  2. 关键用户可见 surfaces 同步更新：prompt、默认 Agent 名称、Onboarding、Help、Channels、skills/
+  3. 对 `skills/` 与 `app/data/skills/` 建一致性测试，避免再次漂移
+- **文件：** `app/lib/agent/prompt.ts`、`app/lib/ask-agent.ts`、`app/lib/i18n/modules/*`、`skills/mindos*`、`app/data/skills/mindos*`
+- **规则：** 只要是“产品身份 / 默认助手命名”这类跨入口文案，就不能局部修补；必须把 source-of-truth 与所有用户可见关键 surface 一起对齐
 

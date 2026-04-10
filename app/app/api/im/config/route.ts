@@ -36,6 +36,7 @@ export async function PUT(req: NextRequest) {
       conversation?: {
         enabled?: boolean;
         encrypt_key?: string;
+        verification_token?: string;
         public_base_url?: string;
         allow_group_mentions?: boolean;
       };
@@ -61,11 +62,15 @@ export async function PUT(req: NextRequest) {
     }
 
     if (platform === 'feishu' && conversation && typeof conversation === 'object') {
+      if (!existing.app_id || !existing.app_secret) {
+        return NextResponse.json({ error: 'Save Feishu App ID and App Secret before enabling conversations' }, { status: 422 });
+      }
       const merged = ((config.providers as Record<string, any>)[platform] ?? {}) as Record<string, any>;
       merged.conversation = {
         ...(merged.conversation ?? {}),
         enabled: Boolean(conversation.enabled),
         encrypt_key: conversation.encrypt_key ?? merged.conversation?.encrypt_key,
+        verification_token: conversation.verification_token ?? merged.conversation?.verification_token,
         public_base_url: conversation.public_base_url ?? merged.conversation?.public_base_url,
         allow_group_mentions: conversation.allow_group_mentions ?? merged.conversation?.allow_group_mentions ?? true,
       };
