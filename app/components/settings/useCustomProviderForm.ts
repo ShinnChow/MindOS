@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { type ProviderId } from '@/lib/agent/providers';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { type ProviderId, PROVIDER_PRESETS } from '@/lib/agent/providers';
 import { type Provider, generateProviderId } from '@/lib/custom-endpoints';
 
 export type TestState = 'idle' | 'testing' | 'ok' | 'error';
@@ -32,6 +32,29 @@ export interface CustomProviderFormState {
   handleSave: () => void;
 }
 
+export function buildDefaultProviderName(
+  protocol: ProviderId,
+  existingNames: string[] = [],
+  excludeName?: string,
+  locale?: string,
+): string {
+  const preset = PROVIDER_PRESETS[protocol];
+  const baseName = locale === 'zh' ? preset.nameZh : preset.name;
+  const normalizedExisting = new Set(
+    existingNames
+      .filter((name) => name && name !== excludeName)
+      .map((name) => name.trim().toLowerCase()),
+  );
+
+  if (!normalizedExisting.has(baseName.trim().toLowerCase())) return baseName;
+
+  let index = 2;
+  while (normalizedExisting.has(`${baseName} ${index}`.toLowerCase())) {
+    index++;
+  }
+  return `${baseName} ${index}`;
+}
+
 /**
  * Shared form state + test/save logic for provider forms.
  * Used by both the inline form (AiTab) and the modal (ProviderModal).
@@ -47,27 +70,64 @@ export function useCustomProviderForm({
   locale: string;
   existingNames?: string[];
 }): CustomProviderFormState {
-  const [name, setName] = useState(initial?.name ?? '');
-  const [protocol, setProtocol] = useState<ProviderId>(initial?.protocol ?? 'openai');
+  const initialName = useMemo(
+    () => initial?.name ?? buildDefaultProviderName(initial?.protocol ?? 'openai', existingNames, initial?.name, locale),
+    [initial?.name, initial?.protocol, existingNames, locale],
+  );
+
+  const [name, setNameState] = useState(initialName);
+  const [protocol, setProtocolState] = useState<ProviderId>(initial?.protocol ?? 'openai');
   const [apiKey, setApiKey] = useState(initial?.apiKey ?? '');
   const [model, setModel] = useState(initial?.model ?? '');
   const [baseUrl, setBaseUrl] = useState(initial?.baseUrl ?? '');
   const [testResult, setTestResult] = useState<TestResult>({ state: 'idle' });
+  const [nameTouched, setNameTouched] = useState(!!initial?.name);
+
+  const autoName = useMemo(
+    () => buildDefaultProviderName(protocol, existingNames, initial?.name, locale),
+    [protocol, existingNames, initial?.name, locale],
+  );
+
+  useEffect(() => {
+    if (!nameTouched) {
+      setNameState(autoName);
+    }
+  }, [autoName, nameTouched]);
+
+  const setName = useCallback((value: string) => {
+    setNameTouched(true);
+    setNameState(value);
+  }, []);
+
+  const setProtocol = useCallback((value: ProviderId) => {
+    setProtocolState(value);
+    setTestResult({ state: 'idle' });
+  }, []);
 
   // Check for duplicate name (exclude the provider being edited)
   const trimmedName = name.trim();
-  const isDuplicateName = !!(trimmedName && existingNames?.some(
-    n => n.toLowerCase() === trimmedName.toLowerCase(),
+  const effectiveName = trimmedName || autoName;
+  const isDuplicateName = !!(effectiveName && existingNames?.some(
+    n => n !== initial?.name && n.toLowerCase() === effectiveName.toLowerCase(),
   ));
 
-  const canSave = !!(trimmedName && baseUrl.trim() && model.trim() && !isDuplicateName);
+  const canSave = !!(baseUrl.trim() && model.trim() && !isDuplicateName);
+
+  const requiredFieldsMessage = locale === 'zh'
+    ? '接口地址和模型为必填'
+    : 'Base URL and model are required';
+
+  const duplicateNameMessage = locale === 'zh'
+    ? '名称已存在，请使用其他名称'
+    : 'Name already exists, please use a different name';
 
   const handleTest = useCallback(async () => {
-    if (!canSave) {
-      setTestResult({
-        state: 'error',
-        error: locale === 'zh' ? '名称、接口地址和模型为必填' : 'Name, base URL, and model are required',
-      });
+    if (isDuplicateName) {
+      setTestResult({ state: 'error', error: duplicateNameMessage });
+      return;
+    }
+    if (!baseUrl.trim() || !model.trim()) {
+      setTestResult({ state: 'error', error: requiredFieldsMessage });
       return;
     }
     setTestResult({ state: 'testing' });
@@ -90,32 +150,26 @@ export function useCustomProviderForm({
     } catch {
       setTestResult({ state: 'error', code: 'network_error', error: 'Network error' });
     }
-  }, [canSave, apiKey, model, baseUrl, protocol, locale, initial?.id]);
+  }, [isDuplicateName, duplicateNameMessage, baseUrl, model, initial?.id, apiKey, protocol, requiredFieldsMessage]);
 
   const handleSave = useCallback(() => {
     if (isDuplicateName) {
-      setTestResult({
-        state: 'error',
-        error: locale === 'zh' ? '名称已存在，请使用其他名称' : 'Name already exists, please use a different name',
-      });
+      setTestResult({ state: 'error', error: duplicateNameMessage });
       return;
     }
-    if (!canSave) {
-      setTestResult({
-        state: 'error',
-        error: locale === 'zh' ? '名称、接口地址和模型为必填' : 'Name, base URL, and model are required',
-      });
+    if (!baseUrl.trim() || !model.trim()) {
+      setTestResult({ state: 'error', error: requiredFieldsMessage });
       return;
     }
     onSave({
       id: initial?.id || generateProviderId(),
-      name: name.trim(),
+      name: effectiveName,
       protocol,
       apiKey,
       model: model.trim(),
       baseUrl: baseUrl.trim(),
     });
-  }, [canSave, isDuplicateName, name, protocol, apiKey, model, baseUrl, initial?.id, onSave, locale]);
+  }, [isDuplicateName, duplicateNameMessage, baseUrl, model, requiredFieldsMessage, onSave, initial?.id, effectiveName, protocol, apiKey]);
 
   return {
     name, setName,

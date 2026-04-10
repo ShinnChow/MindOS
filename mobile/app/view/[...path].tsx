@@ -17,6 +17,8 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Markdown from 'react-native-markdown-display';
 import { mindosClient } from '@/lib/api-client';
+import { findNode, sortFileNodes } from '@/lib/file-tree';
+import { getMarkdownStyles } from '@/lib/markdown-styles';
 import MarkdownEditor from '@/components/editor/MarkdownEditor';
 import CSVTable from '@/components/CSVTable';
 import type { FileNode } from '@/lib/types';
@@ -75,12 +77,7 @@ export default function ViewScreen() {
           const node = findNode(tree, filePath);
           if (node?.children) {
             // Sort: directories first, then alphabetically
-            const sorted = [...node.children].sort((a, b) => {
-              if (a.type === 'directory' && b.type !== 'directory') return -1;
-              if (a.type !== 'directory' && b.type === 'directory') return 1;
-              return a.name.localeCompare(b.name);
-            });
-            setChildren(sorted);
+            setChildren(sortFileNodes(node.children));
             setIsDir(true);
           } else {
             setError('File not found');
@@ -213,22 +210,11 @@ export default function ViewScreen() {
         <CSVTable content={content} delimiter={fileName.endsWith('.tsv') ? '\t' : ','} />
       ) : (
         <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
-          <Markdown style={markdownStyles}>{content}</Markdown>
+          <Markdown style={getMarkdownStyles('document')}>{content}</Markdown>
         </ScrollView>
       )}
     </View>
   );
-}
-
-function findNode(tree: FileNode[], targetPath: string): FileNode | null {
-  for (const node of tree) {
-    if (node.path === targetPath) return node;
-    if (node.children) {
-      const found = findNode(node.children, targetPath);
-      if (found) return found;
-    }
-  }
-  return null;
 }
 
 const styles = StyleSheet.create({
@@ -266,52 +252,3 @@ const styles = StyleSheet.create({
   },
 });
 
-const markdownStyles = {
-  body: { color: '#d6d3d1', fontSize: 15, lineHeight: 24 },
-  heading1: { color: '#fafaf9', fontSize: 24, fontWeight: '700' as const, marginTop: 24, marginBottom: 8 },
-  heading2: { color: '#fafaf9', fontSize: 20, fontWeight: '700' as const, marginTop: 20, marginBottom: 8 },
-  heading3: { color: '#fafaf9', fontSize: 17, fontWeight: '600' as const, marginTop: 16, marginBottom: 6 },
-  strong: { color: '#fafaf9', fontWeight: '600' as const },
-  em: { fontStyle: 'italic' as const },
-  link: { color: '#c8873a' },
-  blockquote: {
-    borderLeftWidth: 3,
-    borderLeftColor: '#c8873a',
-    paddingLeft: 12,
-    marginLeft: 0,
-    opacity: 0.8,
-  },
-  code_inline: {
-    backgroundColor: '#292524',
-    color: '#fbbf24',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
-    fontFamily: 'monospace',
-    fontSize: 13,
-  },
-  code_block: {
-    backgroundColor: '#292524',
-    padding: 12,
-    borderRadius: 8,
-    fontFamily: 'monospace',
-    fontSize: 13,
-    color: '#d6d3d1',
-  },
-  fence: {
-    backgroundColor: '#292524',
-    padding: 12,
-    borderRadius: 8,
-    fontFamily: 'monospace',
-    fontSize: 13,
-    color: '#d6d3d1',
-  },
-  list_item: { marginBottom: 4 },
-  bullet_list: { marginLeft: 8 },
-  ordered_list: { marginLeft: 8 },
-  hr: { borderColor: '#44403c', marginVertical: 16 },
-  table: { borderColor: '#44403c' },
-  thead: { backgroundColor: '#292524' },
-  th: { color: '#fafaf9', fontWeight: '600' as const, padding: 8 },
-  td: { color: '#d6d3d1', padding: 8, borderColor: '#44403c' },
-};

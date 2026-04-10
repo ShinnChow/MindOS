@@ -15,6 +15,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import Markdown from 'react-native-markdown-display';
 import { Ionicons } from '@expo/vector-icons';
+import { getMarkdownStyles } from '@/lib/markdown-styles';
 import type { Message, ToolCallPart, ReasoningPart, ImagePart } from '@/lib/types';
 
 interface MessageBubbleProps {
@@ -63,7 +64,7 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
           isUser ? (
             <RNText style={styles.userText}>{message.content}</RNText>
           ) : (
-            <Markdown style={markdownStyles}>{message.content}</Markdown>
+            <Markdown style={getMarkdownStyles('bubble')}>{message.content}</Markdown>
           )
         ) : null}
 
@@ -340,42 +341,3 @@ const styles = StyleSheet.create({
   },
 });
 
-const markdownStyles = {
-  body: { color: '#d6d3d1', fontSize: 14, lineHeight: 20 },
-  strong: { color: '#fafaf9', fontWeight: '600' as const },
-  em: { fontStyle: 'italic' as const },
-  code_inline: {
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    color: '#fbbf24',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
-    fontFamily: 'monospace',
-    fontSize: 12,
-  },
-  code_block: {
-    backgroundColor: '#1a1917',
-    padding: 10,
-    borderRadius: 6,
-    fontFamily: 'monospace',
-    fontSize: 12,
-    color: '#d6d3d1',
-  },
-  fence: {
-    backgroundColor: '#1a1917',
-    padding: 10,
-    borderRadius: 6,
-    fontFamily: 'monospace',
-    fontSize: 12,
-    color: '#d6d3d1',
-  },
-  link: { color: '#c8873a' },
-  list_item: { marginBottom: 4 },
-  bullet_list: { marginLeft: 8 },
-  blockquote: {
-    borderLeftWidth: 3,
-    borderLeftColor: '#c8873a',
-    paddingLeft: 10,
-    opacity: 0.8,
-  },
-};

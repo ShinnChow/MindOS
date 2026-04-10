@@ -1,61 +1,99 @@
 /**
- * Quick Capture - Append text to daily inbox file without creating a new editor session
+ * Quick Capture - domain logic for appending quick notes to the daily inbox.
  */
+
+import { ApiError, mindosClient } from '@/lib/api-client';
+
+export class QuickCaptureReadError extends Error {
+  constructor(message = "Failed to read today's inbox. Please retry.") {
+    super(message);
+    this.name = 'QuickCaptureReadError';
+  }
+}
 
 export interface QuickCaptureOptions {
   basePath?: string;
+  /** Date used for inbox file path (defaults to now) */
+  pathDate?: Date;
+  /** Date used for timestamp in note content (defaults to now, separate from pathDate) */
+  contentDate?: Date;
 }
 
-/**
- * Build today's inbox file path: inbox/YYYY-MM-DD.md
- */
-export function buildInboxPath(basePath = 'inbox'): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const dateStr = `${year}-${month}-${day}`;
-  return `${basePath}/${dateStr}.md`;
+export interface QuickCaptureSaveResult {
+  inboxPath: string;
+  content: string;
 }
 
-/**
- * Format capture content for inbox: add timestamp prefix and section marker
- */
-export function formatCaptureContent(text: string): string {
+export function buildInboxPath(basePath = 'inbox', date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${basePath}/${year}-${month}-${day}.md`;
+}
+
+export function isValidCapture(text: string): boolean {
+  return text.trim().length > 0;
+}
+
+export function formatCaptureContent(text: string, date = new Date()): string {
   const trimmed = text.trim();
   if (!trimmed) return '';
 
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
-
-  // Format: [HH:MM] text
-  return `[${timeStr}] ${trimmed}`;
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `[${hours}:${minutes}] ${trimmed}`;
 }
 
-/**
- * Append capture to inbox file content
- * - If file is empty or doesn't exist yet, create structure
- * - Otherwise append to end with newline
- */
-export function appendCaptureToContent(existingContent: string, captureText: string): string {
-  if (!captureText.trim()) return existingContent;
+export function appendCaptureToContent(
+  existingContent: string,
+  captureText: string,
+  date = new Date(),
+): string {
+  if (!isValidCapture(captureText)) return existingContent;
 
-  const formatted = formatCaptureContent(captureText);
+  const formatted = formatCaptureContent(captureText, date);
 
-  // If existing content is empty, create header + content
   if (!existingContent.trim()) {
-    const today = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const today = date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
     return `# Inbox - ${today}\n\n${formatted}\n`;
   }
 
-  // Otherwise append with newline separator
-  const trimmed = existingContent.replace(/\n+$/, '');
-  return `${trimmed}\n${formatted}\n`;
+  return `${existingContent.replace(/\n+$/, '')}\n${formatted}\n`;
 }
 
-/**
- * Validate capture input: not empty, not just whitespace
- */
-export function isValidCapture(text: string): boolean {
-  return text.trim().length > 0;
+export async function saveQuickCapture(
+  text: string,
+  options: QuickCaptureOptions = {},
+): Promise<QuickCaptureSaveResult> {
+  if (!isValidCapture(text)) {
+    throw new Error('Capture text cannot be empty');
+  }
+
+  const pathDate = options.pathDate ?? new Date();
+  const contentDate = options.contentDate ?? new Date();
+  const inboxPath = buildInboxPath(options.basePath, pathDate);
+
+  let existingContent = '';
+  try {
+    const file = await mindosClient.getFileContent(inboxPath);
+    existingContent = file.content;
+  } catch (error) {
+    const isNotFound = error instanceof ApiError && error.status === 404;
+    if (!isNotFound) {
+      throw new QuickCaptureReadError();
+    }
+  }
+
+  const content = appendCaptureToContent(existingContent, text, contentDate);
+  const result = await mindosClient.saveFile(inboxPath, content);
+  if (!result.ok) {
+    throw new Error(result.error || 'Failed to save quick capture');
+  }
+
+  return { inboxPath, content };
 }

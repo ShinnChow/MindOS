@@ -20,6 +20,19 @@
 
 ## Agent / LLM API
 
+### Vitest `vi.mock()` 工厂会被提升，引用顶层变量会直接炸掉 (2026-04-11)
+
+**症状**：测试文件能过 TypeScript，但执行时直接报 `[vitest] There was an error when mocking a module`，并提示 `Cannot access 'xxx' before initialization`。
+
+**根因**：`vi.mock()` 工厂会在模块顶层被 hoist；如果工厂里引用了测试文件里后定义的变量/类（即使肉眼看起来在前面），运行时仍会进入 TDZ。
+
+**规则**：
+- 需要在 mock 工厂里复用的 `fn` / class，优先放进 `vi.hoisted(() => ...)`
+- 或把 mock 所需的最小 class/对象直接定义在工厂内部
+- 不要在 `vi.mock()` 工厂中捕获普通顶层变量
+
+**修复**：Quick Capture 测试改为 `vi.hoisted()` 托管 `getFileContent` / `saveFile` / `ApiError`，再由 mock 工厂引用。
+
 ### Plain JS CLI 直接 import app/*.ts 会在运行时炸掉 (2026-04-10)
 
 **症状**：`node bin/cli.js channel --help` 或其他 bin 命令在启动阶段直接报 `ERR_MODULE_NOT_FOUND` / `Unexpected token`，指向 `app/lib/**.ts`。

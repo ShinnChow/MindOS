@@ -25,7 +25,7 @@ export default function CustomProviderFields({
 
   const nameLabel = locale === 'zh' ? '名称' : 'Name';
   const protocolLabel = locale === 'zh' ? '协议' : 'Protocol';
-  const namePlaceholder = locale === 'zh' ? '输入名称' : 'Enter name';
+  const namePlaceholder = locale === 'zh' ? '可选，默认使用协议名称' : 'Optional, defaults to protocol name';
 
   const nameHint = form.isDuplicateName
     ? (locale === 'zh' ? '名称已存在' : 'Name already exists')

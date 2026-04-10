@@ -15,6 +15,11 @@
   - async 生命周期等待
   - `.plugins/` 私有目录隔离
   - 损坏 `data.json` 明确报错
+- [x] Mobile Quick Capture / Inbox MVP
+  - Home 页快速记录卡片
+  - 当日 `inbox/YYYY-MM-DD.md` 自动追加
+  - 异步保存测试覆盖（正常/边界/错误路径）
+  - Quick Capture 读失败明确报错，避免静默覆盖
 
 ## Next
 

@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { mindosClient } from '@/lib/api-client';
+import { flattenFiles } from '@/lib/file-tree';
 import type { FileNode } from '@/lib/types';
 
 interface FileAttachmentPickerProps {
@@ -21,15 +22,6 @@ interface FileAttachmentPickerProps {
   selectedPaths: string[];
   onChangeSelectedPaths: React.Dispatch<React.SetStateAction<string[]>>;
   onClose: () => void;
-}
-
-function flattenFiles(nodes: FileNode[]): FileNode[] {
-  const result: FileNode[] = [];
-  for (const node of nodes) {
-    if (node.type === 'file') result.push(node);
-    if (node.children?.length) result.push(...flattenFiles(node.children));
-  }
-  return result;
 }
 
 export default function FileAttachmentPicker({

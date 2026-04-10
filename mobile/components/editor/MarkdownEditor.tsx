@@ -28,6 +28,7 @@ import MarkdownToolbar from './MarkdownToolbar';
 import { TOOLBAR_ACTIONS } from './markdown-actions';
 import type { ToolbarAction, Selection } from './markdown-actions';
 import { mindosClient } from '@/lib/api-client';
+import { getMarkdownStyles } from '@/lib/markdown-styles';
 
 const DRAFT_PREFIX = 'mindos_draft_';
 const DRAFT_DEBOUNCE_MS = 3000;
@@ -253,7 +254,7 @@ export default function MarkdownEditor({
         />
       ) : (
         <ScrollView style={styles.preview} contentContainerStyle={styles.previewInner}>
-          <Markdown style={markdownStyles}>{content}</Markdown>
+          <Markdown style={getMarkdownStyles('document')}>{content}</Markdown>
         </ScrollView>
       )}
 
@@ -344,48 +345,3 @@ const styles = StyleSheet.create({
   previewInner: { padding: 16, paddingBottom: 40 },
 });
 
-const markdownStyles = {
-  body: { color: '#d6d3d1', fontSize: 15, lineHeight: 24 },
-  heading1: { color: '#fafaf9', fontSize: 24, fontWeight: '700' as const, marginTop: 24, marginBottom: 8 },
-  heading2: { color: '#fafaf9', fontSize: 20, fontWeight: '700' as const, marginTop: 20, marginBottom: 8 },
-  heading3: { color: '#fafaf9', fontSize: 17, fontWeight: '600' as const, marginTop: 16, marginBottom: 6 },
-  strong: { color: '#fafaf9', fontWeight: '600' as const },
-  em: { fontStyle: 'italic' as const },
-  link: { color: '#c8873a' },
-  code_inline: {
-    backgroundColor: '#292524',
-    color: '#fbbf24',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
-    fontFamily: 'monospace',
-    fontSize: 13,
-  },
-  code_block: {
-    backgroundColor: '#292524',
-    padding: 12,
-    borderRadius: 8,
-    fontFamily: 'monospace',
-    fontSize: 13,
-    color: '#d6d3d1',
-  },
-  fence: {
-    backgroundColor: '#292524',
-    padding: 12,
-    borderRadius: 8,
-    fontFamily: 'monospace',
-    fontSize: 13,
-    color: '#d6d3d1',
-  },
-  blockquote: {
-    borderLeftWidth: 3,
-    borderLeftColor: '#c8873a',
-    paddingLeft: 12,
-    marginLeft: 0,
-    opacity: 0.8,
-  },
-  list_item: { marginBottom: 4 },
-  bullet_list: { marginLeft: 8 },
-  ordered_list: { marginLeft: 8 },
-  hr: { borderColor: '#44403c', marginVertical: 16 },
-};

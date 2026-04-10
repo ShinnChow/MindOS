@@ -119,6 +119,9 @@ export default function CustomProvidersCard({
         onClose={() => setIsModalOpen(false)}
         onSave={handleSaveProvider}
         initialProvider={editingProvider ?? undefined}
+        existingNames={providers
+          .filter((p) => p.id !== editingId)
+          .map((p) => p.name)}
         t={t}
       />
 

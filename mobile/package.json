@@ -9,6 +9,7 @@
     "android": "expo start --android",
     "web": "expo start --web",
     "lint": "eslint .",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build:dev": "eas build --profile development --platform all",
     "build:preview": "eas build --profile preview --platform all"
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@types/react": "~18.3.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "vitest": "^4.1.0"
   }
 }
