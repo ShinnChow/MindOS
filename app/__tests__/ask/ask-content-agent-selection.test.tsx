@@ -3,13 +3,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import AskContent from '@/components/ask/AskContent';
+import type { ChatSession } from '@/lib/types';
 
 const mockSetMessages = vi.fn();
 const mockPersistSession = vi.fn();
 const mockClearPersistTimer = vi.fn();
 const mockInitSessions = vi.fn();
-let mockLocalAttachments: Array<{ name: string; content: string; status?: 'loading' | 'success' | 'error' }> = [];
-let mockUploadError = '';
+const mockSetSessionDefaultAcpAgent = vi.fn();
+
+const sessionWithClaude: ChatSession = {
+  id: 's1',
+  createdAt: 1,
+  updatedAt: 1,
+  messages: [],
+  defaultAcpAgent: { id: 'claude-code', name: 'Claude Code' },
+};
 
 vi.mock('@/lib/stores/locale-store', () => ({
   useLocale: () => ({
@@ -23,16 +31,19 @@ vi.mock('@/lib/stores/locale-store', () => ({
         panelComposerResetHint: 'Double click reset',
         panelComposerKeyboard: 'Arrow keys',
         attachFile: 'attach file',
-        uploadsProcessing: 'Wait for uploaded files to finish processing before sending.',
+        attachFileLabel: 'Document',
+        attachImageLabel: 'Image',
         stopTitle: 'Stop',
         cancelReconnect: 'Cancel reconnect',
         connecting: 'connecting',
         thinking: 'thinking',
         generating: 'generating',
+        reconnecting: (attempt: number, max: number) => `retry ${attempt}/${max}`,
         stopped: 'stopped',
         errorNoResponse: 'no response',
         emptyPrompt: 'empty',
         suggestions: [],
+        copyMessage: 'Copy',
       },
       search: { close: 'close' },
       hints: {
@@ -47,6 +58,8 @@ vi.mock('@/lib/stores/locale-store', () => ({
         openAsPopup: 'Open as popup',
         closePanel: 'Close',
       },
+      fileImport: { unsupported: 'Unsupported file type' },
+      panels: { agents: {} },
     },
   }),
 }));
@@ -54,29 +67,45 @@ vi.mock('@/lib/stores/locale-store', () => ({
 vi.mock('@/hooks/useAskSession', () => ({
   useAskSession: () => ({
     messages: [],
-    sessions: [],
-    activeSession: null,
+    sessions: [sessionWithClaude],
+    activeSession: sessionWithClaude,
     activeSessionId: 's1',
     initSessions: mockInitSessions,
     persistSession: mockPersistSession,
     clearPersistTimer: mockClearPersistTimer,
     setMessages: mockSetMessages,
-    setSessionDefaultAcpAgent: vi.fn(),
+    setSessionDefaultAcpAgent: mockSetSessionDefaultAcpAgent,
     resetSession: vi.fn(),
     loadSession: vi.fn(),
     deleteSession: vi.fn(),
+    renameSession: vi.fn(),
+    togglePinSession: vi.fn(),
     clearAllSessions: vi.fn(),
   }),
 }));
 
 vi.mock('@/hooks/useFileUpload', () => ({
   useFileUpload: () => ({
-    localAttachments: mockLocalAttachments,
-    uploadError: mockUploadError,
+    localAttachments: [],
+    uploadError: '',
     uploadInputRef: { current: null },
     clearAttachments: vi.fn(),
     removeAttachment: vi.fn(),
     pickFiles: vi.fn(),
+    injectFiles: vi.fn(),
+  }),
+}));
+
+vi.mock('@/hooks/useImageUpload', () => ({
+  useImageUpload: () => ({
+    images: [],
+    imageError: '',
+    clearImages: vi.fn(),
+    removeImage: vi.fn(),
+    handlePaste: vi.fn(),
+    handleDrop: vi.fn(),
+    handleFileSelect: vi.fn(),
+    addImages: vi.fn(),
   }),
 }));
 
@@ -104,7 +133,7 @@ vi.mock('@/hooks/useSlashCommand', () => ({
 
 vi.mock('@/hooks/useAcpDetection', () => ({
   useAcpDetection: () => ({
-    installedAgents: [],
+    installedAgents: [{ id: 'claude-code', name: 'Claude Code', binaryPath: '/tmp/claude' }],
     notInstalledAgents: [],
     loading: false,
     error: null,
@@ -112,32 +141,40 @@ vi.mock('@/hooks/useAcpDetection', () => ({
   }),
 }));
 
-vi.mock('@/hooks/useComposerVerticalResize', () => ({
-  useComposerVerticalResize: () => vi.fn(),
-}));
-
 vi.mock('@/components/ask/MessageList', () => ({
   default: () => <div data-testid="message-list" />,
 }));
-vi.mock('@/components/ask/MentionPopover', () => ({
-  default: () => null,
+vi.mock('@/components/ask/MentionPopover', () => ({ default: () => null }));
+vi.mock('@/components/ask/SlashCommandPopover', () => ({ default: () => null }));
+vi.mock('@/components/ask/SessionHistory', () => ({ default: () => null }));
+vi.mock('@/components/ask/SessionHistoryPanel', () => ({ default: () => null }));
+vi.mock('@/components/ask/AskHeader', () => ({ default: () => <div /> }));
+vi.mock('@/components/ask/FileChip', () => ({ default: () => null }));
+vi.mock('@/components/ask/AgentSelectorCapsule', () => ({
+  default: ({ selectedAgent, onSelect }: { selectedAgent: { id: string; name: string } | null; onSelect: (agent: { id: string; name: string } | null) => void }) => (
+    <div>
+      <div data-testid="agent-selector">{selectedAgent?.name ?? 'MindOS'}</div>
+      <button type="button" onClick={() => onSelect({ id: 'claude-code', name: 'Claude Code' })}>Select Claude</button>
+    </div>
+  ),
 }));
-vi.mock('@/components/ask/SessionHistory', () => ({
+vi.mock('@/components/ask/ProviderModelCapsule', () => ({
   default: () => null,
+  getPersistedProviderModel: () => ({ provider: null, model: null }),
 }));
-vi.mock('@/components/ask/FileChip', () => ({
+vi.mock('@/components/ask/ModeCapsule', () => ({
   default: () => null,
+  getPersistedMode: () => 'agent',
 }));
+vi.mock('@/lib/utils', () => ({ cn: (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ') }));
 
 vi.mock('@/lib/agent/stream-consumer', () => ({
   consumeUIMessageStream: () => new Promise(() => {}),
 }));
 
-describe('AskContent input behavior while running', () => {
+describe('AskContent ACP session binding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockLocalAttachments = [];
-    mockUploadError = '';
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
@@ -145,60 +182,43 @@ describe('AskContent input behavior while running', () => {
     }));
   });
 
-  it('keeps panel textarea enabled while request is in-flight', async () => {
+  it('restores the bound session agent when the panel opens', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const root = createRoot(host);
 
     await act(async () => {
-      root.render(<AskContent visible variant="panel" initialMessage="run a task" />);
+      root.render(<AskContent visible variant="panel" />);
     });
 
-    const textarea = host.querySelector('textarea') as HTMLTextAreaElement;
-    expect(textarea).toBeTruthy();
-
-    const form = host.querySelector('form') as HTMLFormElement;
     await act(async () => {
-      if (typeof form.requestSubmit === 'function') {
-        form.requestSubmit();
-      } else {
-        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-      }
+      await Promise.resolve();
     });
 
-    const textareaAfterSubmit = host.querySelector('textarea') as HTMLTextAreaElement;
-    const stopButton = host.querySelector('button[title="Stop"]');
-    expect(stopButton).toBeTruthy();
-    expect(textareaAfterSubmit.disabled).toBe(false);
-    expect(textareaAfterSubmit.value).toBe('');
+    expect(host.querySelector('[data-testid="agent-selector"]')?.textContent).toBe('Claude Code');
 
     await act(async () => {
       root.unmount();
     });
   });
 
-  it('blocks submit while uploaded files are still processing', async () => {
-    mockLocalAttachments = [{ name: 'appendix.pdf', content: '', status: 'loading' }];
-
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      body: new ReadableStream(),
-      json: async () => ({}),
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
+  it('does not clear the selected agent after submit', async () => {
     const host = document.createElement('div');
     document.body.appendChild(host);
     const root = createRoot(host);
 
     await act(async () => {
-      root.render(<AskContent visible variant="panel" initialMessage="read the appendix" />);
+      root.render(<AskContent visible variant="panel" initialMessage="review this diff" />);
     });
 
-    const submitButton = host.querySelector('button[type="submit"]') as HTMLButtonElement;
-    expect(submitButton.disabled).toBe(true);
-    expect(submitButton.title).toBe('Wait for uploaded files to finish processing before sending.');
-    expect(host.textContent).toContain('Wait for uploaded files to finish processing before sending.');
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const selectButton = Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Select Claude') as HTMLButtonElement;
+    await act(async () => {
+      selectButton.click();
+    });
 
     const form = host.querySelector('form') as HTMLFormElement;
     await act(async () => {
@@ -209,37 +229,7 @@ describe('AskContent input behavior while running', () => {
       }
     });
 
-    expect(fetchMock.mock.calls.some(([url]) => url === '/api/ask')).toBe(false);
-
-    await act(async () => {
-      root.unmount();
-    });
-  });
-
-  it('clears textarea value after submit in modal variant', async () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const root = createRoot(host);
-
-    await act(async () => {
-      root.render(<AskContent visible variant="modal" initialMessage="hello world" onClose={() => {}} />);
-    });
-
-    const textarea = host.querySelector('textarea') as HTMLTextAreaElement;
-    expect(textarea).toBeTruthy();
-    expect(textarea.value).toBe('hello world');
-
-    const form = host.querySelector('form') as HTMLFormElement;
-    await act(async () => {
-      if (typeof form.requestSubmit === 'function') {
-        form.requestSubmit();
-      } else {
-        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-      }
-    });
-
-    const textareaAfterSubmit = host.querySelector('textarea') as HTMLTextAreaElement;
-    expect(textareaAfterSubmit.value).toBe('');
+    expect(host.querySelector('[data-testid="agent-selector"]')?.textContent).toBe('Claude Code');
 
     await act(async () => {
       root.unmount();

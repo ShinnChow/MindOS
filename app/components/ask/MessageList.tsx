@@ -107,6 +107,16 @@ function UserMessageContent({ content, skillName, images, attachedFiles, uploade
   );
 }
 
+function AssistantAgentBadge({ agentName }: { agentName?: string }) {
+  if (!agentName) return null;
+  return (
+    <div className="mb-2 inline-flex items-center gap-1 rounded-full border border-[var(--amber)]/15 bg-[var(--amber)]/8 px-2 py-0.5 text-[10px] font-medium tracking-wide text-[var(--amber)]">
+      <Sparkles size={10} className="shrink-0" />
+      <span>{agentName}</span>
+    </div>
+  );
+}
+
 function AssistantMessage({ content, isStreaming }: { content: string; isStreaming: boolean }) {
   const cleaned = stripThinkingTags(content);
   if (!cleaned && !isStreaming) return null;
@@ -292,6 +302,7 @@ export default memo(function MessageList({
             </div>
           ) : m.content.startsWith('__error__') ? (
             <div className="max-w-[85%] px-3.5 py-3 rounded-2xl rounded-bl-md border border-error/30 bg-error/10 text-sm shadow-sm">
+              <AssistantAgentBadge agentName={m.agentName} />
               <div className="flex items-start gap-2.5 text-error">
                 <AlertCircle size={15} className="shrink-0 mt-0.5" />
                 <span className="leading-relaxed font-medium">{m.content.slice(9)}</span>
@@ -299,6 +310,7 @@ export default memo(function MessageList({
             </div>
           ) : (
             <div className="group relative max-w-[85%] px-3.5 py-2.5 rounded-2xl rounded-bl-lg bg-card border border-border/30 shadow-sm text-foreground text-sm">
+              <AssistantAgentBadge agentName={m.agentName} />
               {(m.parts && m.parts.length > 0) || stripThinkingTags(m.content) ? (
                 <>
                   <AssistantMessageWithParts message={m} isStreaming={isLoading && i === messages.length - 1} />

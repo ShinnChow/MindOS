@@ -23,6 +23,7 @@ import AgentSelectorCapsule from '@/components/ask/AgentSelectorCapsule';
 import ProviderModelCapsule, { getPersistedProviderModel } from '@/components/ask/ProviderModelCapsule';
 import type { ProviderId } from '@/lib/agent/providers';
 import { useAskChat } from '@/hooks/useAskChat';
+import { getSelectedAcpAgentFromMessage, resolveComposerAgent } from '@/lib/ask-agent';
 import { cn } from '@/lib/utils';
 import { useAcpDetection } from '@/hooks/useAcpDetection';
 import type { AcpAgentSelection } from '@/hooks/useAskModal';
@@ -100,6 +101,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
   const [isDragOver, setIsDragOver] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const attachButtonRef = useRef<HTMLButtonElement>(null);
+  const attachMenuRef = useRef<HTMLDivElement>(null);
   const [attachMenuPos, setAttachMenuPos] = useState<{ top: number; left: number } | null>(null);
 
   const [selectedSkill, setSelectedSkill] = useState<SlashItem | null>(null);
@@ -107,6 +109,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
   selectedSkillRef.current = selectedSkill;
   const [selectedAcpAgent, setSelectedAcpAgent] = useState<AcpAgentSelection | null>(null);
   const selectedAcpAgentRef = useRef(selectedAcpAgent);
+  const pendingOpenAgentRef = useRef<AcpAgentSelection | null>(null);
   selectedAcpAgentRef.current = selectedAcpAgent;
   const [chatMode, setChatMode] = useState<AskMode>('agent');
   const [providerOverride, setProviderOverride] = useState<ProviderId | `p_${string}` | null>(null);
@@ -141,7 +144,6 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
   const resetInputState = useCallback(() => {
     setInput('');
     setSelectedSkill(null);
-    setSelectedAcpAgent(null);
     setAttachedFiles(currentFile ? [currentFile] : []);
     uploadRef.current.clearAttachments();
   }, [currentFile]);
@@ -156,6 +158,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
     if (userMessage.skillName) {
       slashRef.current.resetSlash();
     }
+    setSelectedAcpAgent(getSelectedAcpAgentFromMessage(userMessage));
     setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
 
@@ -174,6 +177,13 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
   const { isLoading, loadingPhase, reconnectAttempt, reconnectMaxRef } = chat;
   const handleSubmit = chat.submit;
   const handleStop = chat.stop;
+
+  const handleSelectAcpAgent = useCallback((agent: AcpAgentSelection | null) => {
+    setSelectedAcpAgent(agent);
+    session.setSessionDefaultAcpAgent(agent);
+  }, [session]);
+  const hasLoadingAttachments = upload.localAttachments.some((f) => f.status === 'loading');
+  const composerStatusMessage = upload.uploadError || imageUpload.imageError || (hasLoadingAttachments ? (t.ask.uploadsProcessing ?? 'Wait for uploaded files to finish processing before sending.') : '');
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -199,16 +209,18 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
     });
   }, [showAttachMenu]);
 
-  // Close attach menu when clicking outside
+  // Close attach menu when clicking outside the button + menu portal.
   useEffect(() => {
     if (!showAttachMenu) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (attachButtonRef.current && !attachButtonRef.current.contains(e.target as Node)) {
-        setShowAttachMenu(false);
-      }
+    const handlePointerDownOutside = (e: MouseEvent) => {
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (attachButtonRef.current?.contains(target)) return;
+      if (attachMenuRef.current?.contains(target)) return;
+      setShowAttachMenu(false);
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handlePointerDownOutside);
+    return () => document.removeEventListener('mousedown', handlePointerDownOutside);
   }, [showAttachMenu]);
 
   // Home suggestion chip click — inject text into input
@@ -237,6 +249,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
     const fileChanged = visible && prevVisibleRef.current && currentFile !== prevFileRef.current;
 
     if (justOpened) {
+      pendingOpenAgentRef.current = initialAcpAgent ?? null;
       setTimeout(() => inputRef.current?.focus(), 50);
       void session.initSessions();
       setInput(initialMessage || '');
@@ -264,6 +277,30 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
     prevFileRef.current = currentFile;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, currentFile]);
+
+  useEffect(() => {
+    if (!visible || !session.activeSessionId) return;
+
+    const openerAgent = pendingOpenAgentRef.current;
+    const restoredAgent = resolveComposerAgent({
+      sessionAgent: session.activeSession?.defaultAcpAgent ?? null,
+      initialAgent: openerAgent,
+    });
+
+    setSelectedAcpAgent(restoredAgent);
+
+    if (openerAgent && !session.activeSession?.defaultAcpAgent && session.activeSession?.messages.length === 0) {
+      session.setSessionDefaultAcpAgent(openerAgent);
+    }
+
+    pendingOpenAgentRef.current = null;
+  }, [
+    visible,
+    session.activeSessionId,
+    session.activeSession?.defaultAcpAgent,
+    session.activeSession?.messages.length,
+    session.setSessionDefaultAcpAgent,
+  ]);
 
   // Persist session on message changes (skip if last msg is empty assistant placeholder during loading)
   const clearPersistTimerRef = useRef(session.clearPersistTimer);
@@ -297,15 +334,6 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [variant, visible, onClose, maximized, onMaximize]);
-
-  // Close attach menu on any outside click
-  useEffect(() => {
-    if (!showAttachMenu) return;
-    const handler = () => setShowAttachMenu(false);
-    // Delay to avoid closing immediately from the click that opened it
-    const id = setTimeout(() => document.addEventListener('click', handler), 0);
-    return () => { clearTimeout(id); document.removeEventListener('click', handler); };
-  }, [showAttachMenu]);
 
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -446,6 +474,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
     slashRef.current.resetSlash();
     setSelectedSkill(null);
     setSelectedAcpAgent(null);
+    pendingOpenAgentRef.current = null;
     setShowHistory(false);
     chat.firstMessageFired.current = false;
     setTimeout(() => inputRef.current?.focus(), 0);
@@ -519,7 +548,6 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
     mentionRef.current.resetMention();
     slashRef.current.resetSlash();
     setSelectedSkill(null);
-    setSelectedAcpAgent(null);
     setTimeout(() => inputRef.current?.focus(), 0);
   }, [currentFile]);
 
@@ -671,12 +699,12 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
                   <FileChip
                     path={typeof selectedAcpAgent === 'object' && 'name' in selectedAcpAgent ? (selectedAcpAgent as { name: string }).name : 'Remote Agent'}
                     variant="skill"
-                    onRemove={() => { setSelectedAcpAgent(null); inputRef.current?.focus(); }}
+                    onRemove={() => { handleSelectAcpAgent(null); inputRef.current?.focus(); }}
                   />
                 )}
               </div>
-              {(upload.uploadError || imageUpload.imageError) && (
-                <div className="mt-1 text-xs text-error">{upload.uploadError || imageUpload.imageError}</div>
+              {composerStatusMessage && (
+                <div className="mt-1 text-xs text-error">{composerStatusMessage}</div>
               )}
             </div>
           )}
@@ -703,6 +731,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
             {/* Attach menu rendered as Portal to avoid clipping by overflow-hidden parent */}
             {mounted && showAttachMenu && attachMenuPos && createPortal(
               <div
+                ref={attachMenuRef}
                 className="fixed py-1 rounded-xl border border-border/60 bg-card shadow-lg z-50 min-w-[150px] animate-in fade-in-0 slide-in-from-bottom-2 duration-150"
                 style={{
                   top: `${attachMenuPos.top}px`,
@@ -714,7 +743,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
                 <button
                   type="button"
                   className="flex w-full items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted transition-colors text-left rounded-lg"
-                  onClick={() => { setShowAttachMenu(false); upload.uploadInputRef.current?.click(); }}
+                  onClick={() => { upload.uploadInputRef.current?.click(); setShowAttachMenu(false); }}
                 >
                   <FileText size={12} className="shrink-0 text-muted-foreground" />
                   {t.ask.attachFileLabel}
@@ -722,7 +751,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
                 <button
                   type="button"
                   className="flex w-full items-center gap-2.5 px-3 py-2 text-xs hover:bg-muted transition-colors text-left rounded-lg"
-                  onClick={() => { setShowAttachMenu(false); imageInputRef.current?.click(); }}
+                  onClick={() => { imageInputRef.current?.click(); setShowAttachMenu(false); }}
                 >
                   <ImageIcon size={12} className="shrink-0 text-muted-foreground" />
                   {t.ask.attachImageLabel}
@@ -774,7 +803,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
                 {loadingPhase === 'reconnecting' ? <X size={inputIconSize} /> : <StopCircle size={inputIconSize} />}
               </button>
             ) : (
-              <button type="submit" disabled={!input.trim() && imageUpload.images.length === 0} className="p-2 rounded-xl disabled:opacity-20 disabled:scale-95 disabled:cursor-not-allowed transition-all duration-150 shrink-0 bg-[var(--amber)] text-[var(--amber-foreground)] shadow-sm shadow-[var(--amber)]/15 hover:shadow-md hover:shadow-[var(--amber)]/20 active:scale-95">
+              <button type="submit" title={hasLoadingAttachments ? (t.ask.uploadsProcessing ?? 'Wait for uploaded files to finish processing before sending.') : t.ask.send} disabled={hasLoadingAttachments || (!input.trim() && imageUpload.images.length === 0)} className="p-2 rounded-xl disabled:opacity-20 disabled:scale-95 disabled:cursor-not-allowed transition-all duration-150 shrink-0 bg-[var(--amber)] text-[var(--amber-foreground)] shadow-sm shadow-[var(--amber)]/15 hover:shadow-md hover:shadow-[var(--amber)]/20 active:scale-95">
                 <Send size={14} />
               </button>
             )}
@@ -787,7 +816,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
             {mounted && acpDetection.installedAgents.length > 0 && (
               <AgentSelectorCapsule
                 selectedAgent={selectedAcpAgent}
-                onSelect={setSelectedAcpAgent}
+                onSelect={handleSelectAcpAgent}
                 installedAgents={acpDetection.installedAgents}
                 loading={acpDetection.loading}
               />

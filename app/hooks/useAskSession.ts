@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import type { Message, ChatSession } from '@/lib/types';
+import type { AgentIdentity, Message, ChatSession } from '@/lib/types';
 import { apiFetch } from '@/lib/api';
+import { bindSessionAgent } from '@/lib/ask-agent';
 
 const MAX_SESSIONS = 30;
 
@@ -241,6 +242,34 @@ export function useAskSession(currentFile?: string) {
     });
   }, []);
 
+  /** Update the session-level ACP agent binding for the currently active session. */
+  const setSessionDefaultAcpAgent = useCallback((agent: AgentIdentity | null) => {
+    if (!activeSessionId) return;
+
+    const currentSession = sessions.find((session) => session.id === activeSessionId);
+    if (!currentSession) return;
+
+    const updatedSession = bindSessionAgent({
+      ...currentSession,
+      currentFile,
+      updatedAt: Date.now(),
+    }, agent);
+
+    setSessions((prev) => {
+      const rest = prev.filter((session) => session.id !== activeSessionId);
+      return [updatedSession, ...rest]
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, MAX_SESSIONS);
+    });
+
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    if (updatedSession.messages.length > 0) {
+      persistTimerRef.current = setTimeout(() => {
+        void upsertSession(updatedSession);
+      }, 600);
+    }
+  }, [activeSessionId, currentFile, sessions]);
+
   const clearAllSessions = useCallback(() => {
     // Only delete sessions that have messages (were persisted)
     const persistedIds = sessions.filter(s => s.messages.length > 0).map(s => s.id);
@@ -259,11 +288,13 @@ export function useAskSession(currentFile?: string) {
     if (!a.pinned && b.pinned) return 1;
     return b.updatedAt - a.updatedAt;
   });
+  const activeSession = sessions.find((session) => session.id === activeSessionId) ?? null;
 
   return {
     messages,
     setMessages,
     sessions: sortedSessions,
+    activeSession,
     activeSessionId,
     initSessions,
     persistSession,
@@ -273,6 +304,7 @@ export function useAskSession(currentFile?: string) {
     deleteSession,
     renameSession,
     togglePinSession,
+    setSessionDefaultAcpAgent,
     clearAllSessions,
   };
 }

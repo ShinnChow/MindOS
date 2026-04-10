@@ -1,9 +1,10 @@
 'use client';
 
 import { useRef, useState, useCallback } from 'react';
-import type { Message, ImagePart, AskMode, LocalAttachment } from '@/lib/types';
+import type { AgentIdentity, Message, ImagePart, AskMode, LocalAttachment } from '@/lib/types';
 import type { ProviderId } from '@/lib/agent/providers';
 import { consumeUIMessageStream } from '@/lib/agent/stream-consumer';
+import { annotateMessageWithAgent } from '@/lib/ask-agent';
 import { isRetryableError, retryDelay, sleep } from '@/lib/agent/reconnect';
 
 export type LoadingPhase = 'connecting' | 'thinking' | 'streaming' | 'reconnecting';
@@ -21,7 +22,7 @@ export interface AskChatRefs {
     localAttachments: LocalAttachment[];
   }>;
   selectedSkillRef: React.RefObject<{ name: string } | null>;
-  selectedAcpAgentRef: React.RefObject<unknown>;
+  selectedAcpAgentRef: React.RefObject<AgentIdentity | null>;
   attachedFilesRef: React.RefObject<string[]>;
 }
 
@@ -125,7 +126,8 @@ export function useAskChat({
     if (!m || !s || !img || !sess || !upl) return;
     if (m.mentionQuery !== null || s.slashQuery !== null) return;
     const text = refs.inputValueRef.current?.trim() ?? '';
-    if ((!text && img.images.length === 0) || isLoadingRef.current) return;
+    const hasLoadingUploads = upl.localAttachments.some(f => f.status === 'loading');
+    if (hasLoadingUploads || ((!text && img.images.length === 0) || isLoadingRef.current)) return;
 
     const skill = refs.selectedSkillRef.current;
     const acpAgent = refs.selectedAcpAgentRef.current;
@@ -136,7 +138,7 @@ export function useAskChat({
     const pendingUploadedNames = upl.localAttachments
       .filter(f => f.status !== 'loading')
       .map(f => f.name);
-    const userMsg: Message = {
+    const userMsg: Message = annotateMessageWithAgent({
       role: 'user',
       content: text,
       timestamp: Date.now(),
@@ -144,7 +146,7 @@ export function useAskChat({
       ...(pendingImages && { images: pendingImages }),
       ...(pendingAttachedFiles && { attachedFiles: pendingAttachedFiles }),
       ...(pendingUploadedNames.length > 0 && { uploadedFileNames: pendingUploadedNames }),
-    };
+    }, acpAgent);
     img.clearImages();
     const requestMessages = [...sess.messages, userMsg];
 
@@ -157,7 +159,7 @@ export function useAskChat({
     };
     retractedRef.current = false;
 
-    sess.setMessages([...requestMessages, { role: 'assistant', content: '', timestamp: Date.now() }]);
+    sess.setMessages([...requestMessages, annotateMessageWithAgent({ role: 'assistant', content: '', timestamp: Date.now() }, acpAgent)]);
 
     resetInputState();
 
@@ -232,7 +234,7 @@ export function useAskChat({
           setLoadingPhase('streaming');
           refs.sessionRef.current?.setMessages(prev => {
             const updated = [...prev];
-            updated[updated.length - 1] = msg;
+            updated[updated.length - 1] = annotateMessageWithAgent(msg, acpAgent);
             return updated;
           });
         },
@@ -252,7 +254,7 @@ export function useAskChat({
           setLoadingPhase('reconnecting');
           refs.sessionRef.current?.setMessages(prev => {
             const updated = [...prev];
-            updated[updated.length - 1] = { role: 'assistant', content: '', timestamp: Date.now() };
+            updated[updated.length - 1] = annotateMessageWithAgent({ role: 'assistant', content: '', timestamp: Date.now() }, acpAgent);
             return updated;
           });
           await sleep(retryDelay(attempt - 1), controller.signal);
@@ -264,7 +266,7 @@ export function useAskChat({
           if (!finalMessage.content.trim() && (!finalMessage.parts || finalMessage.parts.length === 0)) {
             refs.sessionRef.current?.setMessages(prev => {
               const updated = [...prev];
-              updated[updated.length - 1] = { role: 'assistant', content: `__error__${errorLabels.noResponse}` };
+              updated[updated.length - 1] = annotateMessageWithAgent({ role: 'assistant', content: `__error__${errorLabels.noResponse}` }, acpAgent);
               return updated;
             });
           }
@@ -290,7 +292,7 @@ export function useAskChat({
               const last = updated[lastIdx];
               const hasContent = last.content.trim() || (last.parts && last.parts.length > 0);
               if (!hasContent) {
-                updated[lastIdx] = { role: 'assistant', content: `__error__${errorLabels.stopped}` };
+                updated[lastIdx] = annotateMessageWithAgent({ role: 'assistant', content: `__error__${errorLabels.stopped}` }, acpAgent);
               }
             }
             return updated;
@@ -305,11 +307,11 @@ export function useAskChat({
             const last = updated[lastIdx];
             const hasContent = last.content.trim() || (last.parts && last.parts.length > 0);
             if (!hasContent) {
-              updated[lastIdx] = { role: 'assistant', content: `__error__${errMsg}` };
+              updated[lastIdx] = annotateMessageWithAgent({ role: 'assistant', content: `__error__${errMsg}` }, acpAgent);
               return updated;
             }
           }
-          return [...updated, { role: 'assistant', content: `__error__${errMsg}` }];
+          return [...updated, annotateMessageWithAgent({ role: 'assistant', content: `__error__${errMsg}` }, acpAgent)];
         });
       }
     } finally {

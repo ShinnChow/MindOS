@@ -74,11 +74,13 @@ vi.mock('@/hooks/useAskSession', () => ({
   useAskSession: () => ({
     messages: [],
     sessions: [],
+    activeSession: null,
     activeSessionId: 's1',
     initSessions: vi.fn(),
     persistSession: vi.fn(),
     clearPersistTimer: vi.fn(),
     setMessages: vi.fn(),
+    setSessionDefaultAcpAgent: vi.fn(),
     resetSession: vi.fn(),
     loadSession: vi.fn(),
     deleteSession: vi.fn(),
