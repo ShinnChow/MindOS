@@ -709,8 +709,9 @@ export function searchFiles(query: string): AppSearchResult[] {
 
   const { fuse } = getSearchIndex();
 
-  const hasCJK = /[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/.test(query);
-  const searchQuery = hasCJK ? `'${query}` : query;
+  // FIXED: Removed CJK-specific exact-match forcing.
+  // Now all queries use the same Fuse.js fuzzy matching for consistent UX.
+  const searchQuery = query;
 
   const fuseResults = fuse.search(searchQuery, { limit: 20 });
 
