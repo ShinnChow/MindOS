@@ -5,6 +5,7 @@ import { collectAllFiles } from './tree';
 import { readFile } from './fs-ops';
 import { SearchIndex } from './search-index';
 import type { SearchResult, SearchOptions } from './types';
+import { expandQueryWithSynonyms } from './synonym-dict';
 
 /**
  * Module-level search index singleton.
@@ -113,6 +114,31 @@ function splitQueryTerms(query: string): string[] {
 }
 
 /**
+ * Count how many times a term appears in text using word-boundary-aware matching.
+ * For Latin terms: uses word boundaries (\b)
+ * For CJK terms: just counts substring occurrences (CJK has no word boundaries in regex)
+ */
+function countTermOccurrences(term: string, text: string): number {
+  // Check if term contains CJK characters
+  const cjkRegex = /[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\uac00-\ud7af]/;
+  const hasCJK = cjkRegex.test(term);
+  
+  const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  
+  if (hasCJK) {
+    // For CJK: just use substring matching (no word boundaries)
+    const regex = new RegExp(escapedTerm, 'g');
+    const matches = text.match(regex);
+    return matches ? matches.length : 0;
+  } else {
+    // For Latin: use word boundaries to avoid partial matches
+    const regex = new RegExp(`\\b${escapedTerm}\\b`, 'g');
+    const matches = text.match(regex);
+    return matches ? matches.length : 0;
+  }
+}
+
+/**
  * Core literal search — used by MCP tools via REST API.
  *
  * Scoring: **BM25** (Best Matching 25) — the standard information retrieval
@@ -125,9 +151,12 @@ function splitQueryTerms(query: string): string[] {
  * Candidate narrowing: uses an in-memory inverted index with UNION semantics
  * for multi-term queries (a document matching ANY term is a candidate).
  *
+ * Synonym expansion: queries are expanded via the synonym dictionary so that
+ * "架构" automatically searches for "系统设计", "技术方案", etc.
+ *
  * NOTE: The App also has a separate Fuse.js fuzzy search in `lib/fs.ts` for the
  * browser `⌘K` search overlay. The two coexist intentionally:
- * - Core search (here): exact literal match + BM25 ranking, used by MCP/API
+ * - Core search (here): exact literal match + BM25 ranking + synonyms, used by MCP/API
  * - App search (lib/fs.ts): Fuse.js fuzzy match with CJK support, used by frontend
  */
 export function searchFiles(mindRoot: string, query: string, opts: SearchOptions = {}): SearchResult[] {
@@ -147,7 +176,20 @@ export function searchFiles(mindRoot: string, query: string, opts: SearchOptions
 
   const totalDocs = searchIndex.getFileCount();
   const avgDocLength = searchIndex.getAvgDocLength();
-  const queryTerms = splitQueryTerms(query);
+  
+  // NEW: Expand query with synonyms (e.g., "架构" → ["架构", "系统设计", "技术方案", ...])
+  const expandedTerms = expandQueryWithSynonyms(query);
+  
+  // If synonym expansion produced new terms, use the expanded set.
+  // Otherwise fall back to the original query term splitting behavior.
+  let queryTerms: string[];
+  if (expandedTerms.length > 0 && expandedTerms.length !== 1) {
+    queryTerms = expandedTerms;
+  } else if (expandedTerms.length === 1) {
+    queryTerms = splitQueryTerms(query);
+  } else {
+    queryTerms = splitQueryTerms(query);
+  }
 
   // Use UNION index to get candidate files (any file matching any term)
   const candidates = searchIndex.getCandidatesUnion(query);
@@ -183,10 +225,7 @@ export function searchFiles(mindRoot: string, query: string, opts: SearchOptions
   const lowerQuery = query.toLowerCase();
 
   // ── Pre-scan: compute document frequency for each query term ──
-  // We count how many candidate files contain each term via literal match.
-  // This is more accurate than using the inverted index token df, because
-  // the index tokenizes via Intl.Segmenter (CJK word boundaries) which may
-  // split query terms differently than our literal substring match.
+  // FIXED: Now uses consistent term counting (word boundaries for Latin, substring for CJK)
   const termDf = new Map<string, number>();
   const fileContents = new Map<string, string>();
 
@@ -206,7 +245,8 @@ export function searchFiles(mindRoot: string, query: string, opts: SearchOptions
     fileContents.set(filePath, content);
 
     for (const term of queryTerms) {
-      if (lower.includes(term)) {
+      // Use consistent term counting with word boundaries for Latin terms
+      if (countTermOccurrences(term, lower) > 0) {
         termDf.set(term, (termDf.get(term) ?? 0) + 1);
       }
     }
@@ -226,9 +266,7 @@ export function searchFiles(mindRoot: string, query: string, opts: SearchOptions
     const docLength = content.length;
 
     for (const term of queryTerms) {
-      const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const matches = lowerContent.match(new RegExp(escapedTerm, 'g'));
-      const tf = matches ? matches.length : 0;
+      const tf = countTermOccurrences(term, lowerContent);
       if (tf === 0) continue;
 
       matchedAnyTerm = true;
