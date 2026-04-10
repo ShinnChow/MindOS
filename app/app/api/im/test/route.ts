@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       recipientId: recipient_id,
       text: message,
       format: 'text',
-    });
+    }, undefined, { activityType: 'test' });
 
     if (result.ok) {
       return NextResponse.json({ ok: true, messageId: result.messageId, timestamp: result.timestamp });

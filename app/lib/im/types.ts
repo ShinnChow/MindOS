@@ -55,9 +55,18 @@ export interface TelegramConfig {
   bot_token: string;
 }
 
+export interface FeishuConversationConfig {
+  enabled?: boolean;
+  encrypt_key?: string;
+  verification_token?: string;
+  public_base_url?: string;
+  allow_group_mentions?: boolean;
+}
+
 export interface FeishuConfig {
   app_id: string;
   app_secret: string;
+  conversation?: FeishuConversationConfig;
 }
 
 export interface DiscordConfig {
@@ -144,3 +153,99 @@ const RECIPIENT_ID_PATTERNS: Record<IMPlatform, RegExp> = {
 export function isValidRecipientId(platform: IMPlatform, recipientId: string): boolean {
   return RECIPIENT_ID_PATTERNS[platform].test(recipientId);
 }
+
+// ─── Activity Types ───────────────────────────────────────────────────────────
+
+export type IMActivityType = 'test' | 'agent' | 'manual' | 'conversation_inbound' | 'conversation_reply';
+export type IMActivityStatus = 'success' | 'failed';
+
+export interface IMActivity {
+  id: string;
+  platform: IMPlatform;
+  type: IMActivityType;
+  status: IMActivityStatus;
+  recipient: string;
+  /** Truncated to 50 chars */
+  messageSummary: string;
+  error?: string;
+  timestamp: string;
+}
+
+export interface IMActivityStore {
+  version: 1;
+  activities: Partial<Record<IMPlatform, IMActivity[]>>;
+}
+
+export interface IncomingIMMessage {
+  platform: IMPlatform;
+  senderId: string;
+  senderName?: string;
+  chatId: string;
+  chatType: 'dm' | 'group';
+  text: string;
+  messageId: string;
+  threadId?: string;
+  mentionsBot?: boolean;
+  rawEvent: unknown;
+}
+
+export interface IMSessionKey {
+  platform: IMPlatform;
+  chatId: string;
+}
+
+export interface IMSessionState {
+  key: IMSessionKey;
+  sessionId: string;
+  lastActiveAt: string;
+}
+
+export type IMWebhookState = 'disabled' | 'pending' | 'ready' | 'error';
+
+export interface IMWebhookStatus {
+  platform: IMPlatform;
+  state: IMWebhookState;
+  webhookUrl?: string;
+  publicBaseUrl?: string;
+  lastVerifiedAt?: string;
+  lastInboundAt?: string;
+  lastError?: string;
+  activeSessions?: number;
+}
+
+export interface FeishuWebhookChallengeBody {
+  challenge?: string;
+  token?: string;
+  type?: string;
+}
+
+export interface FeishuWebhookEventEnvelope {
+  schema?: string;
+  header?: {
+    event_id?: string;
+    event_type?: string;
+    tenant_key?: string;
+    create_time?: string;
+    token?: string;
+    app_id?: string;
+  };
+  event?: {
+    message?: {
+      message_id?: string;
+      chat_id?: string;
+      chat_type?: 'p2p' | 'group';
+      content?: string;
+      mentions?: Array<{ key?: string; id?: { open_id?: string; union_id?: string; user_id?: string } }>;
+    };
+    sender?: {
+      sender_id?: {
+        open_id?: string;
+        union_id?: string;
+        user_id?: string;
+      };
+      sender_type?: string;
+      tenant_key?: string;
+    };
+  };
+}
+

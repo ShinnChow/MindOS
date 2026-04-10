@@ -1,11 +1,12 @@
 // ─── IM Unified Executor ──────────────────────────────────────────────────────
 // Manages adapter lifecycle (lazy-load, singleton cache, hot-reload) and dispatches messages.
 
-import type { IMAdapter, IMMessage, IMPlatform, IMSendResult } from './types';
+import type { IMAdapter, IMMessage, IMPlatform, IMSendResult, IMActivityType } from './types';
 import { isValidRecipientId, PLATFORM_LIMITS } from './types';
 import { getPlatformConfig, getIMConfigMtime, getConfiguredPlatforms } from './config';
 import { preprocessMessage } from './format';
 import { retryDelay, sleep } from '@/lib/agent/reconnect';
+import { recordActivity } from './activity';
 
 const MAX_RETRIES = 3;
 
@@ -99,16 +100,23 @@ async function getAdapter(platform: IMPlatform): Promise<IMAdapter> {
 export async function sendIMMessage(
   message: IMMessage,
   signal?: AbortSignal,
+  options?: { activityType?: IMActivityType },
 ): Promise<IMSendResult> {
   // Validate inputs
   if (!message.text || !message.text.trim()) {
-    return { ok: false, error: 'Message text cannot be empty', timestamp: new Date().toISOString() };
+    const result = { ok: false, error: 'Message text cannot be empty', timestamp: new Date().toISOString() };
+    recordIMActivity(message, result, options?.activityType ?? 'manual');
+    return result;
   }
   if (!message.recipientId || !message.recipientId.trim()) {
-    return { ok: false, error: 'Recipient ID cannot be empty', timestamp: new Date().toISOString() };
+    const result = { ok: false, error: 'Recipient ID cannot be empty', timestamp: new Date().toISOString() };
+    recordIMActivity(message, result, options?.activityType ?? 'manual');
+    return result;
   }
   if (!isValidRecipientId(message.platform, message.recipientId)) {
-    return { ok: false, error: `Invalid recipient_id format for ${message.platform}`, timestamp: new Date().toISOString() };
+    const result = { ok: false, error: `Invalid recipient_id format for ${message.platform}`, timestamp: new Date().toISOString() };
+    recordIMActivity(message, result, options?.activityType ?? 'manual');
+    return result;
   }
 
   // Preprocess: downgrade format + truncate
@@ -119,11 +127,15 @@ export async function sendIMMessage(
   try {
     adapter = await getAdapter(processed.platform);
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err), timestamp: new Date().toISOString() };
+    const result = { ok: false, error: err instanceof Error ? err.message : String(err), timestamp: new Date().toISOString() };
+    recordIMActivity(processed, result, options?.activityType ?? 'manual');
+    return result;
   }
 
   // Send with retry
-  return sendWithRetry(adapter, processed, signal);
+  const result = await sendWithRetry(adapter, processed, signal);
+  recordIMActivity(processed, result, options?.activityType ?? 'manual');
+  return result;
 }
 
 /** List all configured and connectable platforms. */
@@ -208,6 +220,21 @@ async function sendWithRetry(
   }
 
   return lastResult ?? { ok: false, error: 'Unknown error after retries', timestamp: new Date().toISOString() };
+}
+
+function recordIMActivity(message: IMMessage, result: IMSendResult, activityType: IMActivityType): void {
+  try {
+    recordActivity({
+      platform: message.platform,
+      type: activityType,
+      status: result.ok ? 'success' : 'failed',
+      recipient: message.recipientId,
+      message: message.text,
+      error: result.error,
+    });
+  } catch {
+    // Activity logging should never block message sending.
+  }
 }
 
 function isRetryableError(error?: string): boolean {

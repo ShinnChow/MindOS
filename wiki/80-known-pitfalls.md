@@ -232,6 +232,16 @@ rootcause: app/api/ask/route.ts:143 直接传递 llmHistoryMessages（pi-ai Mess
 
 ## 前端
 
+### 渠道详情页若只展示配置表单，用户会误解为“聊天页”或“不知道下一步做什么”
+- **现象：** 用户点击 Feishu / Telegram 这类 Channel 后，会问“我能在这里聊天吗？”“这个页面到底是干嘛的？”
+- **原因：** 页面只展示凭证表单和 test send，缺少用途说明、运行状态、最近活动，无法建立“消息投递渠道”的正确心智模型
+- **解决：** Channel detail 首屏必须先回答 3 个问题：**这是干嘛的、它在不在工作、我下一步做什么**。具体做法：
+  1. 顶部增加 `How it works` / 用途说明，明确“不是聊天收件箱”
+  2. 增加 `Status summary`，展示最近活动、最近成功/失败、能力摘要
+  3. 增加 `Recent activity`，让用户知道系统真的在工作
+  4. 把凭证维护下沉到 `Settings`，不要让配置表单成为页面主角
+- **文件参考：** `app/components/agents/AgentsContentChannelDetail.tsx`, `app/lib/im/platforms.ts`, `app/lib/im/activity.ts`
+
 ### Emoji Hydration Mismatch（Twemoji 浏览器扩展）
 - **现象：** SSR 渲染的 emoji 文本（如 `🎯`、`🚀`）在客户端被 Twemoji 等浏览器扩展替换为 `<img>` 元素，触发 React hydration error：`Hydration failed because the server rendered text didn't match the client`
 - **原因：** 浏览器扩展在 React hydration 之前修改 DOM，将 emoji 文本节点替换为 `<img src="...twemoji...">`，导致 SSR HTML 与客户端 DOM 不一致

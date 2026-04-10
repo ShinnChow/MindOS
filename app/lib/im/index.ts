@@ -68,6 +68,7 @@ export default function imExtension(pi: ExtensionAPI) {
           threadId: thread_id,
         },
         signal,
+        { activityType: 'agent' },
       );
 
       if (result.ok) {
