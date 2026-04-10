@@ -122,7 +122,7 @@ export function safeRmSync(
  */
 export function safeMkdir(
   dir: string,
-  options: Parameters<typeof require('fs').mkdirSync>[1] = {}
+  options: { recursive?: boolean; mode?: number } = {}
 ): string {
   const { mkdirSync } = require('fs');
 
