@@ -40,8 +40,8 @@ export async function proxy(req: NextRequest) {
     }
 
     // /api/auth handles its own password validation — never block it.
-    // /api/health is unauthenticated so check-port can detect this MindOS instance.
-    if (pathname === '/api/auth' || pathname === '/api/health') return withCors(NextResponse.next());
+    // /api/health and /api/connect are unauthenticated so mobile apps can discover this instance.
+    if (pathname === '/api/auth' || pathname === '/api/health' || pathname === '/api/connect') return withCors(NextResponse.next());
 
     if (!authToken) return withCors(NextResponse.next());
 

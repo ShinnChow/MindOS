@@ -69,7 +69,7 @@ export default function SearchScreen() {
           renderItem={({ item }) => (
             <Pressable
               style={styles.resultRow}
-              onPress={() => router.push(`/view/${item.path}`)}
+              onPress={() => router.push(`/view/${item.path}` as any)}
             >
               <Text style={styles.resultPath} numberOfLines={1}>{item.path}</Text>
               <Text style={styles.resultSnippet} numberOfLines={2}>{item.snippet}</Text>

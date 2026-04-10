@@ -1,7 +1,7 @@
 /**
  * File/directory view — renders Markdown content or directory listing.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -29,19 +29,28 @@ export default function ViewScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Track current request to prevent stale updates on rapid navigation
+  const requestIdRef = useRef(0);
+
   useEffect(() => {
+    const currentId = ++requestIdRef.current;
+    const controller = new AbortController();
+
     (async () => {
       setLoading(true);
       setError('');
       try {
         // Try to read as file first
-        const data = await mindosClient.getFileContent(filePath);
+        const data = await mindosClient.getFileContent(filePath, controller.signal);
+        if (currentId !== requestIdRef.current) return; // stale
         setContent(data.content);
         setIsDir(false);
       } catch {
+        if (currentId !== requestIdRef.current) return; // stale
         // If file read fails, try listing as directory
         try {
           const tree = await mindosClient.getFileTree();
+          if (currentId !== requestIdRef.current) return; // stale
           const node = findNode(tree, filePath);
           if (node?.children) {
             setChildren(node.children);
@@ -50,12 +59,17 @@ export default function ViewScreen() {
             setError('File not found');
           }
         } catch (e) {
+          if (currentId !== requestIdRef.current) return;
           setError((e as Error).message);
         }
       } finally {
-        setLoading(false);
+        if (currentId === requestIdRef.current) {
+          setLoading(false);
+        }
       }
     })();
+
+    return () => controller.abort();
   }, [filePath]);
 
   if (loading) {
@@ -93,7 +107,7 @@ export default function ViewScreen() {
           renderItem={({ item }) => (
             <Pressable
               style={styles.row}
-              onPress={() => router.push(`/view/${item.path}`)}
+              onPress={() => router.push(`/view/${item.path}` as any)}
             >
               <Ionicons
                 name={item.type === 'directory'
@@ -166,13 +180,14 @@ const styles = StyleSheet.create({
   retryText: { color: '#fafaf9', fontWeight: '500' },
 });
 
-const markdownStyles = StyleSheet.create({
+// react-native-markdown-display requires plain objects, not StyleSheet.create()
+const markdownStyles = {
   body: { color: '#d6d3d1', fontSize: 15, lineHeight: 24 },
-  heading1: { color: '#fafaf9', fontSize: 24, fontWeight: '700', marginTop: 24, marginBottom: 8 },
-  heading2: { color: '#fafaf9', fontSize: 20, fontWeight: '700', marginTop: 20, marginBottom: 8 },
-  heading3: { color: '#fafaf9', fontSize: 17, fontWeight: '600', marginTop: 16, marginBottom: 6 },
-  strong: { color: '#fafaf9', fontWeight: '600' },
-  em: { fontStyle: 'italic' },
+  heading1: { color: '#fafaf9', fontSize: 24, fontWeight: '700' as const, marginTop: 24, marginBottom: 8 },
+  heading2: { color: '#fafaf9', fontSize: 20, fontWeight: '700' as const, marginTop: 20, marginBottom: 8 },
+  heading3: { color: '#fafaf9', fontSize: 17, fontWeight: '600' as const, marginTop: 16, marginBottom: 6 },
+  strong: { color: '#fafaf9', fontWeight: '600' as const },
+  em: { fontStyle: 'italic' as const },
   link: { color: '#c8873a' },
   blockquote: {
     borderLeftWidth: 3,
@@ -197,7 +212,6 @@ const markdownStyles = StyleSheet.create({
     fontFamily: 'monospace',
     fontSize: 13,
     color: '#d6d3d1',
-    overflow: 'hidden',
   },
   fence: {
     backgroundColor: '#292524',
@@ -213,6 +227,6 @@ const markdownStyles = StyleSheet.create({
   hr: { borderColor: '#44403c', marginVertical: 16 },
   table: { borderColor: '#44403c' },
   thead: { backgroundColor: '#292524' },
-  th: { color: '#fafaf9', fontWeight: '600', padding: 8 },
+  th: { color: '#fafaf9', fontWeight: '600' as const, padding: 8 },
   td: { color: '#d6d3d1', padding: 8, borderColor: '#44403c' },
-});
+};

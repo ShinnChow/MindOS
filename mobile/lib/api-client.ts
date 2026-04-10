@@ -35,9 +35,13 @@ class MindOSClient {
     return false;
   }
 
-  /** Set and persist the server URL. */
-  async setServer(url: string): Promise<void> {
+  /** Set base URL in memory (does NOT persist). */
+  setBaseUrl(url: string): void {
     this._baseUrl = url.replace(/\/+$/, '');
+  }
+
+  /** Persist current base URL to storage. Call only after verifying connection. */
+  async persistServer(): Promise<void> {
     await AsyncStorage.setItem(STORAGE_KEY, this._baseUrl);
   }
 
@@ -53,7 +57,7 @@ class MindOSClient {
 
   async health(): Promise<HealthResponse | null> {
     try {
-      const res = await this.fetch('/api/health', { timeout: 5000 });
+      const res = await this.fetchWithTimeout('/api/health', { timeout: 5000 });
       if (!res.ok) return null;
       return res.json();
     } catch {
@@ -63,7 +67,7 @@ class MindOSClient {
 
   async getConnectInfo(): Promise<ConnectResponse | null> {
     try {
-      const res = await this.fetch('/api/connect');
+      const res = await this.fetchWithTimeout('/api/connect');
       if (!res.ok) return null;
       return res.json();
     } catch {
@@ -76,28 +80,36 @@ class MindOSClient {
   // ---------------------------------------------------------------------------
 
   async getFileTree(): Promise<FileNode[]> {
-    const res = await this.fetch('/api/files');
+    const res = await this.fetchWithTimeout('/api/files');
     if (!res.ok) throw new ApiError(res.status, 'Failed to load files');
     const data = await res.json();
-    return data.tree ?? data;
+    const tree = data.tree ?? data;
+    if (!Array.isArray(tree)) throw new ApiError(500, 'Invalid response format');
+    return tree;
   }
 
-  async getFileContent(path: string): Promise<{ content: string; mtime?: number }> {
-    const res = await this.fetch(`/api/file?path=${enc(path)}&op=read_file`);
-    if (!res.ok) throw new ApiError(res.status, `Failed to read ${path}`);
+  async getFileContent(
+    filePath: string,
+    signal?: AbortSignal,
+  ): Promise<{ content: string; mtime?: number }> {
+    const res = await this.fetchWithTimeout(
+      `/api/file?path=${enc(filePath)}&op=read_file`,
+      { signal },
+    );
+    if (!res.ok) throw new ApiError(res.status, `Failed to read ${filePath}`);
     return res.json();
   }
 
   async saveFile(
-    path: string,
+    filePath: string,
     content: string,
     expectedMtime?: number,
   ): Promise<FileSaveResponse> {
-    const res = await this.fetch('/api/file', {
+    const res = await this.fetchWithTimeout('/api/file', {
       method: 'POST',
       body: JSON.stringify({
         op: 'save_file',
-        path,
+        path: filePath,
         content,
         expectedMtime,
       }),
@@ -113,30 +125,44 @@ class MindOSClient {
   // ---------------------------------------------------------------------------
 
   async search(query: string): Promise<SearchResult[]> {
-    const res = await this.fetch(`/api/search?q=${enc(query)}`);
+    const res = await this.fetchWithTimeout(`/api/search?q=${enc(query)}`);
     if (!res.ok) throw new ApiError(res.status, 'Search failed');
     const data = await res.json();
-    return data.results ?? data;
+    const results = data.results ?? data;
+    if (!Array.isArray(results)) return [];
+    return results;
   }
 
   // ---------------------------------------------------------------------------
-  // Internal fetch wrapper
+  // Internal fetch wrapper — uses AbortController (RN-compatible, no AbortSignal.timeout)
   // ---------------------------------------------------------------------------
 
-  private fetch(
+  private fetchWithTimeout(
     path: string,
-    opts: { method?: string; body?: string; timeout?: number } = {},
+    opts: { method?: string; body?: string; timeout?: number; signal?: AbortSignal } = {},
   ): Promise<Response> {
-    const { method = 'GET', body, timeout = DEFAULT_TIMEOUT } = opts;
+    const { method = 'GET', body, timeout = DEFAULT_TIMEOUT, signal } = opts;
     const headers: Record<string, string> = {};
     if (body) headers['Content-Type'] = 'application/json';
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    // If an external signal is provided, forward its abort
+    if (signal) {
+      if (signal.aborted) {
+        controller.abort();
+      } else {
+        signal.addEventListener('abort', () => controller.abort(), { once: true });
+      }
+    }
 
     return fetch(`${this._baseUrl}${path}`, {
       method,
       headers,
       body,
-      signal: AbortSignal.timeout(timeout),
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
   }
 }
 

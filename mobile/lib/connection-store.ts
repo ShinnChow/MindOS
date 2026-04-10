@@ -24,7 +24,7 @@ interface ConnectionState {
   checkHealth: () => Promise<boolean>;
 }
 
-export const useConnectionStore = create<ConnectionState>((set, get) => ({
+export const useConnectionStore = create<ConnectionState>((set) => ({
   status: 'disconnected',
   serverUrl: '',
   serverVersion: '',
@@ -38,10 +38,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     set({ status: 'connecting', serverUrl: mindosClient.baseUrl });
     const health = await mindosClient.health();
     if (health?.ok) {
-      set({
-        status: 'connected',
-        serverVersion: health.version,
-      });
+      set({ status: 'connected', serverVersion: health.version });
     } else {
       set({ status: 'error', error: 'Saved server is unreachable' });
     }
@@ -51,10 +48,13 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
     const normalized = url.replace(/\/+$/, '');
     set({ status: 'connecting', serverUrl: normalized, error: '' });
 
-    await mindosClient.setServer(normalized);
+    // Set URL in memory first (for health check), but do NOT persist yet
+    mindosClient.setBaseUrl(normalized);
     const health = await mindosClient.health();
 
     if (health?.ok) {
+      // Only persist after successful verification
+      await mindosClient.persistServer();
       const connectInfo = await mindosClient.getConnectInfo();
       set({
         status: 'connected',
@@ -64,6 +64,8 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
       return true;
     }
 
+    // Reset base URL on failure — don't leave a bad URL in memory
+    mindosClient.setBaseUrl('');
     set({
       status: 'error',
       error: 'Unable to connect. Make sure MindOS is running and on the same network.',
@@ -83,6 +85,7 @@ export const useConnectionStore = create<ConnectionState>((set, get) => ({
   },
 
   checkHealth: async () => {
+    set({ status: 'connecting' });
     const health = await mindosClient.health();
     if (health?.ok) {
       set({ status: 'connected', serverVersion: health.version });

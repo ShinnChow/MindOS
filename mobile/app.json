@@ -4,7 +4,10 @@
     "slug": "mindos-mobile",
     "version": "0.0.1",
     "scheme": "mindos",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
@@ -16,7 +19,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.mindos.mobile",
       "infoPlist": {
-        "NSLocalNetworkUsageDescription": "MindOS needs local network access to connect to your desktop MindOS server."
+        "NSLocalNetworkUsageDescription": "MindOS needs local network access to connect to your desktop MindOS server.",
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {
@@ -27,7 +33,11 @@
       "package": "com.mindos.mobile",
       "usesCleartextTraffic": true
     },
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      "expo-asset",
+      "expo-font"
+    ],
     "experiments": {
       "typedRoutes": true
     }

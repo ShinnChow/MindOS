@@ -45,8 +45,7 @@ export default function HomeScreen() {
   }, [loadData]);
 
   const spaces = tree.filter((n) => n.type === 'directory' && n.isSpace);
-  const recentFiles = tree
-    .filter((n) => n.type === 'file')
+  const recentFiles = flattenFiles(tree)
     .sort((a, b) => (b.mtime ?? 0) - (a.mtime ?? 0))
     .slice(0, 10);
 
@@ -96,7 +95,7 @@ export default function HomeScreen() {
                     <Pressable
                       key={space.path}
                       style={styles.spaceCard}
-                      onPress={() => router.push(`/view/${space.path}`)}
+                      onPress={() => router.push(`/view/${space.path}` as any)}
                     >
                       <Ionicons name="layers-outline" size={20} color="#c8873a" />
                       <Text style={styles.spaceName} numberOfLines={1}>{space.name}</Text>
@@ -118,7 +117,7 @@ export default function HomeScreen() {
         renderItem={({ item }) => (
           <Pressable
             style={styles.fileRow}
-            onPress={() => router.push(`/view/${item.path}`)}
+            onPress={() => router.push(`/view/${item.path}` as any)}
           >
             <Ionicons
               name={item.extension === '.csv' ? 'grid-outline' : 'document-text-outline'}
@@ -146,6 +145,15 @@ export default function HomeScreen() {
       />
     </SafeAreaView>
   );
+}
+
+function flattenFiles(nodes: FileNode[]): FileNode[] {
+  const result: FileNode[] = [];
+  for (const node of nodes) {
+    if (node.type === 'file') result.push(node);
+    if (node.children) result.push(...flattenFiles(node.children));
+  }
+  return result;
 }
 
 function formatRelativeTime(mtimeMs: number): string {

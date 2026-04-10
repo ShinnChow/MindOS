@@ -1,7 +1,7 @@
 /**
  * Settings tab — connection management + app info.
  */
-import { View, Text, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, Pressable, ActivityIndicator, StyleSheet, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,8 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { status, serverUrl, serverVersion, hostname, disconnect, checkHealth } =
     useConnectionStore();
+
+  const isChecking = status === 'connecting';
 
   async function handleDisconnect() {
     Alert.alert(
@@ -37,9 +39,9 @@ export default function SettingsScreen() {
 
         <View style={styles.card}>
           <View style={styles.row}>
-            <View style={[styles.dot, status === 'connected' && styles.dotGreen]} />
+            <View style={[styles.dot, status === 'connected' ? styles.dotGreen : status === 'connecting' ? styles.dotYellow : null]} />
             <Text style={styles.label}>
-              {status === 'connected' ? 'Connected' : 'Disconnected'}
+              {status === 'connected' ? 'Connected' : status === 'connecting' ? 'Checking...' : status === 'error' ? 'Error' : 'Disconnected'}
             </Text>
           </View>
 
@@ -63,9 +65,13 @@ export default function SettingsScreen() {
           ) : null}
 
           <View style={styles.actions}>
-            <Pressable style={styles.actionButton} onPress={checkHealth}>
-              <Ionicons name="refresh" size={16} color="#c8873a" />
-              <Text style={styles.actionText}>Check Connection</Text>
+            <Pressable style={styles.actionButton} onPress={checkHealth} disabled={isChecking}>
+              {isChecking ? (
+                <ActivityIndicator size="small" color="#c8873a" />
+              ) : (
+                <Ionicons name="refresh" size={16} color="#c8873a" />
+              )}
+              <Text style={styles.actionText}>{isChecking ? 'Checking...' : 'Check Connection'}</Text>
             </Pressable>
 
             {serverUrl ? (
@@ -106,6 +112,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#78716c' },
   dotGreen: { backgroundColor: '#22c55e' },
+  dotYellow: { backgroundColor: '#eab308' },
   label: { fontSize: 15, fontWeight: '600', color: '#fafaf9' },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   infoLabel: { fontSize: 13, color: '#78716c' },

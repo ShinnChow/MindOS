@@ -69,7 +69,7 @@ export default function FilesScreen() {
         renderItem={({ item }) => (
           <Pressable
             style={styles.row}
-            onPress={() => router.push(`/view/${item.path}`)}
+            onPress={() => router.push(`/view/${item.path}` as any)}
           >
             <Ionicons
               name={iconForNode(item) as any}
