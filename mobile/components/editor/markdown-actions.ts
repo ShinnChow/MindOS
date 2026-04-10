@@ -53,7 +53,10 @@ function prefixLine(prefix: string): ActionFn {
       const newContent = content.slice(0, lineStart) + stripped + content.slice(actualEnd);
       return {
         content: newContent,
-        selection: { start: sel.start - prefix.length, end: sel.end - prefix.length },
+        selection: {
+          start: Math.max(lineStart, sel.start - prefix.length),
+          end: Math.max(lineStart, sel.end - prefix.length),
+        },
       };
     }
 

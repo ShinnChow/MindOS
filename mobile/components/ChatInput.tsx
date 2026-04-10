@@ -60,7 +60,7 @@ export default function ChatInput({
             disabled={isLoading}
           >
             <Ionicons
-              name={m === 'chat' ? 'chatbubble-outline' : 'sparkles'}
+              name={m === 'chat' ? 'chatbubble-outline' : 'flash-outline'}
               size={14}
               color={mode === m ? '#c8873a' : '#78716c'}
             />

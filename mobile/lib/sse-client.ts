@@ -1,16 +1,18 @@
 /**
- * SSE (Server-Sent Events) client for React Native mobile.
+ * SSE (Server-Sent Events) client for React Native (Hermes).
  *
- * MindOS /api/ask uses text/event-stream format:
+ * IMPORTANT: Hermes does NOT support ReadableStream or TextDecoder.
+ * This implementation uses XMLHttpRequest with onprogress, which is
+ * the only reliable way to get streaming data in React Native.
+ *
+ * MindOS /api/ask SSE format:
  *   data:{"type":"text_delta","delta":"hello"}\n\n
- *   data:{"type":"tool_start","toolCallId":"1","toolName":"search","args":{}}\n\n
  *   data:{"type":"done"}\n\n
- *
- * This implementation uses native fetch() with manual SSE parsing.
- * No dependency on react-native-sse.
  */
 
-import type { Message, MessagePart, TextPart, ReasoningPart, ToolCallPart } from './types';
+import type { Message, MessagePart, ReasoningPart, ToolCallPart } from './types';
+
+// ─── SSE Event Types ───────────────────────────────────────────
 
 export type SSEEventType =
   | 'text_delta'
@@ -39,95 +41,114 @@ export interface StreamConsumerCallbacks {
   onComplete: () => void;
 }
 
+// ─── XMLHttpRequest-based SSE Stream ───────────────────────────
+
 /**
- * Consume SSE stream from /api/ask.
- * Returns a cancel function to abort the stream.
+ * Stream SSE events from /api/ask using XMLHttpRequest.
+ * Returns a cancel function.
  */
 export function streamChat(
   baseUrl: string,
   body: Record<string, unknown>,
   callbacks: StreamConsumerCallbacks,
-  externalSignal?: AbortSignal,
 ): () => void {
-  const controller = new AbortController();
   let isClosed = false;
+  let processedLength = 0;
+  let buffer = '';
 
-  // Forward external abort to our controller (AbortSignal.any() is not in RN)
-  if (externalSignal) {
-    if (externalSignal.aborted) {
-      controller.abort();
-    } else {
-      externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
-    }
-  }
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', `${baseUrl}/api/ask`);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.setRequestHeader('Accept', 'text/event-stream');
 
-  (async () => {
-    try {
-      const response = await fetch(`${baseUrl}/api/ask`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
+  xhr.onprogress = () => {
+    if (isClosed) return;
 
-      if (!response.ok) {
-        const text = await response.text().catch(() => '');
-        throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
-      }
+    // Get only the new data since last progress event
+    const newData = xhr.responseText.slice(processedLength);
+    processedLength = xhr.responseText.length;
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('No response body — streaming may not be supported');
+    buffer += newData;
 
-      const decoder = new TextDecoder();
-      let buffer = '';
+    // SSE events are separated by \n\n
+    const chunks = buffer.split('\n\n');
+    buffer = chunks.pop() || '';
 
-      while (!isClosed) {
-        const { done, value } = await reader.read();
-        if (done) break;
+    for (const chunk of chunks) {
+      if (!chunk.trim()) continue;
 
-        buffer += decoder.decode(value, { stream: true });
+      for (const line of chunk.split('\n')) {
+        if (!line.startsWith('data:')) continue;
 
-        // SSE uses \n\n as event separator
-        const chunks = buffer.split('\n\n');
-        buffer = chunks.pop() || '';
+        const dataStr = line.slice(5).trim();
+        if (!dataStr) continue;
 
-        for (const chunk of chunks) {
-          // Each SSE event can have multiple lines; we only care about data: lines
-          for (const line of chunk.split('\n')) {
-            if (!line.startsWith('data:')) continue;
+        try {
+          const event = JSON.parse(dataStr) as SSEEvent;
+          if (!isClosed) callbacks.onEvent(event);
 
-            const dataStr = line.slice(5).trim();
-            if (!dataStr) continue;
-
-            try {
-              const event = JSON.parse(dataStr) as SSEEvent;
-              callbacks.onEvent(event);
-
-              if (event.type === 'done' || event.type === 'error') {
-                isClosed = true;
-              }
-            } catch {
-              // Skip unparseable lines
-            }
+          if (event.type === 'done' || event.type === 'error') {
+            isClosed = true;
           }
+        } catch {
+          // Skip unparseable lines (e.g. partial JSON)
         }
       }
-
-      if (!isClosed) callbacks.onComplete();
-    } catch (error) {
-      if (!isClosed && !(error instanceof Error && error.name === 'AbortError')) {
-        callbacks.onError(error instanceof Error ? error : new Error(String(error)));
-      }
-    } finally {
-      isClosed = true;
     }
-  })();
+  };
+
+  xhr.onload = () => {
+    if (!isClosed) {
+      // Process any remaining buffer
+      if (buffer.trim()) {
+        for (const line of buffer.split('\n')) {
+          if (!line.startsWith('data:')) continue;
+          const dataStr = line.slice(5).trim();
+          if (!dataStr) continue;
+          try {
+            const event = JSON.parse(dataStr) as SSEEvent;
+            callbacks.onEvent(event);
+          } catch { /* skip */ }
+        }
+      }
+      callbacks.onComplete();
+    }
+    isClosed = true;
+  };
+
+  xhr.onerror = () => {
+    if (!isClosed) {
+      callbacks.onError(new Error('Network error — check your connection'));
+    }
+    isClosed = true;
+  };
+
+  xhr.ontimeout = () => {
+    if (!isClosed) {
+      callbacks.onError(new Error('Request timed out'));
+    }
+    isClosed = true;
+  };
+
+  // 5 minute timeout for long-running agent tasks
+  xhr.timeout = 300_000;
+
+  try {
+    xhr.send(JSON.stringify(body));
+  } catch (e) {
+    callbacks.onError(e instanceof Error ? e : new Error(String(e)));
+    isClosed = true;
+  }
 
   return () => {
-    isClosed = true;
-    controller.abort();
+    if (!isClosed) {
+      isClosed = true;
+      xhr.abort();
+    }
   };
 }
+
+// ─── Message Builder ───────────────────────────────────────────
 
 /**
  * Build a Message from accumulated SSE events.
@@ -185,7 +206,7 @@ export class MessageBuilder {
   /** Finalize: mark unfinished tool calls as errored. */
   finalize(): Message {
     for (const tc of this.toolCalls.values()) {
-      if (tc.state === 'running' || tc.state === 'pending') {
+      if (tc.state === 'running') {
         tc.state = 'error';
         tc.output = tc.output || 'Stream ended before tool completed';
       }

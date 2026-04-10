@@ -49,8 +49,8 @@ export default function ChatScreen() {
       <SafeAreaView style={styles.container} edges={['left', 'right']}>
         <KeyboardAvoidingView
           style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={90}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
         >
           <View style={styles.emptyCenter}>
             <Text style={styles.emptyIcon}>◆</Text>
@@ -110,8 +110,8 @@ export default function ChatScreen() {
           ref={listRef}
           data={messages}
           keyExtractor={(_, index) => String(index)}
-          renderItem={({ item, index }) => (
-            <MessageBubble message={item} index={index} />
+          renderItem={({ item }) => (
+            <MessageBubble message={item} />
           )}
           contentContainerStyle={styles.messageList}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}

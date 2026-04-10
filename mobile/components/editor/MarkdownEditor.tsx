@@ -9,7 +9,7 @@
  * - Large file warning (>20KB on Android)
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import {
   View,
   TextInput,
@@ -53,11 +53,13 @@ export default function MarkdownEditor({
   const [lastMtime, setLastMtime] = useState(initialMtime);
   const [saveError, setSaveError] = useState('');
 
+  const [selection, setSelection] = useState<Selection>({ start: 0, end: 0 });
   const selectionRef = useRef<Selection>({ start: 0, end: 0 });
   const inputRef = useRef<TextInput>(null);
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isLargeFile = new TextEncoder().encode(content).length > MAX_EDITABLE_BYTES;
+  // Hermes has no TextEncoder; use string.length as rough byte estimate
+  const isLargeFile = content.length > MAX_EDITABLE_BYTES;
 
   // --- Draft auto-save ---
 
@@ -98,13 +100,9 @@ export default function MarkdownEditor({
     const result = actionFn(content, selectionRef.current);
     setContent(result.content);
     setDirty(true);
-
-    // Set cursor position after formatting
-    setTimeout(() => {
-      inputRef.current?.setNativeProps({
-        selection: result.selection,
-      });
-    }, 50);
+    // Update selection via controlled prop (setNativeProps doesn't work on Fabric)
+    setSelection(result.selection);
+    selectionRef.current = result.selection;
   }, [content]);
 
   // --- Save to server ---
@@ -233,7 +231,12 @@ export default function MarkdownEditor({
           style={styles.editor}
           value={content}
           onChangeText={(text) => { setContent(text); setDirty(true); }}
-          onSelectionChange={(e) => { selectionRef.current = e.nativeEvent.selection; }}
+          selection={selection}
+          onSelectionChange={(e) => {
+            const sel = e.nativeEvent.selection;
+            selectionRef.current = sel;
+            setSelection(sel);
+          }}
           multiline
           autoCapitalize="none"
           autoCorrect={false}

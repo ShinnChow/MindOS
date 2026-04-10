@@ -46,7 +46,7 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
 
   connect: async (url: string) => {
     const normalized = url.replace(/\/+$/, '');
-    set({ status: 'connecting', serverUrl: normalized, error: '' });
+    set({ status: 'connecting', error: '' });
 
     // Set URL in memory first (for health check), but do NOT persist yet
     mindosClient.setBaseUrl(normalized);
@@ -58,6 +58,7 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
       const connectInfo = await mindosClient.getConnectInfo();
       set({
         status: 'connected',
+        serverUrl: normalized,
         serverVersion: health.version,
         hostname: connectInfo?.hostname ?? '',
       });
@@ -68,6 +69,7 @@ export const useConnectionStore = create<ConnectionState>((set) => ({
     mindosClient.setBaseUrl('');
     set({
       status: 'error',
+      serverUrl: '',
       error: 'Unable to connect. Make sure MindOS is running and on the same network.',
     });
     return false;
