@@ -701,8 +701,10 @@ Later: Feature 5 (知识编译) — 依赖 LLM，成本/质量需验证
 - [ ] Agent 不会未经用户确认就修改现有文件
 - [ ] 无相关笔记时不多余输出（静默跳过）
 
-### Feature 5: 知识编译
-- [ ] `mindos compile Research` 生成 `Research/_overview.md`
-- [ ] 综述包含：核心概念、关键发现、知识空白、建议
-- [ ] 7 天内重复编译跳过（除非 force=true）
-- [ ] 文件数 < 3 的 Space 不编译
+### Feature 5: 知识编译 ✅
+- [x] Agent 工具 `compile` / MCP 工具 `mindos_compile` / API `/api/space-overview` 生成 Space `README.md`
+- [x] 综述包含：标题、概述、核心主题、重要文件、知识地图（按 prompt 模板）
+- [x] UI：DirView 中模板 README 显示 CTA 引导卡片，已有内容显示 Sparkle 再生成按钮
+- [x] 路径遍历防护（resolveSafe）+ 缓存失效（invalidateCache）+ 多状态错误恢复
+- [x] 12 个单元测试（compile 核心 + API route）
+- 变更：使用 `README.md` 而非 `_overview.md`；取消 7 天冷却期和最少文件数限制（UI 已处理无文件场景）

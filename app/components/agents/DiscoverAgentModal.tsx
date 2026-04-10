@@ -46,7 +46,7 @@ export default function DiscoverAgentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={handleClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center modal-backdrop" onClick={handleClose}>
       <div
         className="bg-popover border border-border rounded-xl shadow-lg w-full max-w-md mx-4 p-5"
         onClick={e => e.stopPropagation()}
@@ -79,7 +79,7 @@ export default function DiscoverAgentModal({
             onKeyDown={handleKeyDown}
             placeholder={p.a2aDiscoverPlaceholder}
             disabled={discovering}
-            className="flex-1 px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+            className="flex-1 px-3 py-2 text-xs rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
             autoFocus
           />
           <button

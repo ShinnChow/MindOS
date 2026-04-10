@@ -17,7 +17,7 @@ interface EditorProps {
 
 const darkTheme = EditorView.theme({
   '&': {
-    backgroundColor: '#09090b',
+    backgroundColor: 'var(--background)',
     height: '100%',
     fontSize: '0.875rem',
     fontFamily: 'var(--font-ibm-plex-mono), ui-monospace, monospace',
@@ -28,7 +28,7 @@ const darkTheme = EditorView.theme({
   },
   '.cm-content': {
     padding: '16px',
-    caretColor: '#60a5fa',
+    caretColor: 'var(--amber)',
   },
   '.cm-focused': {
     outline: 'none',
@@ -37,24 +37,24 @@ const darkTheme = EditorView.theme({
     padding: '0 4px',
   },
   '.cm-gutters': {
-    backgroundColor: '#0d0d0f',
-    borderRight: '1px solid #27272a',
-    color: '#52525b',
+    backgroundColor: 'var(--card)',
+    borderRight: '1px solid var(--border)',
+    color: 'var(--muted-foreground)',
   },
   '.cm-activeLineGutter': {
-    backgroundColor: '#18181b',
+    backgroundColor: 'var(--muted)',
   },
   '.cm-activeLine': {
-    backgroundColor: '#18181b50',
+    backgroundColor: 'color-mix(in srgb, var(--muted) 50%, transparent)',
   },
   '.cm-selectionBackground': {
-    backgroundColor: '#2563eb40',
+    backgroundColor: 'color-mix(in srgb, var(--amber) 25%, transparent)',
   },
   '&.cm-focused .cm-selectionBackground': {
-    backgroundColor: '#2563eb60',
+    backgroundColor: 'color-mix(in srgb, var(--amber) 38%, transparent)',
   },
   '.cm-cursor': {
-    borderLeftColor: '#60a5fa',
+    borderLeftColor: 'var(--amber)',
     borderLeftWidth: '2px',
   },
 });

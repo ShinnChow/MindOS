@@ -427,7 +427,7 @@ export default function ProviderModelCapsule({
               onChange={e => setModelSearch(e.target.value)}
               onKeyDown={handleModelKeyDown}
               placeholder={t.ask?.searchModels ?? 'Search...'}
-              className="w-full text-2xs pl-6 pr-2 py-1 rounded border border-border/50 bg-transparent text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:border-[var(--amber)]/50"
+              className="w-full text-2xs pl-6 pr-2 py-1 rounded border border-border/50 bg-transparent text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus-visible:border-[var(--amber)]/50"
               autoComplete="off"
             />
           </div>

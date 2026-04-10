@@ -77,7 +77,7 @@
 - [x] **Feature 1: 查询回流（Save Insight）** — Ask 面板中 AI 回答气泡 hover 出现 Save 按钮，点击展开 inline 保存表单（路径/模式/预览），一键保存到知识库。Provider/Trigger 分离架构，13 个纯逻辑测试。红队修复 4 项。[spec](./specs/spec-save-insight.md)
 - [x] Feature 2: 知识体检（KB Lint）— P1。核心静态分析模块 `lib/lint.ts`（findOrphans/findStaleFiles/findBrokenLinks/findEmptyFiles/computeHealthScore/runLint），API route `/api/lint`，Agent 工具 `lint`，MCP 工具 `mindos_lint`。28 个单元测试。二进制内容检测 + URL 解码链接解析。[spec](./specs/spec-kb-lint.md)
 - [ ] Feature 4: 深度摄入（Ingest Ripple）— P2
-- [ ] Feature 5: 知识编译（Space Overview）— P3
+- [x] Feature 5: 知识编译（Space Overview）— AI 生成/再生成 Space README。`lib/compile.ts` 核心逻辑（文件收集 + LLM 调用 + 语言检测），`/api/space-overview` API（GET 文件数 / POST 触发编译），Agent 工具 `compile`，MCP 工具 `mindos_compile`。DirView UI：模板 README 显示 CTA 卡片引导生成，已有内容显示再生成按钮。路径遍历防护（resolveSafe）+ 缓存失效 + 错误恢复。12 个单元测试。[spec](./specs/spec-llm-wiki-spike.md)
 
 ### 🔴 高优先（下一批做）
 
@@ -99,7 +99,7 @@
 - [x] **Desktop：内置运行时 Next standalone + 精简 prepare** — `app/next.config` `output: 'standalone'`；`prepare-mindos-bundle.mjs` 合并 static/public、拷贝 app 时去掉 `node_modules` / `.next/cache` / `.next/dev`。[spec](./specs/spec-desktop-standalone-runtime.md)
 - [x] **Electron Desktop App（Phase 1）** — 本地+远程双模式桌面端，含系统托盘（模式感知）、自动更新（electron-updater）、IPC 安全桥接、窗口状态持久化、Node.js 自动检测/下载。CI 多平台构建（macOS arm64+x64/Windows/Linux）。30+ 源文件 + 198MB 内置运行时。[spec](./specs/spec-electron-desktop-app.md)
 - [x] **Ask Panel Focus Mode + 宽度扩展** — 拖拽上限从 700px/45% 扩展到 1400px/92%，Maximize 改为 Focus Mode（统一用 width 定位，消除 left 定位跳变）。支持 Esc 退出 Focus，进入/退出平滑过渡。[spec](./specs/spec-ask-panel-focus-mode.md)
-- [ ] **Capacitor 移动端（Phase 2）** — iOS/Android 原生壳，复用 Phase 1 连接 SDK。[spec](./specs/spec-capacitor-mobile-app.md)
+- [ ] **React Native 移动端（Expo）** — iOS/Android 跨端 APP，Phase 1 已完成项目骨架（5-tab 导航 + API 客户端 + 连接配置 + 文件浏览 + 搜索）。前置条件已实现：CORS 中间件、QR 连接 API、文件保存冲突检测。Phase 2: AI Chat、Phase 3: Markdown 编辑器。[spec](./specs/spec-rn-phase1-app-shell.md)
 - [x] **Help 页面** — `/help` 路由 + ActivityBar 底部 `?` 图标入口。6 个 section，前 4 个默认展开：
   - 什么是 MindOS（非技术版定位：你和 AI 共享同一个大脑）
   - 核心概念：Space → Instruction → Skill（从"知识在哪"→"怎么控制 AI"→"AI 怎么干活"）
