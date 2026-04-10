@@ -30,24 +30,48 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { platform, credentials } = body as { platform: string; credentials: Record<string, string> };
+    const { platform, credentials, conversation } = body as {
+      platform: string;
+      credentials?: Record<string, string>;
+      conversation?: {
+        enabled?: boolean;
+        encrypt_key?: string;
+        public_base_url?: string;
+        allow_group_mentions?: boolean;
+      };
+    };
 
-    if (!platform || !credentials || typeof credentials !== 'object') {
-      return NextResponse.json({ error: 'Missing platform or credentials' }, { status: 400 });
+    if (!platform || ((!credentials || typeof credentials !== 'object') && (!conversation || typeof conversation !== 'object'))) {
+      return NextResponse.json({ error: 'Missing platform credentials or conversation settings' }, { status: 400 });
     }
 
-    // Validate before saving
-    const validation = validatePlatformConfig(platform as IMPlatform, credentials);
-    if (!validation.valid) {
-      return NextResponse.json({
-        error: `Invalid config: missing ${validation.missing?.join(', ')}`,
-        missing: validation.missing,
-      }, { status: 422 });
-    }
-
-    // Read current config, merge, write
     const config = readIMConfig();
-    (config.providers as Record<string, unknown>)[platform] = credentials;
+    const existing = (config.providers as Record<string, any>)[platform] ?? {};
+
+    if (credentials && typeof credentials === 'object') {
+      const mergedCredentials = { ...existing, ...credentials };
+      const validation = validatePlatformConfig(platform as IMPlatform, mergedCredentials);
+      if (!validation.valid) {
+        return NextResponse.json({
+          error: `Invalid config: missing ${validation.missing?.join(', ')}`,
+          missing: validation.missing,
+        }, { status: 422 });
+      }
+      (config.providers as Record<string, unknown>)[platform] = mergedCredentials;
+    }
+
+    if (platform === 'feishu' && conversation && typeof conversation === 'object') {
+      const merged = ((config.providers as Record<string, any>)[platform] ?? {}) as Record<string, any>;
+      merged.conversation = {
+        ...(merged.conversation ?? {}),
+        enabled: Boolean(conversation.enabled),
+        encrypt_key: conversation.encrypt_key ?? merged.conversation?.encrypt_key,
+        public_base_url: conversation.public_base_url ?? merged.conversation?.public_base_url,
+        allow_group_mentions: conversation.allow_group_mentions ?? merged.conversation?.allow_group_mentions ?? true,
+      };
+      (config.providers as Record<string, unknown>)[platform] = merged;
+    }
+
     writeIMConfig(config);
 
     return NextResponse.json({ ok: true, platform });

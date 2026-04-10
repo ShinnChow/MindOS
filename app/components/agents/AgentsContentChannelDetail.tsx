@@ -69,6 +69,17 @@ function ChannelLoadingSkeleton() {
   );
 }
 
+function formatActivityType(type: IMActivity['type'], labels: { test: string; agent: string; manual: string }) {
+  switch (type) {
+    case 'test':
+      return labels.test;
+    case 'agent':
+      return labels.agent;
+    default:
+      return labels.manual;
+  }
+}
+
 function SectionCard({ title, children, icon }: { title: string; children: React.ReactNode; icon?: React.ReactNode }) {
   return (
     <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
@@ -95,6 +106,12 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
   const [saving, setSaving] = useState(false);
   const [saveResult, setSaveResult] = useState<{ ok: boolean; msg: string } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [conversationEnabled, setConversationEnabled] = useState(false);
+  const [conversationEncryptKey, setConversationEncryptKey] = useState('');
+  const [conversationPublicBaseUrl, setConversationPublicBaseUrl] = useState('');
+  const [conversationAllowMentions, setConversationAllowMentions] = useState(true);
+  const [conversationSaving, setConversationSaving] = useState(false);
+  const [conversationResult, setConversationResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const [testRecipient, setTestRecipient] = useState('');
   const [testMsg, setTestMsg] = useState('Hello from MindOS');
@@ -126,6 +143,10 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
 
       setStatus(nextStatus);
       setActivities(nextActivities);
+      if (platformId === 'feishu') {
+        setConversationEnabled(nextStatus?.webhook?.state !== 'disabled');
+        setConversationPublicBaseUrl(nextStatus?.webhook?.publicBaseUrl ?? '');
+      }
       setLoadState('ready');
     } catch {
       setLoadState('error');
@@ -155,6 +176,11 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
 
   const isConnected = status?.connected ?? false;
   const isFormComplete = platform.fields.every(field => formValues[field.key]?.trim());
+  const isFeishu = platformId === 'feishu';
+  const webhookState = status?.webhook?.state ?? 'disabled';
+  const conversationModeLabel = isFeishu && webhookState === 'ready'
+    ? im.twoWayConversation
+    : im.notificationsOnly;
   const latestActivity = activities[0] ?? null;
   const lastSuccess = activities.find(item => item.status === 'success') ?? null;
   const lastFailure = activities.find(item => item.status === 'failed') ?? null;
@@ -237,6 +263,44 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
   const recipientExample = locale === 'zh' ? (platform.recipientExampleZh ?? platform.recipientExample) : platform.recipientExample;
   const recipientHint = recipientExample ? `${im.recipientHint} ${recipientExample}` : im.recipientHint;
 
+  const webhookStateLabel = webhookState === 'ready'
+    ? im.conversationReady
+    : webhookState === 'pending'
+      ? im.conversationWaiting
+      : webhookState === 'error'
+        ? ((status?.webhook?.lastError ?? '').includes('Public base URL') ? im.conversationNeedsPublicUrl : im.conversationNeedsEncryptKey)
+        : im.conversationDisabled;
+
+  const handleSaveConversation = async () => {
+    setConversationSaving(true);
+    setConversationResult(null);
+    try {
+      const res = await fetch('/api/im/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: 'feishu',
+          conversation: {
+            enabled: conversationEnabled,
+            encrypt_key: conversationEncryptKey || undefined,
+            public_base_url: conversationPublicBaseUrl || undefined,
+            allow_group_mentions: conversationAllowMentions,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setConversationResult({ ok: true, msg: im.conversationSaved });
+        await fetchDetail();
+      } else {
+        setConversationResult({ ok: false, msg: data.error || 'Failed' });
+      }
+    } catch (err) {
+      setConversationResult({ ok: false, msg: err instanceof Error ? err.message : 'Network error' });
+    }
+    setConversationSaving(false);
+  };
+
   return (
     <div className="max-w-3xl">
       <Link
@@ -300,6 +364,13 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
                   </ul>
                 </div>
               )}
+              <div className="rounded-md border border-border/70 bg-muted/30 px-3 py-3">
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span className="text-xs font-medium text-muted-foreground">{im.currentMode}</span>
+                  <span className="inline-flex items-center rounded-md bg-[var(--amber-dim)] px-2 py-1 text-xs font-medium text-[var(--amber)]">{conversationModeLabel}</span>
+                </div>
+                <p className="text-sm text-muted-foreground leading-6 max-w-prose">{im.workInMindosHint}</p>
+              </div>
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 <p className="text-xs text-muted-foreground">{im.thisIsNotChat}</p>
                 {platform.guideUrl && (
@@ -319,6 +390,111 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
 
           {isConnected ? (
             <>
+              {isFeishu && (
+                <SectionCard title={im.conversationTitle} icon={<Inbox size={16} className="text-[var(--amber)]" />}>
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3 rounded-md border border-border/70 px-3 py-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">{im.conversationEnable}</p>
+                        <p className="text-xs text-muted-foreground mt-1 leading-5 max-w-prose">{im.conversationHint}</p>
+                      </div>
+                      <label className="inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={conversationEnabled}
+                          onChange={e => setConversationEnabled(e.target.checked)}
+                          aria-label={im.conversationEnable}
+                        />
+                        <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${conversationEnabled ? 'bg-[var(--amber)]' : 'bg-muted'}`}>
+                          <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${conversationEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
+                        </span>
+                      </label>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground block mb-1.5">{im.conversationPublicBaseUrl}</label>
+                        <input
+                          type="url"
+                          placeholder="https://mindos.example.com"
+                          value={conversationPublicBaseUrl}
+                          onChange={e => setConversationPublicBaseUrl(e.target.value)}
+                          className="h-11 w-full px-3 text-sm bg-background border border-border rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1.5 leading-5">{im.conversationReachabilityHint}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground block mb-1.5">{im.conversationEncryptKey}</label>
+                        <input
+                          type={showSecrets ? 'text' : 'password'}
+                          placeholder="Encrypt Key"
+                          value={conversationEncryptKey}
+                          onChange={e => setConversationEncryptKey(e.target.value)}
+                          className="h-11 w-full px-3 text-sm font-mono bg-background border border-border rounded-md focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1.5 leading-5">{im.conversationConfigHint}</p>
+                      </div>
+                    </div>
+
+                    <label className="flex items-start gap-3 rounded-md border border-border/70 px-3 py-3">
+                      <input
+                        type="checkbox"
+                        checked={conversationAllowMentions}
+                        onChange={e => setConversationAllowMentions(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-border text-[var(--amber)] focus-visible:ring-1 focus-visible:ring-ring"
+                      />
+                      <span>
+                        <span className="text-sm font-medium text-foreground">{im.conversationGroupMentions}</span>
+                        <span className="block text-xs text-muted-foreground mt-1">{im.conversationHint}</span>
+                      </span>
+                    </label>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-md bg-muted/40 px-3 py-3">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">{im.conversationStatus}</p>
+                        <p className="text-sm text-foreground">{webhookStateLabel}</p>
+                        {status?.webhook?.lastError && <p className="text-xs text-error mt-1 leading-5">{status.webhook.lastError}</p>}
+                      </div>
+                      <div className="rounded-md bg-muted/40 px-3 py-3">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">{im.conversationWebhookUrl}</p>
+                        <p className="text-sm font-mono text-foreground break-all">{status?.webhook?.webhookUrl ?? im.notAvailable}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleSaveConversation}
+                        disabled={conversationSaving}
+                        className="h-11 px-4 text-sm rounded-md inline-flex items-center gap-1.5 bg-[var(--amber)] text-[var(--amber-foreground)] shadow-sm hover:opacity-90 hover:shadow disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      >
+                        {conversationSaving ? <Loader2 size={14} className="animate-spin" /> : <Settings2 size={14} />}
+                        {im.conversationSave}
+                      </button>
+                      {platform.guideUrl && (
+                        <Link
+                          href={platform.guideUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded-md px-3 py-2 text-sm border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        >
+                          {im.conversationOpenPlatform}
+                          <ExternalLink size={12} />
+                        </Link>
+                      )}
+                    </div>
+
+                    {conversationResult && (
+                      <div role="alert" aria-live="polite" className={`flex items-start gap-1.5 text-sm ${conversationResult.ok ? 'text-success' : 'text-error'}`}>
+                        {conversationResult.ok ? <CheckCircle2 size={16} className="shrink-0 mt-0.5" /> : <XCircle size={16} className="shrink-0 mt-0.5" />}
+                        <span className="break-all">{conversationResult.msg}</span>
+                      </div>
+                    )}
+                  </div>
+                </SectionCard>
+              )}
+
               <SectionCard title={im.statusSummaryTitle} icon={<Clock3 size={16} className="text-muted-foreground" />}>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-md bg-muted/40 px-3 py-3">
@@ -384,7 +560,11 @@ export default function AgentsContentChannelDetail({ platformId }: { platformId:
                               <p className="text-sm text-foreground truncate">{activity.messageSummary}</p>
                             </div>
                             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                              <span>{activity.type}</span>
+                              <span>{formatActivityType(activity.type, {
+                                test: im.activityTypeTest,
+                                agent: im.activityTypeAgent,
+                                manual: im.activityTypeManual,
+                              })}</span>
                               <span>{maskForLog(activity.recipient)}</span>
                               {activity.error && <span className="text-error">{activity.error}</span>}
                             </div>

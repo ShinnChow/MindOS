@@ -22,6 +22,30 @@ vi.mock('@/lib/stores/locale-store', () => ({
           thisIsNotChat: 'This is a delivery channel, not a chat inbox.',
           retry: 'Retry',
           howItWorks: 'How it works',
+          currentMode: 'Current mode',
+          notificationsOnly: 'Notifications only',
+          twoWayConversation: 'Two-way conversation',
+          conversationTitle: 'Conversation',
+          conversationEnable: 'Allow messages from Feishu',
+          conversationWaiting: 'Waiting for verification',
+          conversationReady: 'Ready for replies',
+          conversationDisabled: 'Disabled',
+          conversationNeedsPublicUrl: 'Public URL required',
+          conversationNeedsEncryptKey: 'Encrypt Key required',
+          conversationHint: 'Users can DM the bot, and group messages only trigger when the bot is mentioned.',
+          conversationConfigHint: 'Turn this on after you have a reachable public URL and your Feishu Encrypt Key ready.',
+          conversationWebhookUrl: 'Webhook URL',
+          conversationCopyUrl: 'Copy URL',
+          conversationStatus: 'Webhook status',
+          conversationReachability: 'Reachability',
+          conversationReachabilityHint: 'Feishu must be able to reach this URL from the public internet.',
+          conversationOpenPlatform: 'Open Feishu console',
+          conversationPublicBaseUrl: 'Public base URL',
+          conversationEncryptKey: 'Encrypt Key',
+          conversationGroupMentions: 'Only reply when mentioned in groups',
+          conversationSaved: 'Conversation settings saved',
+          conversationSave: 'Save conversation settings',
+          workInMindosHint: 'Use Ask in MindOS to work with the agent. Use this channel to receive updates, alerts, and sample messages.',
           useCasesTitle: 'What you can receive',
           guideLink: 'Open setup guide',
           statusSummaryTitle: 'Status summary',
@@ -32,6 +56,9 @@ vi.mock('@/lib/stores/locale-store', () => ({
           latestSuccess: 'Latest success',
           latestFailure: 'Latest failure',
           noRecentActivity: 'No recent activity',
+          activityTypeTest: 'Sample message',
+          activityTypeAgent: 'Agent update',
+          activityTypeManual: 'Manual send',
           recentActivity: 'Recent activity',
           noActivityYet: 'No messages sent yet',
           noActivityHint: 'Send a sample message to verify this channel is working.',
@@ -75,7 +102,7 @@ describe('AgentsContentChannelDetail redesign', () => {
         return Promise.resolve({
           ok: true,
           json: async () => ({
-            platforms: [{ platform: 'feishu', connected: true, botName: 'MindOS Bot', capabilities: ['text', 'markdown'] }],
+            platforms: [{ platform: 'feishu', connected: true, botName: 'MindOS Bot', capabilities: ['text', 'markdown'], webhook: { state: 'ready', webhookUrl: 'https://mindos.example.com/api/im/webhook/feishu', publicBaseUrl: 'https://mindos.example.com' } }],
           }),
         });
       }
@@ -110,6 +137,9 @@ describe('AgentsContentChannelDetail redesign', () => {
     });
 
     expect(host.textContent).toContain('How it works');
+    expect(host.textContent).toContain('Conversation');
+    expect(host.textContent).toContain('Ready for replies');
+    expect(host.textContent).toContain('Two-way conversation');
     expect(host.textContent).toContain('Recent activity');
     expect(host.textContent).toContain('Send sample notification');
     expect(host.textContent).toContain('Settings');

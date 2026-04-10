@@ -28,6 +28,12 @@ export type PlatformStatus = {
   connected: boolean;
   botName?: string;
   capabilities: string[];
+  webhook?: {
+    state: 'disabled' | 'pending' | 'ready' | 'error';
+    webhookUrl?: string;
+    publicBaseUrl?: string;
+    lastError?: string;
+  };
 };
 
 export const PLATFORMS: PlatformDef[] = [
@@ -49,10 +55,10 @@ export const PLATFORMS: PlatformDef[] = [
     guide: '1. open.feishu.cn → Create App\n2. Credentials page → copy App ID & Secret\n3. Enable Bot capability + add permissions',
     guideUrl: 'https://open.feishu.cn/',
     editHint: 'Need to update credentials? Edit and save below — MindOS will reconnect automatically.',
-    purpose: 'Receive MindOS results, alerts, and test messages in Feishu.',
-    purposeZh: '通过飞书接收 MindOS 的结果、提醒和测试消息。',
-    useCases: ['Agent completion alerts', 'Error notifications', 'Test messages'],
-    useCasesZh: ['Agent 完成提醒', '错误通知', '测试消息'],
+    purpose: 'Receive MindOS results in Feishu, or let users message the bot directly when conversations are enabled.',
+    purposeZh: '通过飞书接收 MindOS 的结果；开启对话后，也可以让用户直接在飞书里给机器人发消息。',
+    useCases: ['Agent completion alerts', 'Error notifications', 'Test messages', 'Direct bot conversations in Feishu'],
+    useCasesZh: ['Agent 完成提醒', '错误通知', '测试消息', '在飞书里直接与机器人对话'],
     recipientExample: 'e.g. ou_xxx, oc_xxx, or a work email',
     recipientExampleZh: '例如 ou_xxx、oc_xxx，或企业邮箱',
     fields: [
