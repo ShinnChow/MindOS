@@ -211,6 +211,17 @@ npm test                          # 手动跑测试，不杀 dev server
 - 只有打 `v*.*.*` tag 才会触发 `publish-npm` workflow（发布到 npm）
 - `npm run release` 会自动：检查工作区干净 → 跑测试 → bump 版本 → 打 tag → push → 等待 CI
 
+### 手动发版操作规范（避免浪费版本号）
+
+版本号一旦发到 npm 就不能复用，以下步骤**必须严格执行**，防止构建失败导致版本号跳跃：
+
+1. **确保 cwd 在项目根目录**：`cd /data/home/geminitwang/code/sop_note`，不要在 `app/` 子目录操作
+2. **先跑 tsc**：`cd app && npx tsc --noEmit && cd ..`（确认零编译错误再发版）
+3. **同时修改两个 package.json**：根目录 `package.json` 和 `app/package.json` 的 `version` 必须保持一致
+4. **验证 tag 内容**：`git show vX.Y.Z:package.json | grep version`，确认版本号正确后再 push tag
+5. **push tag 到公开仓前确保代码已同步**：先 `git push public main --no-verify`，再 push tag
+6. **一次做对**：不要 "先发再修"，修了再发又占一个版本号
+
 **npm 与 MindOS Desktop 对齐（精简）**
 
 - **MindOS 产品版本** = `@geminilight/mindos` 的 `version` = git **`vX.Y.Z`**（npm 发布主轴）。
