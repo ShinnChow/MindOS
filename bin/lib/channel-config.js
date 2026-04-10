@@ -12,32 +12,16 @@ import { CHANNEL_FIELD_PATTERNS, CHANNEL_REQUIRED_FIELDS } from './channel-const
 const IM_CONFIG_DIR = path.join(os.homedir(), '.mindos');
 const IM_CONFIG_PATH = path.join(IM_CONFIG_DIR, 'im.json');
 
-const EMPTY_CONFIG = { providers: {} };
-
-let cachedConfig = EMPTY_CONFIG;
-let cachedMtime = 0;
+const createEmptyConfig = () => ({ providers: {} });
 
 /**
- * Read IM config from ~/.mindos/im.json
- * Implements mtime-based caching (same as app/lib/im/config.ts)
+ * Read IM config from ~/.mindos/im.json.
+ * CLI config files are tiny; prefer correctness over cache complexity.
  * @returns {Record<string, any>}
  */
 export function readChannelConfig() {
-  let mtime = 0;
-  try {
-    mtime = fs.statSync(IM_CONFIG_PATH).mtimeMs;
-  } catch {
-    return EMPTY_CONFIG;
-  }
-
-  if (mtime > 0 && mtime === cachedMtime) {
-    return cachedConfig;
-  }
-
   if (!fs.existsSync(IM_CONFIG_PATH)) {
-    cachedConfig = EMPTY_CONFIG;
-    cachedMtime = 0;
-    return EMPTY_CONFIG;
+    return createEmptyConfig();
   }
 
   try {
@@ -45,17 +29,12 @@ export function readChannelConfig() {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object' || typeof parsed.providers !== 'object') {
       console.warn('[channel] im.json has invalid structure, using empty config');
-      cachedConfig = EMPTY_CONFIG;
-    } else {
-      cachedConfig = parsed;
+      return createEmptyConfig();
     }
-    cachedMtime = mtime;
-    return cachedConfig;
+    return parsed;
   } catch (err) {
     console.warn('[channel] Failed to parse im.json:', err instanceof Error ? err.message : err);
-    cachedConfig = EMPTY_CONFIG;
-    cachedMtime = 0;
-    return EMPTY_CONFIG;
+    return createEmptyConfig();
   }
 }
 
@@ -90,9 +69,6 @@ export function writeChannelConfig(config, options = {}) {
   if (JSON.stringify(writtenConfig) !== JSON.stringify(config)) {
     throw new Error('Config write validation failed. Retry your command.');
   }
-
-  cachedConfig = config;
-  cachedMtime = fs.statSync(IM_CONFIG_PATH).mtimeMs;
 }
 
 /**
@@ -108,7 +84,6 @@ export function validateChannelConfig(platform, config) {
   }
 
   const c = config;
-
   const required = CHANNEL_REQUIRED_FIELDS[platform];
 
   if (!required) {
@@ -163,6 +138,5 @@ export function getChannelConfigMtime() {
  * Reset config cache (for testing)
  */
 export function _resetConfigCache() {
-  cachedConfig = EMPTY_CONFIG;
-  cachedMtime = 0;
+  // no-op: retained for compatibility with earlier tests
 }
