@@ -38,7 +38,11 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     // extract-pdf.cjs is spawned at runtime (not bundled) — ensure it's
     // copied into .next/standalone/scripts/ so standalone builds work.
-    '/api/extract-pdf': ['./scripts/extract-pdf.cjs'],
+    '/api/extract-pdf': [
+      './scripts/extract-pdf.cjs',
+      './node_modules/pdfjs-dist/legacy/build/pdf.mjs',
+      './node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs',
+    ],
   },
   turbopack: {
     root: projectDir,
