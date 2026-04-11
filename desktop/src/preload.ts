@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('mindos', {
 
   // File system
   openMindRoot: () => ipcRenderer.invoke('open-mindroot'),
+  selectDirectory: () => ipcRenderer.invoke('select-directory'),
 
   // Mode switching
   switchMode: () => ipcRenderer.invoke('switch-mode'),

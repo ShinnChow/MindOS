@@ -34,6 +34,7 @@ import {
 } from '@agentclientprotocol/sdk';
 import type { AcpRegistryEntry } from './types';
 import { resolveAgentCommand, findUserOverride } from './agent-descriptors';
+import { resolveCommandPathSync } from './detect-local';
 import { readSettings } from '../settings';
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
@@ -106,7 +107,7 @@ export function spawnAcpAgent(
   const settings = readSettings();
   const userOverride = findUserOverride(entry.id, settings.acpAgents);
   const resolved = resolveAgentCommand(entry.id, entry, userOverride);
-  const { cmd, args } = { cmd: resolved.cmd, args: resolved.args };
+  const { cmd, args } = { cmd: resolveCommandPathSync(resolved.cmd) ?? resolved.cmd, args: resolved.args };
 
   const mergedEnv = {
     ...process.env,

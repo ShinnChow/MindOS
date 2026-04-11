@@ -300,8 +300,11 @@ MindOS Adapters
 
 - `obsidian` 导出面最小壳：`Plugin` / `Component` / `Events` / `Notice` / `Modal` / `PluginSettingTab` / `Setting` / `TFile` / `TFolder` / `TAbstractFile`
 - `PluginLoader` 支持：插件发现、manifest 校验、模块注入、路径逃逸拦截、异步 `onload()` / `onunload()` 等待
-- `PluginManager` 支持：enabled/disabled 状态持久化、批量加载、错误摘要
+- `PluginManager` 支持：enabled/disabled 状态持久化、批量加载、错误摘要、外部 Obsidian vault 扫描与导入入口
 - `CompatibilityReport` 支持：静态识别高频 Obsidian API、Node/Electron 依赖、partial/blocker 分类，供生态迁移评估使用
+- `ObsidianImport` 支持：扫描 `.obsidian/plugins`、产出兼容摘要、把选中插件导入到 MindOS `.plugins`
+- `Compat Report API` 支持：`/api/obsidian/compat-report?vaultRoot=...` 返回插件清单 + compatible/partial/blocked 汇总，供 UI/CLI 消费
+- `Obsidian Import API` 支持：`POST /api/obsidian/import` 导入指定插件并返回兼容摘要与目标路径
 - `Vault` 支持：create/read/modify/append/delete/rename/copy、事件发射、路径安全、跳过 `.plugins/` 私有文件
 - `MetadataCache` 支持：frontmatter / tags / headings / wikilinks / 相对 markdown links 的最小提取
 - `Plugin` 支持：`loadData/saveData`、命令委托、setting tab 收集、非浏览器环境安全的 UI stub
@@ -313,7 +316,12 @@ MindOS Adapters
 - vault
 - component + plugin
 - command-registry
+- compatibility-report
+- obsidian-import
+- plugin-manager
+- ui/settings DSL
 - integration（导出面 + metadata + async lifecycle）
+- community smoke（Style Settings / QuickAdd / Tag Wrangler / Homepage 风格真实 fixture）
 
 当前状态：
 

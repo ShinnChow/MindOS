@@ -7,9 +7,14 @@
 - [x] Obsidian compat Spike 文档链路
   - 总体方案、API shim、兼容矩阵、生态调研、Spike 计划、Spike 实施规约
 - [x] Obsidian compat 最小宿主骨架
-  - loader、plugin-manager、compatibility-report、vault、metadata-cache、plugin、ui、settings、obsidian export surface
+  - loader、plugin-manager、compatibility-report、obsidian-import、vault、metadata-cache、plugin、ui、settings、obsidian export surface
+- [x] Obsidian compat 迁移前哨能力
+  - `/api/obsidian/compat-report` 兼容报告接口
+  - `POST /api/obsidian/import` 插件导入接口
+  - 社区插件 smoke fixtures（Style Settings / QuickAdd / Tag Wrangler / Homepage）
+  - manager 扫描外部 vault 并导入选中插件
 - [x] Obsidian compat 测试覆盖
-  - manifest、loader、vault、component、plugin、command-registry、integration、plugin-manager、ui
+  - manifest、loader、vault、component、plugin、command-registry、integration、plugin-manager、ui、compatibility-report、obsidian-import、community-smoke
 - [x] Obsidian compat 关键健壮性修复
   - 路径逃逸防护
   - async 生命周期等待
@@ -29,6 +34,13 @@
   - Files tab 加载失败时显示可恢复 inline error banner
   - Android TextInputModal defaultValue 同步 fix
   - 新增 8 条 files-tab-state 测试
+- [x] Mobile Chat Multi-Session Management
+  - 多会话管理：新建/切换/删除/重命名
+  - Session list drawer（iOS ActionSheet / Android Alert + TextInputModal rename）
+  - 首次使用自动创建 session；旧数据迁移
+  - 拆分 ChatHeader/ChatEmptyState/ChatStatusFooter/ScrollToBottomButton 子组件
+  - stale closure fix + FlatList key 稳定化
+  - 新增 13 条 chat-session-store 测试
 - [x] Feishu conversation SDK-first ingress refactor
   - 用 `@larksuiteoapi/node-sdk` 接管 challenge / 验签 / decrypt
   - 保留 MindOS 业务层：过滤、标准化、会话历史、Agent 编排

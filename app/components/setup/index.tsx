@@ -157,6 +157,7 @@ export default function SetupWizard() {
 
   const [webPortStatus, setWebPortStatus] = useState<PortStatus>({ checking: false, available: null, isSelf: false, suggestion: null });
   const [mcpPortStatus, setMcpPortStatus] = useState<PortStatus>({ checking: false, available: null, isSelf: false, suggestion: null });
+  const [pathUnsafe, setPathUnsafe] = useState(false); // Track if mindRoot is in a dangerous location
 
   const [agents, setAgents] = useState<AgentEntry[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
@@ -251,6 +252,22 @@ export default function SetupWizard() {
     }
   }, [step, agentsLoaded, agentsLoading]);
 
+  // Check path safety when mindRoot changes
+  useEffect(() => {
+    if (!state.mindRoot.trim()) { setPathUnsafe(false); return; }
+    const timer = setTimeout(() => {
+      fetch('/api/setup/check-path', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: state.mindRoot }),
+      })
+        .then(r => r.json())
+        .then(d => setPathUnsafe(!!d.unsafe))
+        .catch(() => setPathUnsafe(false));
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [state.mindRoot]);
+
   const update = useCallback(<K extends keyof SetupState>(key: K, val: SetupState[K]) => {
     setState(prev => ({ ...prev, [key]: val }));
   }, []);
@@ -305,7 +322,8 @@ export default function SetupWizard() {
 
   const canNext = () => {
     if (step === STEP_KB) {
-      // KB path required + password required
+      // KB path required + password required + path must be safe
+      if (pathUnsafe) return false;
       return state.mindRoot.trim().length > 0 && state.webPassword.trim().length > 0;
     }
     if (step === STEP_AI) {

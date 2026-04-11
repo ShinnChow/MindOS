@@ -149,4 +149,37 @@ describe('ProcessManager hostname binding', () => {
     // Both must match for health check to succeed
     expect(webHostname).toBe(healthCheckTarget);
   });
+
+  it('should inject MINDOS_INSTALL_DIR for setup path validation', async () => {
+    const pm = new ProcessManager({
+      nodePath: '/usr/bin/node',
+      npxPath: '/usr/bin/npx',
+      projectRoot: '/fake',
+      webPort: 3456,
+      mcpPort: 8781,
+      mindRoot: '/fake/mind',
+      installDir: '/Applications/MindOS.app',
+    });
+
+    (pm as any).waitForReady = vi.fn().mockResolvedValue(true);
+
+    try {
+      await pm.start();
+    } catch {
+      // ignore
+    }
+
+    const allCalls = spawnMock.mock.calls;
+    const webCall = allCalls.find((call) => {
+      const scriptPath = call[1]?.[0];
+      return typeof scriptPath === 'string' && (
+        scriptPath.includes('server.js') ||
+        scriptPath.includes('.bin/next')
+      );
+    });
+
+    expect(webCall).toBeDefined();
+    const [, , options] = webCall!;
+    expect(options?.env?.MINDOS_INSTALL_DIR).toBe('/Applications/MindOS.app');
+  });
 });

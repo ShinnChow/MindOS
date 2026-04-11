@@ -20,6 +20,20 @@
 
 ## Agent / LLM API
 
+### pdfjs-dist 在 Next.js standalone 构建下找不到模块（2026-04-11）
+
+**症状**：用户在 Chatbot 上传 PDF 时报错 `Cannot find module 'pdfjs-dist/legacy/build/pdf.mjs'`，require stack 指向 `.next/standalone/…/extract-pdf.cjs`。dev 模式正常，standalone（Desktop/npm 全局）模式才出问题。
+
+**根因**：`extract-pdf.cjs` 是通过 `execFileSync('node', [scriptPath, …])` 在子进程中运行的，不经过 Next.js 打包。`next.config.ts` 的 `outputFileTracingIncludes` 虽然把脚本文件拷贝到 `.next/standalone/scripts/`，但 `pdfjs-dist` 不在 `serverExternalPackages` 列表，所以 **`node_modules/pdfjs-dist/` 不会被拷贝到 standalone**。子进程 `require('pdfjs-dist/…')` 时找不到模块。
+
+**修复**：将 `pdfjs-dist` 加入 `next.config.ts` 的 `serverExternalPackages` 列表。
+
+**规则**：任何被 spawn 的 `.cjs`/`.mjs` 脚本若直接 `require()`/`import()` npm 包，该包必须同时：
+1. 加入 `serverExternalPackages`（确保 standalone 构建时被拷贝）
+2. 或者将依赖打包进脚本本身（bundle all）
+
+**测试**：新增 `__tests__/scripts/extract-pdf-runtime.test.ts`，直接 spawn `extract-pdf.cjs` 验证 pdfjs-dist 加载成功。
+
 ### Vitest `vi.mock()` 工厂会被提升，引用顶层变量会直接炸掉 (2026-04-11)
 
 **症状**：测试文件能过 TypeScript，但执行时直接报 `[vitest] There was an error when mocking a module`，并提示 `Cannot access 'xxx' before initialization`。
@@ -122,6 +136,24 @@ rootcause: app/api/ask/route.ts:143 直接传递 llmHistoryMessages（pi-ai Mess
 - **现象：** 重装后端口跳到 3457、launchd daemon 无限重试、.next 构建缓存损坏、MCP 客户端配置失效
 - **原因：** macOS 无卸载 hook；拖垃圾桶不触发任何清理。孤立的 Next.js/MCP 进程持续占端口；`desktop-children.pid`/`mindos.pid` 残留；launchd `com.mindos.app` 的 `KeepAlive.SuccessfulExit=false` 导致无限重启
 - **解决：** `healPreviousInstallation()` 在每次 Desktop 启动时静默运行——停 launchd daemon、清理双 PID 文件（Desktop + CLI）、port-based fallback kill、等待端口释放（5s）、验证私有 Node.js 版本、验证 .next 构建缓存。端口偏移时自动更新 MCP 客户端配置。用户无感知。[spec](./specs/spec-desktop-reinstall-healing.md)
+
+### 知识库路径配置在危险目录导致数据丢失风险【v0.6.77 修复】
+- **现象：** 用户将知识库配置到安装目录（如 `D:\Program Files\MindOS\data`）、Electron userData（`%APPDATA%\MindOS`）、或系统管理目录（`~/.mindos/runtime`）后，重装/更新/卸载时知识库被清除
+- **根因：** 
+  1. Setup Wizard 没有验证 `mindRoot` 路径的安全性
+  2. NSIS 卸载器执行 `RMDir /r $INSTDIR` 删除整个安装目录；Core Updater 会清理 `~/.mindos/runtime`
+  3. 用户如果恰好把知识库放在安装目录子目录，则会跟着被删
+- **解决（两层防护）：**
+  - **第一层**（通用黑名单）：新增 `validateMindRootPath()` 函数（`app/api/setup/path-utils.ts`），拦截已知危险路径：Windows `%APPDATA%`/`Program Files` 等、macOS `.app` bundle、Linux `/opt/mindos` 等、跨平台 `~/.mindos/`
+  - **第二层**（精确拦截）：Desktop 通过 `MINDOS_INSTALL_DIR` env 传递**真实安装目录**给 Web 进程，setup 校验时**拒绝用户把知识库设到安装目录或其子目录**（包括自定义安装到 D 盘等情况）
+- **用户体验：** Setup Wizard 显示红色警告框，禁用 Next 按钮直到用户选择安全路径
+- **测试：** `app/__tests__/api/setup-path-utils.test.ts`（26 条测试） + `desktop/src/process-manager-hostname.test.ts`（MINDOS_INSTALL_DIR 注入测试）
+- **重装/更新安全性（已审计）：**
+  - ✅ `~/.mindos/config.json`（含 mindRoot）不会因重装/更新/卸载而被删除
+  - ✅ NSIS 卸载器只删 `$APPDATA\MindOS`（Electron 缓存），不涉及主目录
+  - ✅ 核心热更新仅删 `~/.mindos/runtime/`，config.json 有白名单保护
+  - ✅ 更新后系统自动恢复现有 mindRoot，无须重新配置
+- **规则：** 用户知识库应放在 `~/MindOS/mind`（默认）、`~/Documents/` 或其他用户数据目录
 
 ### macOS：`file://…/app.asar` 内嵌页面 `ERR_FAILED`（connect / splash）
 - **现象：** `did-fail-load` 指向 `…/app.asar/src/connect.html` 等；模式选择或远程连接窗口打不开
@@ -930,6 +962,13 @@ rootcause: app/api/ask/route.ts:143 直接传递 llmHistoryMessages（pi-ai Mess
 - **解决：** (1) `node-detect.ts` 中 `enrichedPath()` 函数注入 `/usr/local/bin`、`/opt/homebrew/bin`、`~/.nvm/current/bin` 等常见路径 (2) 所有 `exec()` / `spawn()` 调用传入 `env: { PATH: enrichedPath(nodeBinDir) }` (3) `getMindosInstallPath()` 先用已知 node 路径旁边的 npm 执行 `npm root -g`，再扫描常见全局路径做兜底
 - **规则：** Electron 打包应用中执行任何 shell 命令，必须手动构造 PATH，不能依赖 `process.env.PATH`
 - **文件：** `desktop/src/node-detect.ts`、`desktop/src/connect-window.ts`
+
+### ACP 检测与启动不能各自重新猜 PATH（2026-04-11）
+- **现象：** macOS 桌面端里 ACP 面板显示 Gemini / CodeBuddy / Claude 已安装，但点击任意 Agent 都报 `ACP Agent Error: initialize failed: write EPIPE`
+- **原因：** 检测阶段会用目录兜底或 shell PATH 解析判断“已安装”，但启动阶段 `spawn()` 仍然直接执行裸命令（如 `gemini` / `codebuddy` / `npx`）。GUI 进程拿到的 PATH 往往比终端短，导致子进程启动即退出，随后 `initialize` 写 stdin 时触发 `EPIPE`
+- **解决：** 检测与启动必须复用同一套“运行时解析到的可执行路径”。优先使用用户 override 的绝对路径；否则先在当前环境 `which/where`，再回退到 login shell `command -v` 解析绝对路径；只有“检测到存在”且“启动命令可解析”时才视为 installed。目录存在但没有可执行命令，只能算 detected，不能算 runnable
+- **规则：** 对桌面端/GUI 进程，**installed = runnable**。不要让“目录兜底检测成功”与“spawn 裸命令启动成功”使用两套不同标准
+- **文件：** `app/lib/acp/detect-local.ts`、`app/lib/acp/subprocess.ts`
 
 ### Desktop 本地模式：`mindos.pid` 存活时绕过 Bundled/User 择优
 - **现象：** 配置了 `mindosRuntimePolicy` 或内置 `mindos-runtime`，仍连上「旧」Web

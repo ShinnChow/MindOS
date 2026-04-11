@@ -71,6 +71,7 @@ export interface ImagePart {
 export type MessagePart = TextPart | ToolCallPart | ReasoningPart | ImagePart;
 
 export interface Message {
+  id?: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp?: number;

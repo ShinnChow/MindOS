@@ -27,7 +27,11 @@ export default function AgentSelectorCapsule({
   loading = false,
 }: AgentSelectorCapsuleProps) {
   const { t } = useLocale();
-  const p = t.panels.agents;
+  const p = t.panels?.agents ?? {
+    acpDefaultAgent: 'MindOS',
+    acpSelectAgent: 'Select Agent',
+    acpChangeAgent: 'Change agent',
+  };
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<DropdownPos | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -116,9 +120,6 @@ export default function AgentSelectorCapsule({
 
   const isDefault = !selectedAgent;
   const displayName = selectedAgent?.name ?? p.acpDefaultAgent;
-
-  // Only show if there are installed agents to choose from
-  if (!loading && installedAgents.length === 0 && !selectedAgent) return null;
 
   const dropdown = open && pos ? (
     <div

@@ -117,4 +117,32 @@ describe('PluginManager', () => {
     const plugin = manager.list().find((item) => item.id === 'toggle-plugin');
     expect(plugin).toMatchObject({ enabled: false, loaded: false });
   });
+
+  it('scans an external Obsidian vault and imports a selected plugin into the manager root', async () => {
+    const sourceVault = fs.mkdtempSync(path.join(os.tmpdir(), 'mindos-obsidian-import-source-'));
+    try {
+      const sourcePluginDir = path.join(sourceVault, '.obsidian', 'plugins', 'ported-plugin');
+      fs.mkdirSync(sourcePluginDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(sourcePluginDir, 'manifest.json'),
+        JSON.stringify({ id: 'ported-plugin', name: 'ported-plugin', version: '1.0.0' }, null, 2),
+        'utf-8',
+      );
+      fs.writeFileSync(
+        path.join(sourcePluginDir, 'main.js'),
+        `const { Plugin } = require('obsidian'); module.exports = class PortedPlugin extends Plugin {};`,
+        'utf-8',
+      );
+
+      const manager = new PluginManager(mindRoot);
+      const scanned = await manager.scanObsidianVault(sourceVault);
+      expect(scanned[0]).toMatchObject({ id: 'ported-plugin', compatibilityLevel: 'compatible' });
+
+      await manager.importFromObsidianVault(sourceVault, 'ported-plugin');
+      const plugins = await manager.discover();
+      expect(plugins.find((item) => item.id === 'ported-plugin')).toBeTruthy();
+    } finally {
+      fs.rmSync(sourceVault, { recursive: true, force: true });
+    }
+  });
 });

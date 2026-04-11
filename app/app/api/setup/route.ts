@@ -4,7 +4,7 @@ import fs from 'fs';
 import os from 'os';
 import { readSettings, writeSettings, ServerSettings } from '@/lib/settings';
 import { applyTemplate } from '@/lib/template';
-import { expandSetupPathHome } from './path-utils';
+import { expandSetupPathHome, validateMindRootPath } from './path-utils';
 import { type ProviderId, isProviderId, PROVIDER_PRESETS } from '@/lib/agent/providers';
 import { type Provider, generateProviderId, findProvider } from '@/lib/custom-endpoints';
 import { handleRouteErrorSimple } from '@/lib/errors';
@@ -59,6 +59,16 @@ export async function POST(req: NextRequest) {
     }
 
     const resolvedRoot = expandSetupPathHome(mindRoot.trim());
+
+    // Validate path is not inside dangerous directories (install dirs, system dirs)
+    const pathValidation = validateMindRootPath(resolvedRoot);
+    if (!pathValidation.safe) {
+      return NextResponse.json({
+        error: pathValidation.reason,
+        errorZh: pathValidation.reasonZh,
+        unsafePath: true,
+      }, { status: 400 });
+    }
 
     // Validate ports
     const webPort = typeof port === 'number' ? port : 3456;

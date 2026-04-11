@@ -1,6 +1,6 @@
 import fs from 'fs';
 import os from 'os';
-import { execFile } from 'child_process';
+import { execFile, execFileSync } from 'child_process';
 import { findUserOverride, getDetectableAgents, resolveAgentCommand } from './agent-descriptors';
 import { readSettings } from '@/lib/settings';
 
@@ -22,17 +22,17 @@ export interface NotInstalledAgent {
   packageName?: string;
 }
 
-function expandHome(filePath: string): string {
+export function expandHome(filePath: string): string {
   if (filePath === '~') return os.homedir();
   if (filePath.startsWith('~/')) return `${os.homedir()}/${filePath.slice(2)}`;
   return filePath;
 }
 
-function isPathLikeCommand(command: string): boolean {
+export function isPathLikeCommand(command: string): boolean {
   return command.startsWith('~/') || command.startsWith('/') || command.startsWith('./') || command.startsWith('../') || command.includes('\\') || /^[A-Za-z]:[\\/]/.test(command);
 }
 
-function resolveDirectCommandPath(command: string | undefined): string | null {
+export function resolveDirectCommandPath(command: string | undefined): string | null {
   if (!command) return null;
   const trimmed = command.trim();
   if (!trimmed || !isPathLikeCommand(trimmed)) return null;
@@ -40,7 +40,7 @@ function resolveDirectCommandPath(command: string | undefined): string | null {
   return fs.existsSync(expanded) ? expanded : null;
 }
 
-function resolveExistingPresenceDir(paths: string[] | undefined): string | null {
+export function resolveExistingPresenceDir(paths: string[] | undefined): string | null {
   if (!paths || paths.length === 0) return null;
   for (const candidate of paths) {
     const expanded = expandHome(candidate);
@@ -49,28 +49,103 @@ function resolveExistingPresenceDir(paths: string[] | undefined): string | null 
   return null;
 }
 
-function lookupCommandPath(command: string): Promise<string | null> {
-  const trimmed = command.trim();
-  if (!trimmed || isPathLikeCommand(trimmed)) return Promise.resolve(null);
+function parseResolvedPath(stdout: string): string | null {
+  const candidates = stdout.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  for (const candidate of candidates) {
+    const expanded = expandHome(candidate);
+    if (isPathLikeCommand(expanded) && fs.existsSync(expanded)) return expanded;
+  }
+  for (const candidate of candidates) {
+    if (isPathLikeCommand(candidate)) return expandHome(candidate);
+  }
+  return null;
+}
 
+function shellEscape(command: string): string {
+  return `'${command.replace(/'/g, `'\\''`)}'`;
+}
+
+function getLoginShells(): string[] {
+  if (process.platform === 'win32') return [];
+  return [...new Set([
+    process.env.SHELL,
+    process.platform === 'darwin' ? '/bin/zsh' : undefined,
+    '/bin/bash',
+    '/bin/sh',
+  ].filter((shell): shell is string => Boolean(shell)))];
+}
+
+function execFileText(command: string, args: string[]): Promise<string | null> {
   return new Promise((resolve) => {
-    execFile(process.platform === 'win32' ? 'where' : 'which', [trimmed], { encoding: 'utf-8', timeout: 3000 }, (err, stdout) => {
+    execFile(command, args, { encoding: 'utf-8', timeout: 3000 }, (err, stdout) => {
       if (err) {
         resolve(null);
         return;
       }
-      const firstMatch = stdout
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .find(Boolean);
-      resolve(firstMatch ?? null);
+      resolve(stdout);
     });
   });
 }
 
+function execFileTextSync(command: string, args: string[]): string | null {
+  try {
+    return execFileSync(command, args, { encoding: 'utf-8', timeout: 3000 });
+  } catch {
+    return null;
+  }
+}
+
+async function lookupCommandPathCurrentEnv(command: string): Promise<string | null> {
+  const stdout = await execFileText(process.platform === 'win32' ? 'where' : 'which', [command]);
+  return stdout ? parseResolvedPath(stdout) : null;
+}
+
+function lookupCommandPathCurrentEnvSync(command: string): string | null {
+  const stdout = execFileTextSync(process.platform === 'win32' ? 'where' : 'which', [command]);
+  return stdout ? parseResolvedPath(stdout) : null;
+}
+
+async function lookupCommandPathLoginShell(command: string): Promise<string | null> {
+  for (const shell of getLoginShells()) {
+    const stdout = await execFileText(shell, ['-lic', `command -v -- ${shellEscape(command)}`]);
+    if (!stdout) continue;
+    const resolved = parseResolvedPath(stdout);
+    if (resolved) return resolved;
+  }
+  return null;
+}
+
+function lookupCommandPathLoginShellSync(command: string): string | null {
+  for (const shell of getLoginShells()) {
+    const stdout = execFileTextSync(shell, ['-lic', `command -v -- ${shellEscape(command)}`]);
+    if (!stdout) continue;
+    const resolved = parseResolvedPath(stdout);
+    if (resolved) return resolved;
+  }
+  return null;
+}
+
+export async function resolveCommandPath(command: string | undefined): Promise<string | null> {
+  if (!command) return null;
+  const direct = resolveDirectCommandPath(command);
+  if (direct) return direct;
+  const trimmed = command.trim();
+  if (!trimmed || isPathLikeCommand(trimmed)) return null;
+  return await lookupCommandPathCurrentEnv(trimmed) ?? await lookupCommandPathLoginShell(trimmed);
+}
+
+export function resolveCommandPathSync(command: string | undefined): string | null {
+  if (!command) return null;
+  const direct = resolveDirectCommandPath(command);
+  if (direct) return direct;
+  const trimmed = command.trim();
+  if (!trimmed || isPathLikeCommand(trimmed)) return null;
+  return lookupCommandPathCurrentEnvSync(trimmed) ?? lookupCommandPathLoginShellSync(trimmed);
+}
+
 async function lookupCommandPaths(commands: string[]): Promise<Map<string, string | null>> {
   const unique = [...new Set(commands.map((command) => command.trim()).filter(Boolean))];
-  const entries = await Promise.all(unique.map(async (command) => [command, await lookupCommandPath(command)] as const));
+  const entries = await Promise.all(unique.map(async (command) => [command, await resolveCommandPath(command)] as const));
   return new Map(entries);
 }
 
@@ -80,29 +155,35 @@ export async function detectLocalAcpAgents(settings = readSettings()): Promise<{
   const plans = agents.map((agent) => {
     const userOverride = findUserOverride(agent.id, settings.acpAgents);
     const resolved = resolveAgentCommand(agent.id, undefined, userOverride);
-    const directPath = resolveDirectCommandPath(userOverride?.command);
-    const commandCandidates = [...new Set([
+    const directOverridePath = resolveDirectCommandPath(userOverride?.command);
+    const presenceCommands = [...new Set([
       ...(agent.detectCommands ?? [agent.binary]),
       ...(userOverride?.command && !isPathLikeCommand(userOverride.command) ? [userOverride.command] : []),
     ])];
-    return { agent, resolved, directPath, commandCandidates };
+    return { agent, resolved, directOverridePath, presenceCommands };
   });
 
-  const commandLookup = await lookupCommandPaths(plans.flatMap((plan) => plan.commandCandidates));
+  const presenceLookup = await lookupCommandPaths(plans.flatMap((plan) => plan.presenceCommands));
+  const launchLookup = await lookupCommandPaths(plans.map((plan) => plan.resolved.cmd));
 
   const installed: InstalledAgent[] = [];
   const notInstalled: NotInstalledAgent[] = [];
 
-  for (const { agent, resolved, directPath, commandCandidates } of plans) {
-    const binaryPath = directPath
-      ?? commandCandidates.map((command) => commandLookup.get(command) ?? null).find(Boolean)
+  for (const { agent, resolved, directOverridePath, presenceCommands } of plans) {
+    const detectedCommandPath = presenceCommands.map((command) => presenceLookup.get(command) ?? null).find(Boolean);
+    const presencePath = directOverridePath
+      ?? detectedCommandPath
       ?? resolveExistingPresenceDir(agent.presenceDirs);
+    const launchPath = directOverridePath
+      ?? launchLookup.get(resolved.cmd)
+      ?? (presenceCommands.includes(resolved.cmd) ? detectedCommandPath : null)
+      ?? null;
 
-    if (binaryPath) {
+    if (presencePath && launchPath) {
       installed.push({
         id: agent.id,
         name: agent.name,
-        binaryPath,
+        binaryPath: launchPath,
         resolvedCommand: { cmd: resolved.cmd, args: resolved.args, source: resolved.source },
       });
     } else {

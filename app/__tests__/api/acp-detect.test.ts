@@ -36,7 +36,7 @@ describe('detectLocalAcpAgents', () => {
     expect(result.installed.some((agent) => agent.id === 'gemini' && agent.binaryPath === '/usr/local/bin/gemini')).toBe(true);
   });
 
-  it('falls back to presence directories when PATH lookup fails', async () => {
+  it('does not mark directory-only detections as runnable when the launch command is unavailable', async () => {
     mockExecFile.mockImplementation((_command, _args, _options, callback) => {
       callback?.(new Error('not found'), '', '');
       return {} as never;
@@ -45,7 +45,8 @@ describe('detectLocalAcpAgents', () => {
 
     const result = await detectLocalAcpAgents({ acpAgents: {} } as any);
 
-    expect(result.installed.some((agent) => agent.id === 'cursor' && agent.binaryPath.includes('.cursor/extensions'))).toBe(true);
+    expect(result.installed.some((agent) => agent.id === 'cursor')).toBe(false);
+    expect(result.notInstalled.some((agent) => agent.id === 'cursor')).toBe(true);
   });
 
   it('treats an override command path as installed even when it is outside PATH', async () => {
@@ -81,7 +82,7 @@ describe('detectLocalAcpAgents', () => {
     expect(result.installed.some((agent) => agent.id === 'gemini' && agent.binaryPath === 'C:\\Tools\\gemini.cmd')).toBe(true);
   });
 
-  it('probes alternate command names such as qwen when the canonical binary is different', async () => {
+  it('can launch from an alternate detected executable when it matches the agent command family', async () => {
     mockExecFile.mockImplementation((_command, args, _options, callback) => {
       const binary = String(args?.[0] ?? '');
       const stdout = binary === 'qwen' ? '/usr/local/bin/qwen\n' : '';

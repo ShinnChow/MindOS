@@ -10,6 +10,7 @@ export { PluginSettingTab, Setting } from './shims/settings';
 export { AppShim } from './shims/app';
 export { PluginLoader } from './loader';
 export { PluginManager } from './plugin-manager';
+export { scanObsidianVaultPlugins, importObsidianPlugin } from './obsidian-import';
 export { analyzePluginCompatibility, getCompatibilityLevel } from './compatibility-report';
 export { CommandRegistry } from './command-registry';
 export { Component } from './component';

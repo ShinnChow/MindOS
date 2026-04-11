@@ -61,6 +61,21 @@ const PID_PATH = path.join(CONFIG_DIR, 'mindos.pid');
 const DEFAULT_WEB_PORT = 3456;
 const DEFAULT_MCP_PORT = 8781;
 
+function getDesktopInstallPath(): string {
+  let appPath = app.getPath('exe');
+  if (process.platform === 'darwin') {
+    const appMatch = appPath.match(/^(.*?\.app)(\/|$)/);
+    if (appMatch) appPath = appMatch[1];
+  } else if (process.platform === 'linux') {
+    // AppImage sets APPIMAGE env to the actual .AppImage file path
+    appPath = process.env.APPIMAGE || path.dirname(appPath);
+  } else {
+    // Windows: installation directory containing MindOS.exe
+    appPath = path.dirname(appPath);
+  }
+  return appPath;
+}
+
 // ── Paths (prefer app.asar.unpacked on macOS — see electron-builder asarUnpack) ──
 const SPLASH_HTML = resolvePreferUnpacked('src', 'splash.html');
 const SPLASH_PRELOAD = resolvePreferUnpacked('dist-electron', 'preload', 'splash-preload.js');
@@ -492,6 +507,7 @@ async function startLocalMode(): Promise<string | null> {
       path.join(app.getPath('home'), 'MindOS', 'mind'),
     authToken: config.authToken,
     webPassword: typeof config.webPassword === 'string' ? config.webPassword : undefined,
+    installDir: getDesktopInstallPath(),
     verbose: false,
     env: getEnrichedEnv(nodePath),
   });
@@ -1303,6 +1319,15 @@ function setupIPC(): void {
     shell.openPath(configured || path.join(app.getPath('home'), 'MindOS', 'mind'));
   });
 
+  // Directory picker for onboarding setup
+  ipcMain.handle('select-directory', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Select Knowledge Base Directory',
+    });
+    return result.canceled ? null : result.filePaths[0] ?? null;
+  });
+
   ipcMain.handle('switch-mode', () => handleChangeMode());
   ipcMain.handle('restart-services', () => handleRestartServices());
   ipcMain.handle('switch-server', () => handleSwitchServer());
@@ -1457,17 +1482,7 @@ function setupIPC(): void {
       // Windows: C:\Program Files\MindOS\MindOS.exe → C:\Program Files\MindOS\
       // Linux AppImage: /tmp/.mount_xxx/mindos → use APPIMAGE env for the real .AppImage file
       // Linux deb/rpm:  /opt/MindOS/mindos → /opt/MindOS/
-      let appPath = app.getPath('exe');
-      if (process.platform === 'darwin') {
-        const appMatch = appPath.match(/^(.*?\.app)(\/|$)/);
-        if (appMatch) appPath = appMatch[1];
-      } else if (process.platform === 'linux') {
-        // AppImage sets APPIMAGE env to the actual .AppImage file path
-        appPath = process.env.APPIMAGE || path.dirname(appPath);
-      } else {
-        // Windows: delete the installation directory
-        appPath = path.dirname(appPath);
-      }
+      const appPath = getDesktopInstallPath();
 
       // trashItem is the modern async replacement for deprecated moveItemToTrash
       try {

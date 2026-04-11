@@ -1,11 +1,22 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, FolderOpen } from 'lucide-react';
 import { Field } from '@/components/settings/Primitives';
 import type { Messages } from '@/lib/i18n';
+import { useLocale } from '@/lib/stores/locale-store';
 import type { SetupState } from './types';
 import { TEMPLATES } from './constants';
+
+// Desktop bridge for folder picker (Electron only)
+interface MindosDesktopBridge {
+  selectDirectory?: () => Promise<string | null>;
+}
+function getDesktopBridge(): MindosDesktopBridge | null {
+  if (typeof window === 'undefined') return null;
+  const w = window as unknown as { mindos?: MindosDesktopBridge };
+  return w.mindos ?? null;
+}
 
 // Derive parent dir from current input for ls — supports both / and \ separators
 function getParentDir(p: string): string {
@@ -26,13 +37,15 @@ export interface StepKBProps {
 }
 
 export default function StepKB({ state, update, t, homeDir }: StepKBProps) {
+  const { locale } = useLocale();
+  const isZh = locale === 'zh';
   const s = t.setup;
   const [passwordTouched, setPasswordTouched] = useState(false);
   // Build platform-aware placeholder, e.g. /Users/alice/MindOS/mind or C:\Users\alice\MindOS\mind
   // Windows homedir always contains \, e.g. C:\Users\Alice — safe to detect by separator
   const sep = homeDir.includes('\\') ? '\\' : '/';
   const placeholder = homeDir !== '~' ? [homeDir, 'MindOS', 'mind'].join(sep) : s.kbPathDefault;
-  const [pathInfo, setPathInfo] = useState<{ exists: boolean; empty: boolean; count: number } | null>(null);
+  const [pathInfo, setPathInfo] = useState<{ exists: boolean; empty: boolean; count: number; unsafe?: boolean; reason?: string; reasonZh?: string } | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
@@ -126,21 +139,42 @@ export default function StepKB({ state, update, t, homeDir }: StepKBProps) {
     <div className="space-y-6">
       <Field label={s.kbPath} hint={s.kbPathHint}>
         <div className="relative">
-          <input
-            ref={inputRef}
-            value={state.mindRoot}
-            onChange={e => { update('mindRoot', e.target.value); setShowSuggestions(true); }}
-            onKeyDown={handleKeyDown}
-            onBlur={() => setTimeout(() => hideSuggestions(), 150)}
-            onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-            placeholder={placeholder}
-            className="w-full px-3 py-2 text-sm rounded-lg border outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring"
-            style={{
-              background: 'var(--input, var(--card))',
-              borderColor: 'var(--border)',
-              color: 'var(--foreground)',
-            }}
-          />
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              value={state.mindRoot}
+              onChange={e => { update('mindRoot', e.target.value); setShowSuggestions(true); }}
+              onKeyDown={handleKeyDown}
+              onBlur={() => setTimeout(() => hideSuggestions(), 150)}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              placeholder={placeholder}
+              className="flex-1 px-3 py-2 text-sm rounded-lg border outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring"
+              style={{
+                background: 'var(--input, var(--card))',
+                borderColor: 'var(--border)',
+                color: 'var(--foreground)',
+              }}
+            />
+            {/* Folder picker button — Desktop (Electron) only */}
+            {getDesktopBridge()?.selectDirectory && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const selected = await getDesktopBridge()?.selectDirectory?.();
+                  if (selected) {
+                    justSelectedRef.current = true;
+                    update('mindRoot', selected);
+                    hideSuggestions();
+                  }
+                }}
+                className="px-3 py-2 rounded-lg border transition-colors hover:bg-muted/50"
+                style={{ borderColor: 'var(--border)' }}
+                title={s.kbPathBrowse ?? 'Browse...'}
+              >
+                <FolderOpen size={16} style={{ color: 'var(--muted-foreground)' }} />
+              </button>
+            )}
+          </div>
           {showSuggestions && suggestions.length > 0 && (
             <div
               role="listbox"
@@ -178,6 +212,21 @@ export default function StepKB({ state, update, t, homeDir }: StepKBProps) {
             style={{ borderColor: 'var(--amber)', color: 'var(--amber)' }}>
             {s.kbPathUseDefault(placeholder)}
           </button>
+        )}
+        {/* ⚠️ Unsafe path warning — blocks setup until user picks a safe path */}
+        {pathInfo?.unsafe && (
+          <div className="mt-3 rounded-lg border p-3 text-sm flex gap-2 items-start"
+            style={{ borderColor: 'var(--error)', background: 'color-mix(in srgb, var(--error) 8%, transparent)' }}>
+            <AlertCircle size={16} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--error)' }} />
+            <div>
+              <p className="font-medium" style={{ color: 'var(--error)' }}>
+                {isZh ? '路径不安全' : 'Unsafe Path'}
+              </p>
+              <p className="mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                {isZh ? pathInfo.reasonZh : pathInfo.reason}
+              </p>
+            </div>
+          </div>
         )}
       </Field>
       {/* Template selection — conditional on directory state */}

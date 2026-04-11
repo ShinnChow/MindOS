@@ -6,6 +6,7 @@
 import fs from 'fs';
 import path from 'path';
 import { analyzePluginCompatibility, getCompatibilityLevel, type CompatibilityLevel, type PluginCompatibilityReport } from './compatibility-report';
+import { importObsidianPlugin, scanObsidianVaultPlugins, type ScannedObsidianPlugin } from './obsidian-import';
 import { PluginLoader } from './loader';
 import type { PluginManifest } from './types';
 
@@ -101,6 +102,18 @@ export class PluginManager {
 
   getLoader(): PluginLoader {
     return this.loader;
+  }
+
+  async scanObsidianVault(vaultRoot: string): Promise<ScannedObsidianPlugin[]> {
+    return scanObsidianVaultPlugins(vaultRoot);
+  }
+
+  async importFromObsidianVault(vaultRoot: string, pluginId: string): Promise<void> {
+    await importObsidianPlugin({
+      vaultRoot,
+      pluginId,
+      targetMindRoot: this.mindRoot,
+    });
   }
 
   private toManagedPlugin(manifest: PluginManifest, state: PluginManagerState): ManagedPlugin {

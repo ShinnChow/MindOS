@@ -815,7 +815,7 @@ export default function AskContent({ visible, currentFile, initialMessage, initi
           <div className={cn('flex items-center justify-between border-t border-border/10', isPanel ? 'px-2 pb-1.5 pt-1 gap-1' : 'px-3 pb-2 pt-1.5')}>
             <div className={cn('flex items-center flex-wrap', isPanel ? 'gap-1' : 'gap-2')}>
               <ModeCapsule mode={chatMode} onChange={setChatMode} disabled={isLoading} />
-            {mounted && acpDetection.installedAgents.length > 0 && (
+            {mounted && (
               <AgentSelectorCapsule
                 selectedAgent={selectedAcpAgent}
                 onSelect={handleSelectAcpAgent}

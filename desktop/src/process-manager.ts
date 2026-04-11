@@ -21,6 +21,8 @@ export interface ProcessManagerOptions {
   authToken?: string;
   /** Same as ~/.mindos/config.json webPassword — Web UI login + Next middleware */
   webPassword?: string;
+  /** Real Desktop install directory/bundle, used to reject mindRoot overlap in setup */
+  installDir?: string;
   verbose?: boolean;
   /** Enriched env with correct PATH for spawned processes */
   env?: Record<string, string>;
@@ -260,6 +262,7 @@ export class ProcessManager extends EventEmitter {
     };
     if (authToken) env.AUTH_TOKEN = authToken;
     if (webPassword) env.WEB_PASSWORD = webPassword;
+    if (this.opts.installDir) env.MINDOS_INSTALL_DIR = this.opts.installDir;
     /** Always bind to 127.0.0.1 for local mode (avoid OS hostname binding that breaks health checks).
      * @see wiki/80-known-pitfalls.md — "Next 生产进程绑定机器 hostname" */
     env.HOSTNAME = '127.0.0.1';

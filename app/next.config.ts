@@ -21,6 +21,8 @@ const nextConfig: NextConfig = {
     // Heavy packages excluded from bundle — dynamically imported at runtime.
     '@huggingface/transformers', 'onnxruntime-web',
     'sharp', '@img/sharp-linux-x64', '@img/sharp-darwin-arm64', '@img/sharp-win32-x64',
+    // PDF extraction: extract-pdf.cjs spawns outside bundler and requires this package directly
+    'pdfjs-dist',
   ],
   output: 'standalone',
   outputFileTracingRoot: projectDir,
