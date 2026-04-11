@@ -30,6 +30,17 @@ export interface SearchPrewarmResponse {
 
 export type SearchWarmState = 'idle' | 'warming' | 'ready' | 'fallback';
 
+export interface SearchWarmHintMessages {
+  preparing: string;
+  fallbackWarmHint: string;
+}
+
+export interface SearchPrewarmEligibility {
+  active: boolean;
+  hasAttemptedPrewarm: boolean;
+  warmState: SearchWarmState;
+}
+
 /** Frontend-facing backlink shape returned by /api/backlinks (transformed from core BacklinkEntry) */
 export interface BacklinkItem {
   filePath: string;
