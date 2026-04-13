@@ -109,10 +109,17 @@ export function hasPrebuiltStandalone() {
   try {
     const builtVersion = readFileSync(STANDALONE_STAMP, 'utf-8').trim();
     const currentVersion = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf-8')).version;
-    return builtVersion === currentVersion;
+    if (builtVersion !== currentVersion) return false;
   } catch {
     return false;
   }
+  // Quick sanity check: manifest + at least the home page bundle must exist.
+  // Catches incomplete builds (e.g. 0.6.75 where manifest listed /wiki but
+  // the page.js was missing, causing 500). Full validation is in prepare-standalone.mjs.
+  const serverDir = resolve(ROOT, '_standalone', '.next', 'server');
+  if (!existsSync(resolve(serverDir, 'app-paths-manifest.json'))) return false;
+  if (!existsSync(resolve(serverDir, 'app', 'page.js'))) return false;
+  return true;
 }
 
 export function ensureAppDeps({ force = false } = {}) {
