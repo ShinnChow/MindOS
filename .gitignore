@@ -1,11 +1,17 @@
 **/node_modules/
 **/dist/
-app/.next
+**/.turbo/
+packages/web/.next
 .next
 _standalone/
-app/.vscode
-app/data
-!app/data/skills
+packages/mindos/_standalone/
+packages/mindos/apps/
+packages/mindos/packages/
+packages/mindos/scripts/
+packages/mindos/assets/
+packages/mindos/skills/
+packages/mindos/templates/
+packages/web/.vscode
 *.tsbuildinfo
 *.pptx
 *.pdf
@@ -25,8 +31,8 @@ app/data
 .pi
 
 # User config is stored in ~/.mindos/config.json (never committed)
-app/.env.local
-app/.mindos-settings.json
+packages/web/.env.local
+packages/web/.mindos-settings.json
 
 my-mind/
 my-mind-backup/
@@ -54,15 +60,14 @@ assets/package.json
 assets/demo-flow.html
 
 # Electron desktop
-desktop/dist/
-desktop/dist-electron/
-desktop/dist-renderer/
-desktop/node_modules/
-# Populated by prepare-mindos-runtime.mjs (keep README tracked)
-desktop/resources/mindos-runtime/*
-!desktop/resources/mindos-runtime/README.md
-!desktop/resources/mindos-runtime/.gitkeep
-desktop/.node-bundle-tmp/
+packages/desktop/dist/
+packages/desktop/dist-electron/
+packages/desktop/dist-renderer/
+packages/desktop/node_modules/
+packages/desktop/resources/mindos-runtime/*
+!packages/desktop/resources/mindos-runtime/README.md
+!packages/desktop/resources/mindos-runtime/.gitkeep
+packages/desktop/.node-bundle-tmp/
 
 # Docker / Docker Compose — local overrides & secrets (keep Dockerfile / docker-compose.yml tracked)
 docker-compose.override.yml
@@ -76,10 +81,12 @@ image.png
 !landing/img/*.png
 !assets/images/*.png
 !docs/images/*.png
-!browser-extension/src/icons/*.png
+!packages/browser-extension/src/icons/*.png
+!packages/web/public/icons/*.png
+!packages/desktop/src/icons/*.png
 .tmux.conf
 TMUX_DOC.md
 .mcp.json
 collect-session-ids.py
-app/__fixtures__/real-plugins/
+packages/web/__fixtures__/real-plugins/
 wiki/migration/

@@ -1,8 +1,51 @@
-<!-- Last verified: 2026-03-31 | Current stage: P1 -->
+<!-- Last verified: 2026-04-28 | Current stage: v1 release-candidate -->
 
 # 踩坑记录 (Known Pitfalls)
 
+## v1 Monorepo Migration
+
+### v1 迁移后不要再把顶层 `app/` / `apps/` / `desktop/` / `mobile/` 当源码入口
+
+**症状**：顶层 legacy source roots 删除后，如果运行时代码仍从 `projectRoot/app/...` 查找 skills 或 Agent extensions，会造成 dev、npm 包和 Desktop runtime 行为不一致。
+
+**根因**：v1 迁移时先复制目录再切入口，旧路径容易残留在 tests、docs、hooks 和动态路径解析里；单纯删除目录不足以证明运行时自洽。
+
+**规则**：
+- 源码入口固定为 `packages/web/`、`packages/desktop/`、`packages/mobile/`、`packages/protocols/acp/`、`packages/protocols/mcp-server/`
+- `packages/web/data/skills/` 是 Web 内置 skill copy；`skills/` 是项目级 source-of-truth copy
+- Desktop 新打包产物也使用 `packages/web/` + `packages/protocols/mcp-server/`，不再生成顶层 `app/` + `mcp/` 兼容布局
+- `packages/mindos/_standalone`、`packages/mindos/packages`、`packages/mindos/scripts` 等是 pack/publish staging output，不是源码；不要在那里修 bug
+
+**验证**：`pnpm exec vitest run tests/legacy-cleanup-contract.test.ts`，发布前再跑真实 `npm pack` tarball smoke。
+
+### MCP source path 迁移后不要再改顶层 `mcp/`
+
+**症状**：v1 迁移后如果继续在顶层 `mcp/` 修 MCP，会出现"本地修了但发布包 / CLI / Desktop 没变化"的假修复。
+
+**根因**：v1 的 MCP 源码和新 Desktop runtime source of truth 都已迁移到 `packages/protocols/mcp-server/`。顶层 `mcp/` 只可能来自旧安装包或旧缓存，不能作为新版本入口。
+
+**规则**：
+- MCP 源码只改 `packages/protocols/mcp-server/src/index.ts`
+- 构建用 `pnpm --filter @mindos/mcp-server build`
+- CLI 通过 `packages/mindos/bin/lib/mcp-build.js` 读取 `packages/protocols/mcp-server/dist/index.cjs`
+- Desktop runtime prepare 直接复制为 `packages/protocols/mcp-server/dist/index.cjs`
+
+**验证**：`pnpm exec vitest run tests/mcp-package-migration-contract.test.ts`，并确认 npm tarball 包含 `packages/protocols/mcp-server/dist/index.cjs`。
+
 ## Git / 双仓同步
+
+### 公开仓 tag push 与 workflow_dispatch 不要双触发同一个发布
+
+**症状**：`npm run release` 后公开仓出现两个 `publish-npm` run；一个成功发布 npm，另一个因为同一版本已存在而失败。
+
+**根因**：`sync-to-mindos.yml` 使用 PAT 把 `vX.Y.Z` tag 推到公开仓时，公开仓的 `publish-npm.yml` 会被 tag push 自动触发。如果 sync workflow 同时再调用 `publish-npm.yml/dispatches`，同一版本会被发布两次。
+
+**规则**：
+- `vX.Y.Z`：只靠公开仓 tag push 自动触发 `publish-npm.yml` / `publish-runtime.yml`
+- `desktop-vX.Y.Z`：因为 desktop workflow 不监听 tag push，才由 `sync-to-mindos.yml` 显式 dispatch `build-desktop.yml`
+- `clipper-vX.Y.Z`：只靠公开仓 tag push 自动触发 `publish-clipper.yml`
+
+**验证**：`pnpm exec vitest run tests/workflow-migration-contract.test.ts`，确认 `sync-to-mindos.yml` 不包含 `publish-npm.yml/dispatches`。
 
 ### 绝对禁止手动 push/merge public repo（2026-03-31 实际事故）
 
@@ -17,30 +60,6 @@
 - 如果 public 有外部 PR，在 GitHub 上合并后让 CI 回流，不要手动 merge
 
 **恢复方式**：`git reset --hard <merge前的commit>` + `git push origin main --force-with-lease`
-
-## NPM 发布
-
-### `mindos onboard` 全局安装后报 MODULE_NOT_FOUND（2026-04-24）
-
-**症状**：用户执行 `npm install -g @geminilight/mindos` 后运行 `mindos onboard`，报错：
-```
-Error: Cannot find module '/opt/homebrew/lib/node_modules/@geminilight/mindos/scripts/setup.js'
-```
-
-**根因**：`package.json` 的 `files` 字段未包含 `scripts/` 目录，导致 npm 发布时该目录被排除，但 `bin/commands/onboard.js:24` 依赖 `scripts/setup.js`。
-
-**修复**：在 `package.json` 的 `files` 数组中添加 `"scripts/"`。
-
-**规则**：
-- 所有被 `bin/` 目录代码引用的文件/目录必须包含在 `files` 字段中
-- 修改 `bin/` 代码引用新目录时，同步检查 `package.json` 的 `files` 字段
-- 发版前用 `npm pack --dry-run --ignore-scripts` 验证关键文件是否包含
-
-**验证**：
-```bash
-npm pack --dry-run --ignore-scripts 2>&1 | grep "scripts/setup.js"
-# 应输出：npm notice 60.3kB scripts/setup.js
-```
 
 ## Agent / LLM API
 
@@ -232,16 +251,16 @@ npm install -g @geminilight/mindos@latest
 
 ### Plain JS CLI 直接 import app/*.ts 会在运行时炸掉 (2026-04-10)
 
-**症状**：`node bin/cli.js channel --help` 或其他 bin 命令在启动阶段直接报 `ERR_MODULE_NOT_FOUND` / `Unexpected token`，指向 `app/lib/**.ts`。
+**症状**：`node packages/mindos/bin/cli.js channel --help` 或其他 bin 命令在启动阶段直接报 `ERR_MODULE_NOT_FOUND` / `Unexpected token`，指向 `packages/web/lib/**.ts`。
 
-**根因**：仓库根部的 CLI 运行在原生 Node ESM 下，`bin/*.js` 不经过 Next / tsx / ts-node 装载链；直接从 plain JS CLI import TypeScript 源文件会在运行时失败。
+**根因**：CLI 运行在原生 Node ESM 下，`packages/mindos/bin/*.js` 不经过 Next / tsx / ts-node 装载链；直接从 plain JS CLI import TypeScript 源文件会在运行时失败。
 
 **规则**：
-- `bin/` 层优先保持纯 JS，可直接做文件 I/O、参数解析、轻量校验。
+- `packages/mindos/bin/` 层优先保持纯 JS，可直接做文件 I/O、参数解析、轻量校验。
 - 复杂 TypeScript 业务逻辑通过 app 内 API route / 子进程边界调用，不要从 `bin/*.js` 直接 import `app/**/*.ts`。
 - 若 CLI 与 app 需要共享规则，优先抽数据常量或协议边界，避免共享需要 TS loader 的实现文件。
 
-**修复**：本次 `mindos channel` 采用 `bin/lib/channel-config.js` + `/api/channels/verify` 的分层方式：CLI 负责配置和 UX，app 负责真实凭证校验。
+**修复**：本次 `mindos channel` 采用 `packages/mindos/bin/lib/channel-config.js` + `/api/channels/verify` 的分层方式：CLI 负责配置和 UX，Web app 负责真实凭证校验。
 
 
 ### DefaultResourceLoader.systemPromptOverride 闭包缓存陷阱 (2026-04-10)
@@ -779,14 +798,14 @@ rootcause: app/api/ask/route.ts:143 直接传递 llmHistoryMessages（pi-ai Mess
 - **原因：** 手写的 `sendAndWait()` 发送 JSON-RPC 后仅靠 `setTimeout` 等待响应，不监听进程 `close`/`error` 事件
 - **解决：** 迁移至 `@agentclientprotocol/sdk`，SDK 的 `ClientSideConnection` 自动将流关闭事件传播为 Promise rejection，消除了手写 JSON-RPC 解析/调度的整类 bug
 - **规则：** 协议层优先使用官方 SDK 而非手写实现。手写 JSON-RPC 解析/调度曾导致 5 类 bug（sessionId 丢失、streaming 格式不匹配、同步 prompt 无文本、进程死亡盲等、modes 解析错误）
-- **文件：** `app/lib/acp/subprocess.ts`, `app/lib/acp/session.ts`
+- **文件：** v1 后为 `packages/protocols/acp/src/subprocess.ts`, `packages/protocols/acp/src/session.ts`
 
 ### ACP waitForTerminalExit 竞态条件（#24）
 - **现象：** 如果终端子进程在 `exitCode !== null` 检查和 `.on('exit')` 监听之间退出，Promise 永远挂起
 - **原因：** Node.js 的 `exit` 事件已触发后不会重发，附加监听器后再也收不到
 - **解决：** 在附加 `.on('exit')` 后再次检查 `exitCode`，覆盖竞态窗口
 - **规则：** 任何 "先检查状态 → 再挂监听器" 的模式都必须在监听器挂上后重新检查状态
-- **文件：** `app/lib/acp/subprocess.ts`
+- **文件：** v1 后为 `packages/protocols/acp/src/subprocess.ts`
 
 ### pi-agent-core 迁移：compact 失败不能静默返回
 - **现象：** `compactMessages()` 调用 `complete()` 失败时直接返回未压缩的消息。如果上下文已超 70%，后续调用大概率超 token limit → 不可预测行为
@@ -1086,8 +1105,8 @@ dir node\node.exe                       # 应该存在
 - 使用 `expect()` 而非 `unwrap()` 提供更好的错误信息
 
 **文件**：
-- `desktop-tauri/src-tauri/tauri.conf.json:15-20`
-- `desktop-tauri/src-tauri/src/main.rs:42-46`
+- `packages/desktop-tauri/src-tauri/tauri.conf.json:15-20`
+- `packages/desktop-tauri/src-tauri/src/main.rs:42-46`
 
 ---
 
@@ -1130,9 +1149,9 @@ mindos onboard
 ### Skill 安装 process.cwd() 路径错误
 - **现象：** GUI Setup Wizard 安装 Skill 提示失败，CLI 正常
 - **原因：** API route 用 `path.resolve(process.cwd(), 'skills')` 定位 skills 目录，但 Next.js 的 `process.cwd()` 是 `app/`，解析到 `app/skills/`（不存在）。CLI 用 `__dirname` 相对定位所以没问题
-- **解决：** 改为 GitHub 源优先（`npx skills add GeminiLight/MindOS --skill mindos`），本地路径作为离线 fallback（搜索 `app/data/skills/` 和 `../skills/`）
+- **解决：** 改为 GitHub 源优先（`npx skills add GeminiLight/MindOS --skill mindos`），本地路径作为离线 fallback（搜索 `packages/web/data/skills/` 和 `skills/`）
 - **教训：** Next.js API route 里 `process.cwd()` 不等于项目根目录，定位文件用 GitHub 源或 `__dirname` 相对路径，不要依赖 cwd
-- **文件：** `app/api/mcp/install-skill/route.ts`、`scripts/setup.js`
+- **文件：** `packages/web/app/api/mcp/install-skill/route.ts`、`scripts/setup.js`
 
 ### Skill 安装多 agent 逗号分隔无效
 - **现象：** 选多个 agent 安装 Skill 时，`skills` CLI 报 "Invalid agents: claude-code,windsurf"
@@ -1163,10 +1182,10 @@ mindos onboard
 
 ### npm 包体积膨胀 — package.json files 排除项遗漏
 - **现象：** npm 包从 ~480kB 膨胀到 1.8MB
-- **原因：** `package.json` 的 `files` 字段缺少排除项：`assets/images/`（1.2MB 截图）、`mcp/package-lock.json`（58kB）、`app/package-lock.json`（560kB）
+- **原因：** 发布包 `package.json` 的 `files` 字段缺少排除项：`assets/images/`（1.2MB 截图）、`mcp/package-lock.json`（58kB）、`app/package-lock.json`（560kB）
 - **`app/package-lock.json` 处理：** 原本 `depsHash()` 读 lock 文件做 hash，导致不能排除。改为读 `app/package.json`（几 KB）做 hash——依赖增删改时 package.json 一定变，精度足够
 - **教训：** npm 官方建议**不要发布 lock 文件**，lock 只对根项目有意义。如有 build 脚本依赖 lock 文件，应改为依赖 package.json 或预算 hash 写入小文件
-- **文件：** `package.json`, `bin/lib/build.js`
+- **文件：** v1 后为 `packages/mindos/package.json`, `packages/mindos/bin/lib/build.js`
 
 ## 变更质量 checklist（通用）
 
@@ -1283,18 +1302,18 @@ mindos onboard
 
 ### @types/node 版本号写了不存在的大版本
 - **现象：** 新电脑首次 `mindos start`，MCP 依赖安装报 `npm error code ETARGET — No matching version found for @types/node@^25.4.0`
-- **原因：** `mcp/package.json` 的 `@types/node` 写成了 `^25.4.0`，但 npm 上该包最新大版本对应 Node 22。开发机有缓存 `node_modules` 所以不触发安装，新机器首次 `npm install` 找不到匹配版本
+- **原因：** 旧版 `mcp/package.json` 的 `@types/node` 写成了 `^25.4.0`，但 npm 上该包最新大版本对应 Node 22。开发机有缓存 `node_modules` 所以不触发安装，新机器首次 `npm install` 找不到匹配版本
 - **解决：** 改为 `^22`，与实际 Node 版本对齐
 - **规则：** `@types/node` 的大版本号 = Node.js 大版本号（如 Node 22 → `@types/node@^22`）。写 devDependencies 时不要凭感觉写版本号，先 `npm view @types/node versions` 确认存在
-- **文件：** `mcp/package.json`
+- **文件：** v1 后为 `packages/protocols/mcp-server/package.json`
 
 ### @modelcontextprotocol/sdk 版本范围过宽导致 express transport 缺失
 - **现象：** 新环境 / 缓存旧版本时，`npm install` 安装到 <1.25.0 的 SDK 版本，运行时 `import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js"` 报 `MODULE_NOT_FOUND`
-- **原因：** `mcp/package.json` 声明 `"@modelcontextprotocol/sdk": "^1.6.1"`，但 `server/express.js` 直到 **1.25.0** 才加入 SDK（1.6.1 ~ 1.24.x 共 19 个大版本都没有该文件）。开发机有 lockfile 锁定 1.27.1 所以不触发
+- **原因：** 旧版 `mcp/package.json` 声明 `"@modelcontextprotocol/sdk": "^1.6.1"`，但 `server/express.js` 直到 **1.25.0** 才加入 SDK（1.6.1 ~ 1.24.x 共 19 个大版本都没有该文件）。开发机有 lockfile 锁定 1.27.1 所以不触发
 - **触发条件：** lockfile 丢失 / 新环境首次 install / `--prefer-offline` 命中旧缓存版本
 - **解决：** 版本范围从 `^1.6.1` 改为 `^1.25.0`，确保最低安装到有 express.js 的版本
 - **规则：** 代码 import 了某个子路径（如 `sdk/server/express.js`），`package.json` 的版本范围**下界**必须 ≥ 该子路径首次出现的版本。用 `npm pack @pkg@x.y.z --dry-run | grep filename` 验证
-- **文件：** `mcp/package.json`、`mcp/package-lock.json`
+- **文件：** v1 后为 `packages/protocols/mcp-server/package.json`
 
 ### --prefer-offline 首次安装失败无回退
 - **现象：** 新机器 `mindos start` 时 MCP 依赖安装失败，报 `npm error code ETARGET` 或 `No matching version found`
@@ -1360,7 +1379,7 @@ mindos onboard
 - **v0.6.4 方案：** 三层防御（postinstall + 运行时安装）——治标不治本，仍依赖网络 + npm 可用
 - **v0.6.6 根治：** esbuild 预编译 MCP → 单文件 `mcp/dist/index.cjs`（1.1MB），直接 `node dist/index.cjs` 运行。彻底消除 `node_modules`、`tsx`、跨平台原生依赖、运行时安装逻辑
 - **删除的文件：** `scripts/postinstall.js`、`desktop/src/ensure-mcp-native-deps.ts`（及其测试）
-- **规则：** MCP 服务器应始终以预编译 bundle 形态发布。修改 `mcp/src/` 后需 `cd mcp && npm run build` 重新打包。`npm pack` / `npm publish` 会通过 `prepack` 钩子自动触发构建
+- **规则：** MCP 服务器应始终以预编译 bundle 形态发布。v1 后修改 `packages/protocols/mcp-server/src/`，用 `pnpm --filter @mindos/mcp-server build` 重新打包。`npm pack` / `npm publish` 会通过 `prepack` 钩子自动触发构建
 
 ### SameSite=None 必须搭配 Secure
 - **现象：** 跨域 auth cookie 被浏览器静默丢弃
@@ -1390,7 +1409,7 @@ mindos onboard
 - **原因：** 检测阶段会用目录兜底或 shell PATH 解析判断“已安装”，但启动阶段 `spawn()` 仍然直接执行裸命令（如 `gemini` / `codebuddy` / `npx`）。GUI 进程拿到的 PATH 往往比终端短，导致子进程启动即退出，随后 `initialize` 写 stdin 时触发 `EPIPE`
 - **解决：** 检测与启动必须复用同一套“运行时解析到的可执行路径”。优先使用用户 override 的绝对路径；否则先在当前环境 `which/where`，再回退到 login shell `command -v` 解析绝对路径；只有“检测到存在”且“启动命令可解析”时才视为 installed。目录存在但没有可执行命令，只能算 detected，不能算 runnable
 - **规则：** 对桌面端/GUI 进程，**installed = runnable**。不要让“目录兜底检测成功”与“spawn 裸命令启动成功”使用两套不同标准
-- **文件：** `app/lib/acp/detect-local.ts`、`app/lib/acp/subprocess.ts`
+- **文件：** v1 后为 `packages/protocols/acp/src/detect-local.ts`、`packages/protocols/acp/src/subprocess.ts`
 
 ### Desktop 本地模式：`mindos.pid` 存活时绕过 Bundled/User 择优
 - **现象：** 配置了 `mindosRuntimePolicy` 或内置 `mindos-runtime`，仍连上「旧」Web
@@ -1438,7 +1457,7 @@ mindos onboard
 
 ### `mindos mcp` stdio 模式因端口冲突 EADDRINUSE 崩溃
 - **现象：** `mindos start` 运行中（占用 3456 + 8781），MCP 客户端（Claude Code 等）调用 `mindos mcp` 报 EADDRINUSE
-- **原因：** `bin/cli.js` 的 `mcp` 命令处理器未设置 `MCP_TRANSPORT`，`mcp/src/index.ts` 默认 `"http"` → 尝试绑定已被占用的 8781 端口
+- **原因：** `bin/cli.js` 的 `mcp` 命令处理器未设置 `MCP_TRANSPORT`，MCP server 默认 `"http"` → 尝试绑定已被占用的 8781 端口
 - **解决：** `mindos mcp` 默认 `MCP_TRANSPORT=stdio`（HTTP 模式由 `mindos start` → `spawnMcp()` 处理）；同时所有 HTTP 场景显式设置 `MCP_TRANSPORT=http` 消除隐式依赖
 - **规则：** 进程间 transport 类型必须显式声明，不能依赖接收端默认值——尤其当同一入口可能被不同上下文调用时
 
@@ -1475,7 +1494,7 @@ mindos onboard
 ### Desktop 内置 runtime 过期导致 mcp/node_modules 73MB 冗余
 - **现象：** `desktop/resources/mindos-runtime/mcp/node_modules/` 占 73MB，但 v0.6.6 已改为 esbuild 预编译（`mcp/dist/index.cjs` 仅 1.2MB）
 - **原因：** `prepare-mindos-runtime.mjs` 脚本逻辑正确（先 copyTree → 再 rmSync node_modules → 复制 dist/index.cjs），但**脚本未被重新运行**，runtime 目录仍是旧版产物
-- **解决：** 每次发版 Desktop 前必须重跑 `cd desktop && node scripts/prepare-mindos-runtime.mjs`
+- **解决：** 每次发版 Desktop 前必须重跑 `pnpm --filter @mindos/desktop run prepare-mindos-runtime`
 - **验证：** 重跑后 runtime 从 198MB 降至 134MB（-64MB），mcp/node_modules 不存在，mcp/dist/index.cjs 1.2MB
 - **规则：** Desktop 发版 checklist 必须包含 prepare-mindos-runtime 步骤，不能复用旧产物
 
@@ -1485,7 +1504,7 @@ mindos onboard
 - **验证（已确认）：**
   - 在 `serverExternalPackages` 中加入 `koffi`/`sharp`/`typescript` 等 6 个包后 Turbopack build，standalone 体积**不变**（200MB），koffi 87MB、@img 33MB、typescript 20MB 仍在
   - 用 `next build --webpack` 构建，koffi 被正确排除（standalone 降至 110MB），但 @img/typescript 仍被保留（Next.js runtime 依赖）
-- **已解决：** 生产构建已切换到 `next build --webpack`。改动 5 处：`bin/cli.js`(2)、`scripts/release.sh`(1)、`.github/workflows/build-desktop.yml`(1)、`app/package.json`(1)。dev 模式仍用 Turbopack。standalone 从 200MB 降至 115MB（-85MB），koffi 87MB 被正确排除，verify-standalone 通过
+- **已解决：** 生产构建已切换到 `next build --webpack`，v1 dev 入口也固定为 `next dev --webpack`，避免 pnpm workspace 下 Turbopack root/symlink 解析问题。standalone 从 200MB 降至 115MB（-85MB），koffi 87MB 被正确排除，verify-standalone 通过
 - **注意：** `optimizePackageImports: ['lucide-react']` 也已验证为冗余——Turbopack 16.1.6 已内置 lucide-react 优化，有无此配置构建产物**完全一致**（static 4.3M, server 22M）
 - **教训：** 配置改动必须做 before/after 对比验证。不能信赖文档描述或 agent 推断，要用 `du -sh` 实测
 
@@ -1971,13 +1990,13 @@ mindos onboard
   - `port.js`/`build.js`/`doctor.js`: 错误提示区分平台（lsof vs netstat）
 - **规则：** 新增 shell 命令前先问"Windows cmd.exe 支持吗？"；路径比较用 `path.relative()`，不用字符串拼接
 
-### `next build --webpack` 污染 `.next` 缓存 → dev server 每请求 compile 7-8s（2026-04-05）
+### Turbopack dev cache 与 webpack build cache 混用导致每请求 compile 7-8s（2026-04-05）
 
-- **症状：** `next dev`（turbopack）每个请求 compile 7-8s，`/api/tree-version`（9 行代码）也要 15s 完成；view 页面 render 60-100s；3s 轮询不断积压，页面完全点不动
-- **根因：** `npm run build`（走 `next build --webpack`）向 `.next/cache/webpack/` 写入 490MB production cache，同时覆盖 `.next/cache/.tsbuildinfo` 等共享元数据。再次启动 `next dev`（走 turbopack）时，turbopack 检测到元数据与自身缓存不一致 → 整体 invalidate → 每个请求重新编译全部依赖链
+- **症状：** 历史 `next dev`（Turbopack）每个请求 compile 7-8s，`/api/tree-version`（9 行代码）也要 15s 完成；view 页面 render 60-100s；3s 轮询不断积压，页面完全点不动
+- **根因：** `npm run build`（走 `next build --webpack`）向 `.next/cache/webpack/` 写入 490MB production cache，同时覆盖 `.next/cache/.tsbuildinfo` 等共享元数据。再次启动 Turbopack dev 时，Turbopack 检测到元数据与自身缓存不一致 → 整体 invalidate → 每个请求重新编译全部依赖链
 - **表现特征：** `.next` 总大小 2.8GB（turbopack dev cache 650MB + webpack production cache 490MB + 其他碎片）；连续多天开发不重启会逐步恶化
 - **解决：** `rm -rf .next` + 重启 dev server。冷启动首轮 100-300ms，缓存热后回到个位数 ms
-- **预防：** 每次 `npm run build` / `npm run release` 后，重启 dev server 前先 `rm -rf .next`
+- **预防：** v1 dev 已固定为 webpack；如手动试验 Turbopack，先清理 `packages/web/.next`
 - **注意：** 仅影响 dev mode。Production build 所有 route 预编译，不存在 compile 阶段
 
 ### Settings 关闭时 API Key 丢失（debounce 800ms + unmount race）（2026-04-06）
@@ -2049,12 +2068,12 @@ mindos onboard
 
 - **严重等级：** 🟡 Medium — 用户在不同入口看到不同的人格和命名，信任感被稀释
 - **现象：** 聊天行为里已经不再自称“第二大脑操作员”，但 Ask 标题、默认 Agent 名称、Onboarding、Skill 描述仍沿用旧表述或 `MindOS Agent`
-- **根因：** 身份文案分散在共享 prompt、i18n、默认 Agent 常量、skills/ 与 app/data/skills/ 多份副本里，只改一层会留下半套体验
+- **根因：** 身份文案分散在共享 prompt、i18n、默认 Agent 常量、skills/ 与 packages/web/data/skills/ 多份副本里，只改一层会留下半套体验
 - **解决：**
   1. 先定义统一原则：产品名 `MindOS`，描述语 `local knowledge assistant / 本地知识助手`
   2. 关键用户可见 surfaces 同步更新：prompt、默认 Agent 名称、Onboarding、Help、Channels、skills/
-  3. 对 `skills/` 与 `app/data/skills/` 建一致性测试，避免再次漂移
-- **文件：** `app/lib/agent/prompt.ts`、`app/lib/ask-agent.ts`、`app/lib/i18n/modules/*`、`skills/mindos*`、`app/data/skills/mindos*`
+  3. 对 `skills/` 与 `packages/web/data/skills/` 建一致性测试，避免再次漂移
+- **文件：** `packages/web/lib/agent/prompt.ts`、`packages/web/lib/ask-agent.ts`、`packages/web/lib/i18n/modules/*`、`skills/mindos*`、`packages/web/data/skills/mindos*`
 - **规则：** 只要是"产品身份 / 默认助手命名"这类跨入口文案，就不能局部修补；必须把 source-of-truth 与所有用户可见关键 surface 一起对齐
 
 ### ACP killAllAgents/reapStaleSessions 在迭代中修改 Map (2026-04-13)
@@ -2069,7 +2088,7 @@ mindos onboard
 
 **规则**：不要在 `for...of Map/Set` 循环内调用 delete/set 修改正在迭代的集合。先收集到数组再处理。
 
-**文件**：`app/lib/acp/subprocess.ts`、`app/lib/acp/session.ts`、`desktop/resources/mindos-runtime/app/lib/acp/subprocess.ts`
+**文件**：v1 后为 `packages/protocols/acp/src/subprocess.ts`、`packages/protocols/acp/src/session.ts`；旧 Desktop runtime 副本只代表历史安装包。
 
 ### useAskChat submit 依赖数组缺少 modelOverride (2026-04-13)
 
@@ -2091,7 +2110,7 @@ mindos onboard
 
 **修复**：在 `diagnoseInitFailure()` 中增加对 `npm ERR!`、`ERR_SOCKET_TIMEOUT`、`ETIMEDOUT`、`ECONNREFUSED` 等网络错误的专门诊断，明确告知用户检查网络连接和 npm proxy 设置。
 
-**文件**：`app/lib/acp/session.ts`
+**文件**：v1 后为 `packages/protocols/acp/src/session.ts`
 
 ### trash.ts 路径遍历漏洞 — moveToTrash 未使用 resolveSafe (2026-04-13)
 
@@ -2300,7 +2319,7 @@ exit 0
 
 **症状**：Windows 用户在 Chatbot 中使用 ACP 功能时，子进程无法正常启动或终止，导致 Agent 执行失败。
 
-**根因**：`app/lib/acp/subprocess.ts` 中的进程管理逻辑存在 3 个 Windows 兼容性问题：
+**根因**：历史 `app/lib/acp/subprocess.ts` 中的进程管理逻辑存在 3 个 Windows 兼容性问题；v1 后对应源码为 `packages/protocols/acp/src/subprocess.ts`：
 
 1. **负 PID 杀进程（Unix-only）**：
    - `killAgent()` 使用 `process.kill(-pid)` 杀进程组
@@ -2363,7 +2382,7 @@ const proc = spawn(cmd, args, {
 - 优先参考 bin/lib/stop.js 的成熟实现
 
 **测试**：
-- Mac: `cd app && npx vitest run __tests__/acp/` (131 tests passed ✅)
+- Mac: `pnpm --filter @mindos/web exec vitest run __tests__/acp/` (131 tests passed ✅)
 - Windows: 需要在 Windows 环境实际测试 ACP 功能
 
 ## 性能优化
@@ -2404,3 +2423,53 @@ const visibleNodes = useMemo(() => {
 - 对于简单计算（<10ms），不需要 `useMemo`（过度优化）
 
 **测试**：所有现有测试通过（1933 tests），无功能回归。
+
+## CI / Release
+
+### Monorepo 迁移后 workflow 仍引用旧顶层目录（2026-04-27）
+
+**症状**：GitHub Actions 在发版或构建 Desktop/Mobile 时直接失败，常见报错是 `cd app: No such file or directory`、`cd mcp: No such file or directory`、`cd desktop: No such file or directory`。
+
+**根因**：源码已经迁移到 pnpm workspace：
+- Web: `packages/web`
+- Desktop: `packages/desktop`
+- Mobile: `packages/mobile`
+- MCP: `packages/protocols/mcp-server`
+
+但 workflow、public sync 白名单或专项测试仍引用旧的 `app/`、`mcp/`、`desktop/`、`mobile/` 顶层目录。
+
+**修复**：
+- workflow 安装依赖统一使用根目录 `pnpm install --frozen-lockfile`
+- workspace 构建用 `pnpm --filter <package> run <script>`
+- npm standalone 校验使用 `_standalone/__next` / `_standalone/__node_modules`
+- `.syncinclude` 同步 `packages/`、`pnpm-lock.yaml`、`pnpm-workspace.yaml`、`turbo.json` 等 v1 源码和 workspace 元数据；不要重新加入 `apps/`
+- Desktop tag dispatch 必须传 `inputs.tag`，否则安装包版本可能与 release tag 不一致
+
+**防回归**：`tests/workflow-migration-contract.test.ts` 会扫描 workflow 和 `.syncinclude`，禁止旧目录引用重新进入发布链路。
+
+### Browser Extension 也是 app，不要放回顶层目录（2026-04-27）
+
+**症状**：Web Clipper 发布 workflow 找不到目录，或 public sync 额外维护 `browser-extension/` 顶层白名单。
+
+**根因**：v1 monorepo 已经从 `apps/*` + `packages/*` 双根迁到 OpenCode-style `packages/*` 单根。浏览器扩展如果留在根目录，会成为 `.syncinclude`、README 链接、publish workflow 的例外路径。
+
+**规则**：
+- Web Clipper 源码固定在 `packages/browser-extension/`
+- 构建用 `pnpm --filter @mindos/browser-extension run build`
+- `publish-clipper.yml` 只引用 `packages/browser-extension`
+- `.syncinclude` 不单独列顶层 `browser-extension`，由 `packages/` 覆盖
+
+**验证**：`pnpm exec vitest run tests/workflow-migration-contract.test.ts`。
+
+### Tauri Desktop spike 也是 app，不要放回顶层目录（2026-04-27）
+
+**症状**：Tauri spike 留在顶层 `desktop-tauri/` 时，workspace、npm ignore、文档和后续 CI 都要为它维护例外路径。
+
+**根因**：v1 monorepo 已经迁到 OpenCode-style `packages/*` 单根；Tauri spike 是一个完整应用（Vite 前端 + `src-tauri/` Rust 壳），不属于根目录工具脚本。
+
+**修复**：
+- 源码固定在 `packages/desktop-tauri/`
+- npm tarball 通过 `.npmignore` 排除 `packages/desktop-tauri/`
+- `tauri.conf.json` 的 `beforeDevCommand` / `beforeBuildCommand` 使用 `pnpm run dev:web` / `pnpm run build:web`，避免 `dev -> tauri dev -> npm run dev` 递归
+
+**验证**：`pnpm exec vitest run tests/workflow-migration-contract.test.ts`。

@@ -98,10 +98,11 @@ MindOS 是你思考的地方，也是 AI Agent 行动的起点——一个你和
 
 | 日期 | 更新 |
 |------|------|
-| 2025-04 | **网页剪藏插件** — 浏览器扩展，一键剪藏任意网页到 MindOS 暂存台。[安装 →](browser-extension/) |
-| 2025-04 | **PDF & 图片导入** — 拖拽 PDF 和图片到 MindOS，自动转换为可搜索的 Markdown。 |
-| 2025-03 | **桌面客户端** — 原生 macOS / Windows / Linux 应用，支持自动更新和系统托盘。 |
-| 2025-03 | **A2A 协议** — Agent 间通信协议：发现、委派与编排。 |
+| 2026-04 | **产品主包落地** — MindOS 采用 OpenCode 式核心包：`packages/mindos`（`@geminilight/mindos`）承载产品 runtime facade 与 CLI kernel 边界；Web/CLI 围绕它做适配。 |
+| 2026-04 | **OpenCode 式 workspace 扁平化** — 所有源码 workspace 已统一到 `packages/`：`packages/web`、`packages/desktop`、`packages/mobile`、`packages/mindos`、`packages/retrieval/*`、`packages/protocols/*`。npm tarball / CLI / MCP / Web standalone / Desktop / Mobile 均已验证。 |
+| 2026-04 | **发布包清理** — 旧顶层 `app/`、`mcp/`、`desktop/`、`mobile/` 源码根已移除，发布清单精确排除测试、缓存与 nested `node_modules`。 |
+| 2026-04 | **网页剪藏插件** — 浏览器扩展，一键剪藏任意网页到 MindOS 暂存台。[安装 →](packages/browser-extension/) |
+| 2026-04 | **PDF & 图片导入** — 拖拽 PDF 和图片到 MindOS，自动转换为可搜索的 Markdown。 |
 
 ## 🧠 人机共享心智
 
@@ -150,9 +151,11 @@ npm install -g @geminilight/mindos@latest
 ```bash
 git clone https://github.com/GeminiLight/MindOS
 cd MindOS
-npm install
-npm link   # 将 mindos 命令注册为全局命令
+pnpm install
+pnpm link --global   # 将 mindos 命令注册为全局命令
 ```
+
+npm 包会同时安装 CLI 和预构建的本地 Web runtime，这是设计目标：`mindos` 是命令入口，`mindos start` / `mindos open` 使用包内 `_standalone/` 启动浏览器 UI；Web 源码（`packages/web`）、测试、wiki、旧源码根和开发缓存不会进入发布包。
 
 ### 2. 交互式配置
 
@@ -201,7 +204,7 @@ npx skills add https://github.com/GeminiLight/MindOS --skill mindos-zh -g -y   #
 MindOS 的知识不必从零开始——把你已有的信息导入进来：
 
 - **拖拽导入**：将文件（PDF、图片、Markdown、CSV）直接拖入 MindOS GUI，AI 自动分析并归档到对应文件夹。
-- **网页剪藏**：安装[浏览器插件](browser-extension/)，一键保存任意网页到暂存台。快捷键 Ctrl+Shift+M 或右键菜单 →「Save to MindOS」。
+- **网页剪藏**：安装[浏览器插件](packages/browser-extension/)，一键保存任意网页到暂存台。快捷键 Ctrl+Shift+M 或右键菜单 →「Save to MindOS」。
 - **Agent 导入**：让任意已连接的 Agent 阅读文档并同步到你的知识库。
 
 ## ✨ 功能特性
@@ -213,7 +216,7 @@ MindOS 的知识不必从零开始——把你已有的信息导入进来：
 - **一键导入**：拖拽文件即可导入，Inline AI Organize 自动分析、分类、写入知识库，支持进度追踪和撤销。
 - **新手引导**：首次使用的分步引导体验，帮助新用户快速搭建知识库并连接第一个 Agent。
 - **插件扩展**：多种内置渲染器插件——TODO Board、CSV Views、Wiki Graph、Timeline、Workflow Editor、Agent Inspector 等。
-- **网页剪藏**：浏览器扩展，一键将任意网页保存为干净的 Markdown——存入暂存台，稍后 AI 自动整理归档。[安装 →](browser-extension/)
+- **网页剪藏**：浏览器扩展，一键将任意网页保存为干净的 Markdown——存入暂存台，稍后 AI 自动整理归档。[安装 →](packages/browser-extension/)
 
 **Agent 侧**
 
@@ -269,7 +272,7 @@ graph LR
 
 ## 🤝 支持的 Agent
 
-> 完整列表及 MCP 配置路径、手动配置方法：**[docs/zh/supported-agents.md](docs/zh/supported-agents.md)**
+> 当前注册表支持 26 个 Agent。完整列表及 MCP 配置路径、手动配置方法：**[docs/zh/supported-agents.md](docs/zh/supported-agents.md)**
 
 | Agent | MCP | Skills |
 |:------|:---:|:------:|
@@ -284,6 +287,7 @@ graph LR
 | Qoder | ✅ | ✅ |
 | Cline | ✅ | ✅ |
 | Windsurf | ✅ | ✅ |
+| Hermes | ✅ | - |
 
 ---
 
@@ -291,11 +295,16 @@ graph LR
 
 ```bash
 MindOS/
-├── app/              # Next.js 16 前端 — 浏览、编辑、与 AI 交互
-├── mcp/              # MCP Server — 将工具映射到 App API 的 HTTP 适配器
+├── packages/web/         # Next.js 16 前端 — 浏览、编辑、与 AI 交互
+├── packages/desktop/     # Electron 桌面客户端
+├── packages/mobile/      # Expo 移动端
+├── packages/browser-extension/ # Web Clipper 浏览器扩展
+├── packages/desktop-tauri/     # Tauri 桌面 spike
+├── packages/mindos/      # 已发布产品包：runtime facade、foundation/knowledge 内部模块、CLI kernel
+├── packages/retrieval/   # 可选检索栈：search/vector/indexer/API
+├── packages/protocols/   # 外部协议：ACP 与 MCP server
 ├── skills/           # MindOS Skills（`mindos`、`mindos-zh`）— Agent 工作流指南
 ├── templates/        # 预设模板（`en/`、`zh/`、`empty/`）— onboard 时复制到知识库目录
-├── bin/              # CLI（`mindos start`、`mindos file`、`mindos ask`、`mindos agent` 等）
 ├── scripts/          # 配置向导与辅助脚本
 └── README.md
 
@@ -304,6 +313,8 @@ MindOS/
 ├── sync-state.json   # 同步状态（最后同步时间、冲突文件）
 └── mind/             # 你的私有知识库（默认路径，onboard 时可自定义）
 ```
+
+> v1 之后，顶层 `app/`、`apps/`、`mcp/`、`desktop/`、`mobile/`、`browser-extension/`、`desktop-tauri/` 和根目录 `bin/` 不再是源码入口。仓库根目录是 private monorepo 编排层。`packages/mindos` 是 OpenCode 式发布产品包（`@geminilight/mindos`）：仓库内 CLI 入口是 `packages/mindos/bin/cli.js`，npm 安装后用户仍获得包内相对路径 `bin/cli.js`，预构建本地 Web runtime 以 `_standalone/` 发布。`packages/web` 是唯一 Web 源码，不会复制进 npm tarball。`npm pack` / publish 期间可能生成 `packages/mindos/_standalone`、`packages/mindos/packages`、`packages/mindos/scripts`、`packages/mindos/assets`、`packages/mindos/skills`、`packages/mindos/templates` 等 staging 输出；这些不是源码，已被 git 和 pnpm workspace 排除，可用 `pnpm run clean:product-stage` 或 product `postpack` 清理。
 
 ## ⌨️ CLI 命令
 
@@ -326,6 +337,7 @@ MindOS/
 | `mindos search "<query>"` | 搜索知识库 |
 | `mindos ask "<question>"` | 基于知识库向 AI 提问 |
 | `mindos agent <sub>` | AI Agent 管理（list, info） |
+| `mindos channel` / `mindos feishu-ws` | IM 渠道配置与飞书长连接 |
 | `mindos api <METHOD> <path>` | API 透传（开发者/Agent 用） |
 | **MCP 与配置** | |
 | `mindos mcp install` | 自动将 MCP 配置写入 Agent |
@@ -336,7 +348,7 @@ MindOS/
 | `mindos doctor` | 健康检查 |
 | `mindos update` | 更新到最新版本 |
 
-**主要快捷键：** `⌘K` 搜索 · `⌘/` AI 助手 · `E` 编辑 · `⌘S` 保存 · `Esc` 关闭 — 完整列表见 **[docs/zh/cli-commands.md](docs/zh/cli-commands.md)**。
+**主要快捷键：** `⌘K` 搜索 · `⌘/` AI 助手 · `E` 编辑 · `⌘S` 保存 · `Esc` 关闭。
 
 ---
 

@@ -4,13 +4,12 @@
 
 | 命令 | 说明 |
 | :--- | :--- |
-| `mindos` | 使用 `~/.mindos/config.json` 中保存的模式启动 |
-| `mindos onboard` | 交互式初始化（生成配置、选择模板） |
+| `mindos` | 显示帮助，或使用 `~/.mindos/config.json` 中保存的模式启动 |
+| `mindos onboard` / `mindos init` | 交互式初始化（生成配置、选择模板） |
 | `mindos onboard --install-daemon` | 初始化 + 安装并启动后台服务 |
-| `mindos start` | 前台启动 app + MCP 服务（生产模式） |
+| `mindos start` | 前台启动 Web + MCP 服务（生产模式） |
 | `mindos start --daemon` | 安装并以后台 OS 服务方式启动（关闭终端仍运行，崩溃自动重启） |
-| `mindos dev` | 启动 app + MCP 服务（开发模式，热更新） |
-| `mindos dev --turbopack` | 开发模式 + Turbopack（更快的 HMR） |
+| `mindos dev` | 启动 Web + MCP 服务（开发模式，使用 webpack 热更新） |
 | `mindos open` | 在默认浏览器中打开 Web UI |
 | `mindos stop` | 停止正在运行的 MindOS 进程 |
 | `mindos restart` | 停止后重新启动 |
@@ -37,6 +36,13 @@
 
 > 所有知识库命令均支持 `--json` 供 AI Agent 调用。
 
+## IM 渠道
+
+| 命令 | 说明 |
+| :--- | :--- |
+| `mindos channel` | 管理 IM 平台配置 |
+| `mindos feishu-ws` | 启动飞书/Lark 长连接客户端 |
+
 ## MCP
 
 | 命令 | 说明 |
@@ -45,6 +51,8 @@
 | `mindos mcp install` | 自动将 MCP 配置写入 Agent（交互式） |
 | `mindos mcp install -g -y` | 一键全局安装 |
 | `mindos token` | 查看当前 Auth token 及 MCP 配置片段 |
+
+MCP Server 的源码入口是 `packages/protocols/mcp-server`；npm/桌面运行时使用预构建的 `packages/protocols/mcp-server/dist/index.cjs`。
 
 ## 同步
 

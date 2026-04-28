@@ -6,12 +6,12 @@ import path from 'path';
 
 /**
  * CLI smoke tests — verify core commands don't crash on invocation.
- * Runs `node bin/cli.js` in a subprocess with HOME set to an empty temp dir
+ * Runs `node packages/mindos/bin/cli.js` in a subprocess with HOME set to an empty temp dir
  * so no real config interferes.
  */
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const CLI = path.join(ROOT, 'bin', 'cli.js');
+const CLI = path.join(ROOT, 'packages', 'mindos', 'bin', 'cli.js');
 
 let tempHome: string;
 let savedHome: string | undefined;

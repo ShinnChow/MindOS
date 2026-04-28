@@ -5,7 +5,7 @@ Cross-service tests that verify the MCP server correctly communicates with the A
 ## Prerequisites
 
 ```bash
-cd mcp && npm install
+pnpm --filter @mindos/mcp-server build
 ```
 
 ## Running

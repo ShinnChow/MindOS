@@ -5,8 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const CLI = path.join(ROOT, 'bin', 'cli.js');
-const CURRENT_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf-8')).version;
+const CLI = path.join(ROOT, 'packages', 'mindos', 'bin', 'cli.js');
+const CURRENT_VERSION = JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', 'mindos', 'package.json'), 'utf-8')).version;
 
 let tempDir: string;
 let fakeBinDir: string;
@@ -19,7 +19,8 @@ beforeEach(() => {
 
   fs.mkdirSync(fakeBinDir, { recursive: true });
   fs.mkdirSync(path.join(fakeInstallRoot, 'bin'), { recursive: true });
-  fs.mkdirSync(path.join(fakeInstallRoot, 'app', '.next'), { recursive: true });
+  fs.mkdirSync(path.join(fakeInstallRoot, 'packages', 'web', '.next'), { recursive: true });
+  fs.mkdirSync(path.join(fakeInstallRoot, '_standalone'), { recursive: true });
 
   fs.writeFileSync(path.join(fakeBinDir, 'npm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   fs.writeFileSync(path.join(fakeInstallRoot, 'bin', 'cli.js'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
@@ -29,13 +30,15 @@ beforeEach(() => {
     JSON.stringify({ name: '@geminilight/mindos', version: '9.9.9' }),
   );
   fs.writeFileSync(
-    path.join(fakeInstallRoot, 'app', '.next', '.mindos-build-version'),
+    path.join(fakeInstallRoot, 'packages', 'web', '.next', '.mindos-build-version'),
     '9.9.9',
   );
   fs.writeFileSync(
-    path.join(fakeInstallRoot, 'app', 'package.json'),
-    JSON.stringify({ name: 'wiki-app', version: '0.1.0' }),
+    path.join(fakeInstallRoot, 'packages', 'web', 'package.json'),
+    JSON.stringify({ name: '@mindos/web', version: '0.1.0' }),
   );
+  fs.writeFileSync(path.join(fakeInstallRoot, '_standalone', 'server.js'), '');
+  fs.writeFileSync(path.join(fakeInstallRoot, '_standalone', '.mindos-build-version'), '9.9.9');
 });
 
 afterEach(() => {

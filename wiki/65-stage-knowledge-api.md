@@ -262,14 +262,14 @@ Authorization: Bearer mk_xxxx
 
 | 文件 | 改动类型 | 说明 |
 |------|---------|------|
-| `app/app/v1/files/[...path]/route.ts` | 新增 | 文件 CRUD 端点 |
-| `app/app/v1/search/route.ts` | 新增 | 搜索端点 |
-| `app/app/v1/recent/route.ts` | 新增 | 最近文件端点 |
-| `app/app/v1/graph/route.ts` | 新增 | 图谱端点 |
-| `app/app/v1/stats/route.ts` | 新增 | 统计端点 |
-| `app/lib/api-auth.ts` | 新增 | API Key 验证 + scope 检查中间件 |
-| `app/lib/api-error.ts` | 新增 | 统一错误格式处理 |
-| `app/lib/rate-limit.ts` | 新增 | 内存速率限制（令牌桶算法） |
+| `packages/web/app/v1/files/[...path]/route.ts` | 新增 | 文件 CRUD 端点 |
+| `packages/web/app/v1/search/route.ts` | 新增 | 搜索端点 |
+| `packages/web/app/v1/recent/route.ts` | 新增 | 最近文件端点 |
+| `packages/web/app/v1/graph/route.ts` | 新增 | 图谱端点 |
+| `packages/web/app/v1/stats/route.ts` | 新增 | 统计端点 |
+| `packages/web/lib/api-auth.ts` | 新增 | API Key 验证 + scope 检查中间件 |
+| `packages/web/lib/api-error.ts` | 新增 | 统一错误格式处理 |
+| `packages/web/lib/rate-limit.ts` | 新增 | 内存速率限制（令牌桶算法） |
 
 ---
 
@@ -366,10 +366,10 @@ Authorization: Bearer mk_xxxx
 
 | 文件 | 改动类型 | 说明 |
 |------|---------|------|
-| `app/app/v1/batch/route.ts` | 新增 | 批量操作端点 |
-| `app/app/v1/import/route.ts` | 新增 | ZIP/JSON 导入 |
-| `app/app/v1/export/route.ts` | 新增 | ZIP/JSON 导出 |
-| `app/lib/zip.ts` | 新增 | ZIP 打包/解包工具（使用 `archiver` + `unzipper`） |
+| `packages/web/app/v1/batch/route.ts` | 新增 | 批量操作端点 |
+| `packages/web/app/v1/import/route.ts` | 新增 | ZIP/JSON 导入 |
+| `packages/web/app/v1/export/route.ts` | 新增 | ZIP/JSON 导出 |
+| `packages/web/lib/zip.ts` | 新增 | ZIP 打包/解包工具（使用 `archiver` + `unzipper`） |
 | `package.json` | 修改 | 添加 `archiver`, `unzipper` 依赖 |
 
 ---
@@ -505,13 +505,13 @@ Settings → API Tab 新增 Webhook 管理区域：
 
 | 文件 | 改动类型 | 说明 |
 |------|---------|------|
-| `app/app/v1/webhooks/route.ts` | 新增 | Webhook CRUD |
-| `app/app/v1/webhooks/[id]/route.ts` | 新增 | 单个 webhook 操作 |
-| `app/app/v1/webhooks/[id]/deliveries/route.ts` | 新增 | 推送历史 |
-| `app/lib/webhook.ts` | 新增 | 匹配引擎 + 异步推送 + HMAC 签名 + 重试 |
-| `app/lib/fs.ts` | 修改 | 写操作后触发 webhook 事件 |
-| `app/components/settings/ApiTab.tsx` | 新增 | Webhook 管理 UI |
-| `app/components/SettingsModal.tsx` | 修改 | 添加 API Tab |
+| `packages/web/app/v1/webhooks/route.ts` | 新增 | Webhook CRUD |
+| `packages/web/app/v1/webhooks/[id]/route.ts` | 新增 | 单个 webhook 操作 |
+| `packages/web/app/v1/webhooks/[id]/deliveries/route.ts` | 新增 | 推送历史 |
+| `packages/web/lib/webhook.ts` | 新增 | 匹配引擎 + 异步推送 + HMAC 签名 + 重试 |
+| `packages/web/lib/fs.ts` | 修改 | 写操作后触发 webhook 事件 |
+| `packages/web/components/settings/ApiTab.tsx` | 新增 | Webhook 管理 UI |
+| `packages/web/components/SettingsModal.tsx` | 修改 | 添加 API Tab |
 
 ---
 
@@ -618,11 +618,11 @@ Settings → API Tab：
 
 | 文件 | 改动类型 | 说明 |
 |------|---------|------|
-| `app/app/v1/api-keys/route.ts` | 新增 | API Key CRUD |
-| `app/app/v1/api-keys/[id]/route.ts` | 新增 | 单个 key 操作 |
-| `app/lib/api-auth.ts` | 修改 | 支持 `mk_*` key 验证 + scope 检查 |
-| `app/lib/rate-limit.ts` | 修改 | 按 key 维度限流 |
-| `app/components/settings/ApiTab.tsx` | 修改 | API Key 管理 UI |
+| `packages/web/app/v1/api-keys/route.ts` | 新增 | API Key CRUD |
+| `packages/web/app/v1/api-keys/[id]/route.ts` | 新增 | 单个 key 操作 |
+| `packages/web/lib/api-auth.ts` | 修改 | 支持 `mk_*` key 验证 + scope 检查 |
+| `packages/web/lib/rate-limit.ts` | 修改 | 按 key 维度限流 |
+| `packages/web/components/settings/ApiTab.tsx` | 修改 | API Key 管理 UI |
 
 ---
 

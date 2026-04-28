@@ -4,13 +4,12 @@
 
 | Command | Description |
 | :--- | :--- |
-| `mindos` | Start using the mode saved in `~/.mindos/config.json` |
-| `mindos onboard` | Interactive setup (config, template, start mode) |
+| `mindos` | Show help or start using the mode saved in `~/.mindos/config.json` |
+| `mindos onboard` / `mindos init` | Interactive setup (config, template, start mode) |
 | `mindos onboard --install-daemon` | Onboard + install and start background service |
-| `mindos start` | Start app + MCP server (foreground, production mode) |
+| `mindos start` | Start Web + MCP services (foreground, production mode) |
 | `mindos start --daemon` | Install + start as a background OS service (survives terminal close, auto-restarts on crash) |
-| `mindos dev` | Start app + MCP server (dev mode, hot reload) |
-| `mindos dev --turbopack` | Dev mode with Turbopack (faster HMR) |
+| `mindos dev` | Start Web + MCP services (dev mode, hot reload via webpack) |
 | `mindos open` | Open the Web UI in the default browser |
 | `mindos stop` | Stop running MindOS processes |
 | `mindos restart` | Stop then start again |
@@ -37,6 +36,13 @@
 
 > All knowledge commands support `--json` for AI agent consumption.
 
+## Channels
+
+| Command | Description |
+| :--- | :--- |
+| `mindos channel` | Manage IM platform configurations |
+| `mindos feishu-ws` | Start Feishu/Lark long-connection client |
+
 ## MCP
 
 | Command | Description |
@@ -45,6 +51,8 @@
 | `mindos mcp install` | Auto-install MCP config into your Agent (interactive) |
 | `mindos mcp install -g -y` | One-shot global install with defaults |
 | `mindos token` | Show auth token and per-agent MCP config snippets |
+
+The MCP server source of truth is `packages/protocols/mcp-server`; packaged installs use the prebuilt `packages/protocols/mcp-server/dist/index.cjs` bundle.
 
 ## Sync
 

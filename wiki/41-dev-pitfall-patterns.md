@@ -63,13 +63,13 @@ Code review 时增加一项检查：
 
 ```bash
 # 检查硬编码色值泄漏
-rg '#[0-9a-fA-F]{6}' app/components/ app/app/ --glob '*.tsx' --glob '*.ts' | grep -v 'globals.css\|\.svg'
+rg '#[0-9a-fA-F]{6}' packages/web/components/ packages/web/app/ --glob '*.tsx' --glob '*.ts' | grep -v 'globals.css\|\.svg'
 
 # 检查 focus: 而非 focus-visible:
-rg 'focus:ring|focus:border|focus:outline' app/components/ app/app/ --glob '*.tsx'
+rg 'focus:ring|focus:border|focus:outline' packages/web/components/ packages/web/app/ --glob '*.tsx'
 
 # 检查 red/green/blue 硬编码 Tailwind 色
-rg 'text-red-|bg-red-|border-red-|text-green-|bg-green-|border-blue-' app/components/ app/app/ --glob '*.tsx'
+rg 'text-red-|bg-red-|border-red-|text-green-|bg-green-|border-blue-' packages/web/components/ packages/web/app/ --glob '*.tsx'
 ```
 
 发现新泄漏就当场修，别攒着。
@@ -102,7 +102,7 @@ rg 'text-red-|bg-red-|border-red-|text-green-|bg-green-|border-blue-' app/compon
 
 ```bash
 # 示例：加了 pathInfo 驱动的新提示框，检查旧的 pathInfo UI
-rg 'pathInfo' app/components/SetupWizard.tsx
+rg 'pathInfo' packages/web/components/SetupWizard.tsx
 ```
 
 ### 规则 7：新分支改变"期望默认值"时，必须主动设置
@@ -116,7 +116,7 @@ rg 'pathInfo' app/components/SetupWizard.tsx
 一个导航动作（如 `setStep`）可能有多个触发入口：按钮、步骤条、键盘快捷键。加 disabled 守卫时，搜索所有调用该 setter 的地方：
 
 ```bash
-rg 'setStep' app/components/SetupWizard.tsx
+rg 'setStep' packages/web/components/SetupWizard.tsx
 ```
 
 逐一确认每个入口都有守卫。遗漏一个就是一个可被绕过的通道。

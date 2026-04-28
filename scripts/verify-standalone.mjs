@@ -3,7 +3,7 @@
  * Smoke-test Next standalone server: merge static/public, spawn server.js, GET /api/health.
  * Catches missing serverExternalPackages / file-trace gaps (MODULE_NOT_FOUND at startup).
  *
- * Run from repo root after: cd app && ./node_modules/.bin/next build
+ * Run from repo root after: pnpm --filter @mindos/web run build
  *   node scripts/verify-standalone.mjs
  *
  * @see wiki/specs/spec-desktop-standalone-runtime.md
@@ -13,16 +13,16 @@ import http from 'http';
 import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { materializeStandaloneAssets } from '../desktop/scripts/prepare-mindos-bundle.mjs';
+import { materializeStandaloneAssets } from '../packages/desktop/scripts/prepare-mindos-bundle.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
-const appDir = path.join(root, 'app');
+const appDir = path.join(root, 'packages', 'web');
 const serverJs = path.join(appDir, '.next', 'standalone', 'server.js');
 
 if (!existsSync(serverJs)) {
   console.error(
-    `[verify-standalone] Missing ${serverJs}\nBuild first: cd app && ./node_modules/.bin/next build`
+    `[verify-standalone] Missing ${serverJs}\nBuild first: pnpm --filter @mindos/web run build`
   );
   process.exit(1);
 }

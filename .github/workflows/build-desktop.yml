@@ -47,21 +47,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Sync desktop/package.json version from tag input (e.g. desktop-v0.1.13 → 0.1.13)
-      # so electron-builder produces correctly versioned filenames and installers.
-      - name: Sync version from tag
-        if: inputs.tag != ''
-        run: |
-          TAG="${{ inputs.tag }}"
-          VERSION="${TAG#desktop-v}"
-          echo "Setting desktop version to $VERSION (from tag: $TAG)"
-          cd desktop && npm version "$VERSION" --no-git-tag-version --allow-same-version
-          echo "✅ desktop/package.json version: $(node -p "require('./package.json').version")"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       # Windows: redirect USERPROFILE to prevent webpack from scanning protected
       # system directories (INetCache, WindowsApps, etc.) that cause EPERM errors.
@@ -94,34 +88,43 @@ jobs:
 
           Write-Host "Redirected USERPROFILE to $safeHome"
 
-      # Install all dependencies (app + mcp + desktop)
+      # Install all workspace dependencies before mutating package versions.
       - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Sync packages/desktop/package.json version from tag input (e.g. desktop-v0.1.13 -> 0.1.13)
+      # so electron-builder produces correctly versioned filenames and installers.
+      - name: Sync version from tag
+        if: inputs.tag != ''
         run: |
-          cd app && npm install && cd ..
-          cd mcp && npm install && cd ..
-          cd desktop && npm install
+          TAG="${{ inputs.tag }}"
+          VERSION="${TAG#desktop-v}"
+          echo "Setting desktop version to $VERSION (from tag: $TAG)"
+          cd packages/desktop && npm version "$VERSION" --no-git-tag-version --allow-same-version
+          echo "packages/desktop/package.json version: $(node -p "require('./package.json').version")"
 
       # Build Next.js standalone (required by prepare-mindos-runtime)
       - name: Build MindOS (Next.js standalone)
         run: |
-          node scripts/gen-renderer-index.js
-          cd app && npx next build --webpack
+          pnpm --filter @geminilight/mindos build
+          pnpm --filter @mindos/mcp-server build
+          pnpm --filter @mindos/web run build
 
       # Build Electron (compile TS → JS)
       - name: Build Electron
-        run: cd desktop && npm run build
+        run: pnpm --filter @mindos/desktop run build
 
       # Bundle MindOS runtime + Node.js into desktop resources
       - name: Prepare bundled runtime
         env:
           MINDOS_BUNDLE_NODE_ARCH: ${{ matrix.arch }}
-        run: cd desktop && npm run prepare-mindos-runtime
+        run: pnpm --filter @mindos/desktop run prepare-mindos-runtime
 
       # Get version (needed for tag name)
       - name: Get version
         id: version
         run: |
-          VERSION=$(cd desktop && node -p "require('./package.json').version")
+          VERSION=$(cd packages/desktop && node -p "require('./package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       # Package for the target platform.
@@ -160,9 +163,9 @@ jobs:
           fi
 
           if [ "${{ inputs.publish }}" = "true" ]; then
-            cd desktop && npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish always
+            cd packages/desktop && pnpm exec electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish always
           else
-            cd desktop && npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+            cd packages/desktop && pnpm exec electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
           fi
 
       # macOS: verify DMGs are valid before notarization
@@ -170,7 +173,7 @@ jobs:
       - name: Validate DMG integrity
         if: matrix.platform == 'mac'
         run: |
-          for file in desktop/dist/*.dmg; do
+          for file in packages/desktop/dist/*.dmg; do
             [ -f "$file" ] || continue
             echo "Validating: $(basename "$file")"
             hdiutil verify "$file"
@@ -223,7 +226,7 @@ jobs:
           }
 
           FAILED=0
-          for file in desktop/dist/*.dmg; do
+          for file in packages/desktop/dist/*.dmg; do
             [ -f "$file" ] || continue
             notarize_file "$file" || FAILED=1
           done
@@ -233,7 +236,7 @@ jobs:
       - name: Staple notarization tickets
         if: matrix.platform == 'mac' && inputs.sign_mac == true
         run: |
-          for file in desktop/dist/*.dmg; do
+          for file in packages/desktop/dist/*.dmg; do
             [ -f "$file" ] || continue
             echo "📎 Stapling: $(basename "$file")"
             xcrun stapler staple "$file"
@@ -246,9 +249,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=$(cd desktop && node -p "require('./package.json').version")
+          VERSION=$(cd packages/desktop && node -p "require('./package.json').version")
           RELEASE_TAG="v${VERSION}"
-          for file in desktop/dist/*.dmg; do
+          for file in packages/desktop/dist/*.dmg; do
             [ -f "$file" ] || continue
             BASENAME=$(basename "$file")
             echo "Replacing with notarized version: ${BASENAME}"
@@ -262,13 +265,13 @@ jobs:
         with:
           name: mindos-desktop-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
-            desktop/dist/*.dmg
-            desktop/dist/*.zip
-            desktop/dist/*.exe
-            desktop/dist/*.AppImage
-            desktop/dist/*.deb
-            desktop/dist/*.yml
-            desktop/dist/*.yaml
+            packages/desktop/dist/*.dmg
+            packages/desktop/dist/*.zip
+            packages/desktop/dist/*.exe
+            packages/desktop/dist/*.AppImage
+            packages/desktop/dist/*.deb
+            packages/desktop/dist/*.yml
+            packages/desktop/dist/*.yaml
           if-no-files-found: warn
 
   # After all platforms finish: upload to CDN mirrors + finalize GitHub Release
@@ -282,7 +285,12 @@ jobs:
       - name: Get version
         id: version
         run: |
-          VERSION=$(cd desktop && node -p "require('./package.json').version")
+          if [ -n "${{ inputs.tag }}" ]; then
+            TAG="${{ inputs.tag }}"
+            VERSION="${TAG#desktop-v}"
+          else
+            VERSION=$(cd packages/desktop && node -p "require('./package.json').version")
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       # Download all platform artifacts into a single directory
@@ -399,7 +407,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           EB_TAG="v${{ steps.version.outputs.version }}"
-          DESIRED_TAG=${{ inputs.tag != '' && inputs.tag || format('desktop-v{0}', steps.version.outputs.version) }}
+          DESIRED_TAG="${{ inputs.tag }}"
+          if [ -z "$DESIRED_TAG" ]; then
+            DESIRED_TAG="desktop-v${{ steps.version.outputs.version }}"
+          fi
 
           if [ "$EB_TAG" != "$DESIRED_TAG" ]; then
             git tag "$DESIRED_TAG" 2>/dev/null || true

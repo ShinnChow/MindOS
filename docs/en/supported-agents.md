@@ -46,6 +46,7 @@
 | WorkBuddy | ✅ | - | `~/.workbuddy/mcp.json` | - |
 | Lingma | ✅ | - | `~/.lingma/mcp.json` | - |
 | CoPaw | ✅ | - | `~/.copaw/config.json` (nested key: `mcp.clients`) | - |
+| Hermes | ✅ | - | `~/.hermes/config.yaml` (YAML, key: `mcp_servers`) | - |
 
 > **Note:** The paths above are the **global (recommended)** install locations. Some agents also support project-level config (e.g. Claude Code: `.mcp.json`, Cursor: `.cursor/mcp.json`, Trae: `.trae/mcp.json`). Use `mindos mcp install` without `-g` to choose project scope interactively.
 >
@@ -197,3 +198,7 @@ CoPaw uses a nested config path `mcp.clients` inside `~/.copaw/config.json`:
   }
 }
 ```
+
+### Hermes: YAML config
+
+Hermes uses YAML and the `mcp_servers` key in `~/.hermes/config.yaml`. Use `mindos mcp install` to write the correct structure automatically.

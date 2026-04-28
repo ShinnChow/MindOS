@@ -13,11 +13,11 @@ import path from 'path';
  */
 
 async function importYaml() {
-  return await import('../../bin/lib/yaml.js');
+  return await import('../../packages/mindos/bin/lib/yaml.js');
 }
 
 async function importAgents() {
-  return await import('../../bin/lib/mcp-agents.js');
+  return await import('../../packages/mindos/bin/lib/mcp-agents.js');
 }
 
 let tempDir: string;

@@ -24,16 +24,23 @@ jobs:
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
-        run: cd browser-extension && npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build extension
-        run: cd browser-extension && npm run build
+        run: pnpm --filter @mindos/browser-extension run build
 
       - name: Extract version from tag
         id: version
@@ -45,17 +52,17 @@ jobs:
 
       - name: Verify manifest version matches tag
         run: |
-          MANIFEST_VERSION=$(node -p "require('./browser-extension/extension/manifest.json').version")
+          MANIFEST_VERSION=$(node -p "require('./packages/browser-extension/extension/manifest.json').version")
           TAG_VERSION="${{ steps.version.outputs.version }}"
           if [ "$MANIFEST_VERSION" != "$TAG_VERSION" ]; then
             echo "::error::Version mismatch: manifest.json=${MANIFEST_VERSION}, tag=${TAG_VERSION}"
-            echo "::error::Update browser-extension/src/manifest.json before tagging."
+            echo "::error::Update packages/browser-extension/src/manifest.json before tagging."
             exit 1
           fi
 
       - name: Package zip
         run: |
-          cd browser-extension/extension
+          cd packages/browser-extension/extension
           zip -r ../mindos-web-clipper-${{ steps.version.outputs.version }}.zip .
 
       - name: Generate release notes
@@ -65,7 +72,7 @@ jobs:
           # Collect commit messages since last clipper tag
           PREV_TAG=$(git tag --list 'clipper-v*' --sort=-v:refname | grep -v "clipper-v${VERSION}" | head -1 || true)
           if [ -n "$PREV_TAG" ]; then
-            CHANGES=$(git log "${PREV_TAG}..HEAD" --oneline --no-decorate -- browser-extension/ | head -20)
+            CHANGES=$(git log "${PREV_TAG}..HEAD" --oneline --no-decorate -- packages/browser-extension/ | head -20)
           else
             CHANGES=""
           fi
@@ -117,4 +124,4 @@ jobs:
           gh release create "${TAG}" \
             --title "MindOS Web Clipper v${{ steps.version.outputs.version }}" \
             --notes-file /tmp/release-notes.md \
-            browser-extension/mindos-web-clipper-${{ steps.version.outputs.version }}.zip
+            packages/browser-extension/mindos-web-clipper-${{ steps.version.outputs.version }}.zip

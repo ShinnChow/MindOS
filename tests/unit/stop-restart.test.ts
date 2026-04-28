@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-// ── Extracted logic from bin/lib/stop.js ─────────────────────────────────────
+// ── Extracted logic from packages/mindos/bin/lib/stop.js ─────────────────────
 // Unit-testable pure functions extracted from the source to prevent regressions.
 // If the source changes, update these in sync.
 

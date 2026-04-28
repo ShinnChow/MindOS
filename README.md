@@ -98,10 +98,11 @@ MindOS is where you think, and where your AI agents act — a local-first knowle
 
 | Date | Update |
 |------|--------|
-| 2025-04 | **Web Clipper** — Browser extension to clip any web page to your MindOS Inbox with one click. [Get it →](browser-extension/) |
-| 2025-04 | **PDF & Image Import** — Drag PDFs and images into MindOS, auto-converted to searchable Markdown. |
-| 2025-03 | **Desktop App** — Native macOS / Windows / Linux app with auto-update and system tray. |
-| 2025-03 | **A2A Protocol** — Agent-to-Agent communication: discovery, delegation, and orchestration. |
+| 2026-04 | **Product main package** — MindOS now follows an OpenCode-style core package: `packages/mindos` (`@geminilight/mindos`) is the product runtime facade and CLI kernel boundary; Web/CLI adapt around it. |
+| 2026-04 | **OpenCode-style workspace flattening** — all source workspaces now live under `packages/`: `packages/web`, `packages/desktop`, `packages/mobile`, `packages/mindos`, `packages/retrieval/*`, and `packages/protocols/*`. npm tarball, CLI, MCP, Web standalone, Desktop, and Mobile checks have passed. |
+| 2026-04 | **Clean publish package** — legacy top-level `app/`, `mcp/`, `desktop/`, and `mobile/` source roots are removed; publish entries exclude tests, caches, and nested `node_modules`. |
+| 2026-04 | **Web Clipper** — Browser extension to clip any web page to your MindOS Inbox with one click. [Get it →](packages/browser-extension/) |
+| 2026-04 | **PDF & Image Import** — Drag PDFs and images into MindOS, auto-converted to searchable Markdown. |
 
 ## 🧠 Human-AI Shared Mind
 
@@ -117,7 +118,7 @@ Agent memory locked in black boxes makes reasoning unauditable, erasing trust as
 
 **3. Symbiotic Evolution — Experience Flows Back As Instructions**
 
-You express preferences but the next chat starts from zero, leaving your thinking useless for AI. **MindOS auto-distills every thought into your knowledge base. Clarify your standards through interaction and sharpen your cognition with each iteration—AI will never repeat the same mistake.**
+You express preferences but the next chat starts from zero, leaving your thinking useless for AI. **MindOS auto-distills every thought into your knowledge base. Clarify your standards through interaction and sharpen your cognition with each iteration — AI will never repeat the same mistake.**
 
 > **Foundation:** Local-first by default — all data stays in local plain text for privacy, ownership, and speed.
 
@@ -150,9 +151,11 @@ npm install -g @geminilight/mindos@latest
 ```bash
 git clone https://github.com/GeminiLight/MindOS
 cd MindOS
-npm install
-npm link   # registers the `mindos` command globally
+pnpm install
+pnpm link --global   # registers the `mindos` command globally
 ```
+
+The npm package intentionally installs both the CLI and the prebuilt local Web runtime. `mindos` is the command entrypoint, while `_standalone/` provides the browser UI used by `mindos start` / `mindos open`; Web source (`packages/web`), tests, wiki, legacy source roots, and dev caches are excluded from the tarball.
 
 ### 2. Interactive Setup
 
@@ -201,7 +204,7 @@ npx skills add https://github.com/GeminiLight/MindOS --skill mindos-zh -g -y   #
 MindOS knowledge doesn't have to start from scratch — bring in what you already have:
 
 - **Drag & Drop**: drop files (PDF, images, Markdown, CSV) into the MindOS GUI — AI auto-organizes them into the right folders.
-- **Web Clipper**: install the [browser extension](browser-extension/) to save any web page to your Inbox with one click. Ctrl+Shift+M or right-click → "Save to MindOS".
+- **Web Clipper**: install the [browser extension](packages/browser-extension/) to save any web page to your Inbox with one click. Ctrl+Shift+M or right-click → "Save to MindOS".
 - **Agent Import**: tell any connected Agent to read a document and sync it into your knowledge base.
 
 ## ✨ Features
@@ -213,12 +216,12 @@ MindOS knowledge doesn't have to start from scratch — bring in what you alread
 - **One-Click Import**: drag-and-drop files with Inline AI Organize — auto-analyzes, categorizes, and writes into the knowledge base with progress tracking and undo support.
 - **Guided Onboarding**: step-by-step first-run experience that helps new users set up their knowledge base and connect their first Agent.
 - **Plugin Extensions**: multiple built-in renderer plugins — TODO Board, CSV Views, Wiki Graph, Timeline, Workflow Editor, Agent Inspector, and more.
-- **Web Clipper**: browser extension to clip any web page as clean Markdown — one click, saves to Inbox for later AI-powered organizing. [Install →](browser-extension/)
+- **Web Clipper**: browser extension to clip any web page as clean Markdown — one click, saves to Inbox for later AI-powered organizing. [Install →](packages/browser-extension/)
 
 **For Agents**
 
 - **MCP Server + Skills**: stdio + HTTP dual transport, full-lineup Agent compatible (Claude Code, Cursor, Gemini CLI, etc.). Zero-config access.
-- **ACP / A2A Protocols**: Agent Communication Protocol for inter-agent discovery, delegation, and orchestration. Phase 1 live with Agent Card discovery + JSON-RPC messaging.
+- **ACP / A2A Protocols**: Agent communication protocols for discovery, delegation, and orchestration. Phase 1 is live with Agent Card discovery + JSON-RPC messaging.
 - **Workflow Orchestration**: YAML-based workflow editor with step execution engine — define, edit, and run multi-step agent workflows visually.
 - **Structured Templates**: pre-set directory structures for Profiles, Workflows, Configurations, etc., to jumpstart personal context.
 - **Agent-Ready Docs**: everyday notes naturally double as high-quality executable Agent commands — no format conversion needed, write and dispatch.
@@ -269,7 +272,7 @@ graph LR
 
 ## 🤝 Supported Agents
 
-> Full list with MCP config paths and manual setup: **[docs/en/supported-agents.md](docs/en/supported-agents.md)**
+> The current registry supports 26 Agents. Full list with MCP config paths and manual setup: **[docs/en/supported-agents.md](docs/en/supported-agents.md)**
 
 | Agent | MCP | Skills |
 |:------|:---:|:------:|
@@ -284,6 +287,7 @@ graph LR
 | Qoder | ✅ | ✅ |
 | Cline | ✅ | ✅ |
 | Windsurf | ✅ | ✅ |
+| Hermes | ✅ | - |
 
 ---
 
@@ -291,19 +295,26 @@ graph LR
 
 ```bash
 MindOS/
-├── app/              # Next.js 16 Frontend — Browse, edit, and interact with AI
-├── mcp/              # MCP Server — HTTP adapter that maps tools to App API
-├── skills/           # MindOS Skills (`mindos`, `mindos-zh`) — Workflow guides for Agents
+├── packages/web/         # Next.js 16 frontend — browse, edit, and interact with AI
+├── packages/desktop/     # Electron desktop client
+├── packages/mobile/      # Expo mobile app
+├── packages/browser-extension/ # Web Clipper browser extension
+├── packages/desktop-tauri/     # Tauri desktop spike
+├── packages/mindos/      # Published product package: runtime facade, foundation/knowledge internals, CLI kernel
+├── packages/retrieval/   # Optional retrieval stack: search, vector, indexer, API
+├── packages/protocols/   # External protocols: ACP and MCP server
+├── skills/           # MindOS Skills (`mindos`, `mindos-zh`) — workflow guides for Agents
 ├── templates/        # Preset templates (`en/`, `zh/`, `empty/`) — copied to knowledge base on onboard
-├── bin/              # CLI (`mindos start`, `mindos file`, `mindos ask`, `mindos agent`, etc.)
 ├── scripts/          # Setup wizard and helper scripts
 └── README.md
 
 ~/.mindos/            # User data directory (outside project, never committed)
 ├── config.json       # All configuration (AI keys, port, auth token, sync settings)
 ├── sync-state.json   # Sync state (last sync time, conflicts)
-└── mind/             # Your private knowledge base (default: ~/MindOS/mind, customizable on onboard)
+└── mind/             # Your private knowledge base (default path, customizable on onboard)
 ```
+
+> In v1, top-level `app/`, `apps/`, `mcp/`, `desktop/`, `mobile/`, `browser-extension/`, `desktop-tauri/`, and root `bin/` are no longer source roots. The repo root is a private monorepo orchestrator. `packages/mindos` is the OpenCode-style published product package (`@geminilight/mindos`): its repo CLI entry is `packages/mindos/bin/cli.js`, installed npm users still receive the package-relative `bin/cli.js`, and the prebuilt local Web runtime is published as `_standalone/`. `packages/web` remains the only Web source tree and is not copied into the npm tarball. During `npm pack` / publish, `packages/mindos/_standalone`, `packages/mindos/packages`, `packages/mindos/scripts`, `packages/mindos/assets`, `packages/mindos/skills`, and `packages/mindos/templates` may be generated as staging output; they are ignored, excluded from pnpm workspace discovery, and cleaned by `pnpm run clean:product-stage` or product `postpack`.
 
 ## ⌨️ CLI Commands
 
@@ -313,7 +324,7 @@ MindOS/
 | :--- | :--- |
 | **Core** | |
 | `mindos onboard` | Interactive setup (config, template, start mode) |
-| `mindos start` | Start app + MCP server (foreground) |
+| `mindos start` | Start Web + MCP services |
 | `mindos start --daemon` | Start as background OS service |
 | `mindos stop` / `restart` | Stop or restart running processes |
 | `mindos dev` | Start in dev mode |
@@ -326,6 +337,7 @@ MindOS/
 | `mindos search "<query>"` | Search knowledge base |
 | `mindos ask "<question>"` | Ask AI using your knowledge base |
 | `mindos agent <sub>` | AI Agent management (list, info) |
+| `mindos channel` / `mindos feishu-ws` | IM channel config and Feishu long connection |
 | `mindos api <METHOD> <path>` | Raw API passthrough for developers/agents |
 | **MCP & Config** | |
 | `mindos mcp install` | Auto-install MCP config into your Agent |
@@ -336,7 +348,7 @@ MindOS/
 | `mindos doctor` | Health check |
 | `mindos update` | Update to latest version |
 
-**Main keyboard shortcuts:** `⌘K` Search · `⌘/` AI Assistant · `E` Edit · `⌘S` Save · `Esc` Close — see **[docs/en/cli-commands.md](docs/en/cli-commands.md)** for full list.
+**Main keyboard shortcuts:** `⌘K` Search · `⌘/` AI Assistant · `E` Edit · `⌘S` Save · `Esc` Close.
 
 ---
 

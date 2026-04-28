@@ -1,5 +1,5 @@
 {
-  "name": "mindos-integration-tests",
+  "name": "@mindos/integration-tests",
   "private": true,
   "type": "module",
   "devDependencies": {

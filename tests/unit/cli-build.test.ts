@@ -4,7 +4,7 @@ import os from 'os';
 import path from 'path';
 
 /**
- * Tests for bin/lib/build.js — needsBuild, writeBuildStamp, cleanNextDir, ensureAppDeps.
+ * Tests for packages/mindos/bin/lib/build.js — needsBuild, writeBuildStamp, cleanNextDir, ensureAppDeps.
  *
  * We mock constants.js to point ROOT/BUILD_STAMP/DEPS_STAMP at a temp directory,
  * and mock execSync to avoid real npm install.
@@ -32,8 +32,11 @@ beforeEach(() => {
 
   vi.resetModules();
 
-  vi.doMock('../../bin/lib/constants.js', () => ({
+  vi.doMock('../../packages/mindos/bin/lib/constants.js', () => ({
     ROOT: tempDir,
+    PACKAGE_ROOT: tempDir,
+    PRODUCT_PACKAGE_JSON: path.join(tempDir, 'package.json'),
+    WEB_APP_DIR: appDir,
     BUILD_STAMP: buildStamp,
     DEPS_STAMP: depsStamp,
     CONFIG_PATH: path.join(tempDir, 'config.json'),
@@ -54,7 +57,7 @@ afterEach(() => {
 });
 
 async function importBuild() {
-  return await import('../../bin/lib/build.js') as {
+  return await import('../../packages/mindos/bin/lib/build.js') as {
     needsBuild: () => boolean;
     writeBuildStamp: () => void;
     cleanNextDir: () => void;
@@ -145,8 +148,11 @@ describe('ensureAppDeps', () => {
 
     // Write matching deps hash
     const { createHash } = await import('crypto');
-    const pkgContent = fs.readFileSync(path.join(appDir, 'package.json'));
-    const hash = createHash('sha256').update(pkgContent).digest('hex').slice(0, 16);
+    const hash = createHash('sha256')
+      .update(fs.readFileSync(path.join(tempDir, 'package.json')))
+      .update(fs.readFileSync(path.join(appDir, 'package.json')))
+      .digest('hex')
+      .slice(0, 16);
     fs.writeFileSync(depsStamp, hash, 'utf-8');
 
     // Mock execSync — should NOT be called for npm install
@@ -157,8 +163,11 @@ describe('ensureAppDeps', () => {
     vi.resetModules();
 
     // Re-mock constants after resetModules
-    vi.doMock('../../bin/lib/constants.js', () => ({
+    vi.doMock('../../packages/mindos/bin/lib/constants.js', () => ({
       ROOT: tempDir,
+      PACKAGE_ROOT: tempDir,
+      PRODUCT_PACKAGE_JSON: path.join(tempDir, 'package.json'),
+      WEB_APP_DIR: appDir,
       BUILD_STAMP: buildStamp,
       DEPS_STAMP: depsStamp,
       CONFIG_PATH: path.join(tempDir, 'config.json'),

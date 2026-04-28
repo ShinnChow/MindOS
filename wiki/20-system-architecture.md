@@ -1,4 +1,4 @@
-<!-- Last verified: 2026-04-10 | Current stage: v0.6 | Architecture reviews: wiki/reviews/architecture-review-2026-04-10*.md -->
+<!-- Last verified: 2026-04-28 | Current stage: v1 release-candidate | Canonical status: wiki/reviews/v1-migration-status-2026-04-27.md -->
 
 # MindOS 系统架构 (System Architecture)
 
@@ -11,7 +11,7 @@
            │ Browser (GUI)         │ MCP Protocol (stdio/HTTP)
            ▼                       ▼
 ┌─────────────────────┐  ┌────────────────────────┐
-│   app/ (Next.js 16) │  │  mcp/ (MCP Server)     │
+│ packages/web (Next.js)  │  │ packages/protocols/mcp-server    │
 │   ─────────────────  │  │  ────────────────────  │
 │   • 前端 UI 组件     │  │  • MCP ↔ App API       │
 │   • API Routes       │  │  • stdio + HTTP 传输   │
@@ -30,82 +30,21 @@
 
 ```
 mindos/
-├── app/                        # Next.js 16 前端
-│   ├── app/                    # App Router 页面 + API Routes
-│   ├── components/             # UI 组件 (189 个)
-│   │   ├── agents/             # Agent 管理面板 (15 个)
-│   │   │   ├── AgentDetailContent.tsx    # 详情页编排（741 行，从 1,188 行拆分）
-│   │   │   ├── AgentDetailHeader.tsx     # Agent 基本信息展示
-│   │   │   ├── AgentDetailSkills.tsx     # Skill 管理部分
-│   │   │   ├── AgentDetailMcp.tsx        # MCP 配置部分
-│   │   │   ├── AgentDetailSpace.tsx      # 知识空间配置
-│   │   │   ├── AgentDetailConfig.tsx     # 应用设置部分
-│   │   │   ├── AgentDetailSkillEditor.tsx # Skill 编辑器
-│   │   │   ├── AgentsSkillsSection.tsx   # Skills 工作台（655 行）
-│   │   │   ├── AgentsSkillsByAgent.tsx   # ByAgent 视图 + AgentCard
-│   │   │   ├── AgentsPanelA2aTab.tsx     # A2A 面板（297 行）
-│   │   │   └── AcpRegistrySection.tsx    # ACP 注册表 + AgentCard
-│   │   ├── ask/                # AI 对话
-│   │   ├── file-tree/          # 文件树子组件
-│   │   │   └── FileTreeContextMenus.tsx  # 右键菜单（Shell/Space/Folder）
-│   │   ├── renderers/          # 插件渲染器（14 个）
-│   │   │   ├── csv/            # CsvRenderer 拆分：types, EditableCell, TableView, GalleryView, BoardView, ConfigPanel
-│   │   │   └── todo/           # TodoRenderer 拆分：parse-todos, FilterBar, SectionCard
-│   │   └── settings/           # 设置面板
-│   │       ├── DesktopUpdateCards.tsx     # Desktop Core/Shell 更新卡片
-│   │       ├── McpConnectGuides.tsx       # MCP 连接指南（CLI/MCP）
-│   │       ├── SyncEmptyState.tsx         # Git Sync 初始化向导
-│   │       └── ...                        # AiTab, AppearanceTab, KnowledgeTab 等
-│   ├── lib/                    # 核心模块
-│   │   ├── fs.ts               # 文件系统操作
-│   │   ├── agent/              # 内置 Agent (model + tools + prompt)
-│   │   │   ├── sse/            # SSE 事件处理
-│   │   │   │   └── events.ts   # SSE 类型定义 & 守卫函数
-│   │   │   ├── skill-resolver.ts  # Skill 解析器
-│   │   │   ├── non-streaming.ts   # 非流式响应回退逻辑
-│   │   │   ├── file-context.ts    # 文件上下文构建
-│   │   │   ├── request-utils.ts   # JSON 解析 & 验证工具
-│   │   │   ├── prompt.ts         # System Prompt 组装
-│   │   │   ├── tools.ts          # 24 个知识库工具定义
-│   │   │   ├── context.ts        # Token 感知的上下文压缩
-│   │   │   └── model.ts          # LLM 提供者选择
-│   │   ├── a2a/               # A2A Protocol (Agent-to-Agent 通信)
-│   │   ├── acp/               # ACP Protocol (Agent Client Protocol 集成)
-│   │   ├── im/                # IM 集成（Telegram/Discord/Feishu/Slack/WeCom/DingTalk/WeChat/QQ）
-│   │   │   ├── types.ts       # 8 个平台的统一类型定义
-│   │   │   ├── config.ts      # IM 配置文件 I/O + 缓存
-│   │   │   ├── executor.ts    # 统一的消息发送执行器 + 适配器生命周期
-│   │   │   ├── format.ts      # 消息预处理（截断、格式降级）
-│   │   │   ├── index.ts       # Pi Extension API 集成
-│   │   │   └── adapters/      # 8 个平台适配器（各 50-150 行）
-│   │   ├── hooks/              # 共享 React hooks
-│   │   │   └── useDirectoryDragDrop.ts  # 文件拖放 hook
-│   │   ├── stores/             # 全局状态 stores
-│   │   │   ├── mcp-store.ts    # MCP 数据 (Zustand)
-│   │   │   ├── locale-store.ts # 语言切换
-│   │   │   └── hidden-files.ts # 隐藏文件 store
-│   │   ├── parsing/            # 纯逻辑解析器
-│   │   │   └── parse-todos.ts  # TODO 解析、行操作、日期、样式
-│   │   ├── settings.ts         # 配置管理
-│   │   └── renderers/          # 插件注册表
-│   └── data/skills/            # 内置 Skill 上下文
-├── mcp/                        # MCP Server（工具见 mcp/README 表格）
-├── bin/                        # CLI 入口
-│   ├── cli.js                  # 命令路由 + 入口 (208 行)
-│   ├── lib/                    # 30 个模块 (4,118 行)
-│   │   ├── mcp-agents.js       # MCP Agent 注册 (319 行)
-│   │   ├── mcp-install.js      # MCP install 逻辑 (482 行)
-│   │   ├── sync.js             # Git 自动同步 (578 行)
-│   │   ├── gateway.js          # systemd/launchd 管理 (454 行)
-│   │   ├── build.js, config.js, port.js, pid.js, stop.js 等
-│   │   └── [其他 24 个模块]
-│   └── commands/               # 24 个命令 (3,664 行)
-│       ├── file.js            # 文件操作 (849 行)
-│       ├── space.js           # 空间管理 (457 行)
-│       ├── start.js           # 启动服务 (282 行)
-│       ├── update.js          # 更新逻辑 (292 行)
-│       ├── agent.js, doctor.js, config.js, sync-cmd.js 等
-│       └── [其他 19 个命令]
+├── packages/
+│   ├── mindos/                 # @geminilight/mindos 产品主包：foundation/knowledge 内部模块 + CLI kernel
+│   │   ├── bin/                # CLI 入口；npm 安装后仍暴露包内 bin/cli.js
+│   │   └── src/                # product facade + foundation/knowledge/retrieval internals
+│   ├── web/                    # Next.js 16 Web 源码；发布包只包含 _standalone artifact
+│   │   ├── app/                # App Router 页面 + API Routes
+│   │   ├── components/         # UI 组件
+│   │   ├── lib/                # Web runtime modules and adapters
+│   │   └── data/skills/        # 内置 Skill 上下文
+│   ├── desktop/                # Electron 桌面客户端
+│   ├── mobile/                 # Expo 移动端
+│   ├── browser-extension/      # Web Clipper 浏览器扩展
+│   ├── desktop-tauri/          # Tauri spike
+│   ├── retrieval/              # search/vector/indexer/api（可选检索栈）
+│   └── protocols/              # acp/mcp-server 外部协议适配
 ├── skills/                     # Agent 工作流技能
 ├── templates/{en,zh}/          # 预设知识库模板
 ├── landing/                    # 静态 Landing Page
@@ -113,9 +52,13 @@ mindos/
 └── wiki/                       # 项目文档（本文件所在）
 ```
 
+> `packages/mindos` 是 OpenCode 式产品主包，当前承载 `@geminilight/mindos` runtime facade、foundation/knowledge 内部模块、能力归属 contract 与 CLI kernel 边界。可选 retrieval 与外部 protocols 继续使用 `packages/*/*` package 边界；Web/Desktop/Mobile/CLI 逐步变薄。
+>
+> `packages/mindos/_standalone`、`packages/mindos/packages`、`packages/mindos/scripts`、`packages/mindos/assets`、`packages/mindos/skills`、`packages/mindos/templates` 是 `npm pack` / publish 期间 materialize 的 staging output，不是源码目录。它们被 `.gitignore` 和 `pnpm-workspace.yaml` 排除，必要时用 `pnpm run clean:product-stage` 清理。
+
 ## 模块详解
 
-### 1. app/ — Next.js 16 前端
+### 1. packages/web — Next.js 16 前端
 
 **技术栈：** Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS 4 + shadcn/ui + TipTap + CodeMirror 6 + pi-agent-core 0.60.0 + pi-coding-agent 0.61.1 (session/model/auth)
 
@@ -230,27 +173,69 @@ mindos/
 
 **安全：** middleware.ts Bearer Token 认证，同源浏览器免认证。
 
-### 2. mcp/ — MCP Server
+### 2. packages/mindos — 产品主包
+
+`@geminilight/mindos` 是 MindOS 的产品主 runtime package。当前暴露的产品能力入口：
+
+- `@geminilight/mindos/foundation`：shared/errors/core/config/logger/permissions/security。
+- `@geminilight/mindos/knowledge`：storage/spaces/graph/audit/git/knowledge-ops。
+- `@geminilight/mindos/retrieval`：retrieval 核心 contracts、chunking 策略、index/search/vector 抽象与能力边界；默认不启用 MeiliSearch / LanceDB / Express 等重型后端。
+- `@geminilight/mindos/protocols`：MCP/ACP/A2A 的产品逻辑归属规则，协议包只做 transport host。
+- `@geminilight/mindos/cli`：CLI command grouping / registry helpers，让 `packages/mindos/bin/cli.js` 保持薄入口。
+
+它不能 import `packages/web`、Next.js、React 或协议 host。Web 的 `packages/web/app/api/file/operation-kernel.ts` 与 `packages/web/lib/core/security.ts` 只直接 import `@geminilight/mindos`；`NextResponse`、cache refresh、UI state 仍留在 Web adapter。
+
+发布边界：
+- repo root `package.json` 是 `private: true` 的 monorepo orchestrator，不再拥有 npm `bin` / `files` / `prepack` 发布契约。
+- `packages/mindos/package.json` 是实际发布的 `@geminilight/mindos`，拥有 `bin: { "mindos": "bin/cli.js" }`、`exports`、`files` 和 `prepack`。
+- product `prepack` 会构建 Web standalone 到 `packages/mindos/_standalone`，并只 stage ACP/MCP 的 `dist/`、`package.json`、README；不会把 `packages/web` 源码复制进 npm tarball。
+- local `npm pack` 后 product `postpack` 会清理 staging output，避免 generated copies 被误当成源码。
+
+`packages/retrieval/*` 只保留可选 adapter / service：
+
+- `search`：MeiliSearch adapter。
+- `vector`：LanceDB adapter。
+- `indexer`：chokidar watch + search/vector backend 编排。
+- `api`：Express / WebSocket retrieval service。
+
+这些 adapter 依赖 `@geminilight/mindos/retrieval` 的核心 contracts；`packages/mindos` 不反向 import 它们。
+
+### 3. packages/mindos/src/knowledge/knowledge-ops — 知识库操作内核
+
+`packages/mindos/src/knowledge/knowledge-ops` 是知识库写操作的纯 TypeScript 编排层，不依赖 Next.js。它通过 `@geminilight/mindos` 对外暴露，负责：
+
+- 从请求数据推导 `source` 和权限 actor
+- 调用内部 permissions 模块做 allow / deny / ask 决策
+- 调度 Web 注入的 operation handler
+- 统一判断哪些操作会改变文件树（触发 Web sidebar/cache refresh）
+
+Web 的 `packages/web/app/api/file/operation-kernel.ts` 只保留 Next.js adapter：读取 headers/body、创建 `NextResponse`、注入 `fileOperations`，通过 `@geminilight/mindos` 调用操作内核，再把结果交给 route 做 `revalidatePath()` 和 change log 写入。
+
+后续 MCP / CLI 如果需要绕过 HTTP 直接执行知识库操作，应优先复用 `@geminilight/mindos`，不要重新实现权限和 tree-change 规则。
+
+### 4. packages/protocols/mcp-server — MCP Server
 
 **传输：** stdio (本地 Agent) / Streamable HTTP (远程设备，Bearer Token)
 
-**工具覆盖：** 读取 (bootstrap, list, read, recent, backlinks, history) / 搜索 (search_notes) / 写入 (write, create, append, append_csv) / 语义编辑 (insert_after_heading, update_section, insert_lines, update_lines) / 管理 (delete, rename, move) — 完整列表以 `mcp/src/index.ts` 注册为准。
+**工具覆盖：** 读取 (bootstrap, list, read, recent, backlinks, history) / 搜索 (search_notes) / 写入 (write, create, append, append_csv) / 语义编辑 (insert_after_heading, update_section, insert_lines, update_lines) / 管理 (delete, rename, move) — 完整列表以 `packages/protocols/mcp-server/src/index.ts` 注册为准。
 
 **安全边界：** 路径沙箱 (`MIND_ROOT` 内) + `INSTRUCTION.md` 写保护 + 25,000 字符上限
 
-### 3. bin/ — CLI
+### 5. packages/mindos/bin/ — CLI
 
-13 个 lib 模块 + cli.js 主入口。ESM (`"type": "module"`)。
+`packages/mindos/bin/cli.js` 是仓库内 CLI 主入口；npm 安装后仍以包内相对路径 `bin/cli.js` 暴露 `mindos` 命令。命令模块位于 `packages/mindos/bin/commands/*.js`，支撑模块位于 `packages/mindos/bin/lib/*.js`。ESM (`"type": "module"`)。
 
-**命令：** start, dev, stop, open, sync, mcp, mcp install, gateway, token, config, doctor, update, logs, help
+**主命令：** agent, ask, start, stop, status, open, file, space, search, mcp, init/onboard, config, channel, feishu-ws, doctor, update
 
-### 4. skills/ — Agent Skill
+**附加命令：** dev, build, restart, sync, gateway, token, logs, api, init-skills, uninstall
+
+### 6. skills/ — Agent Skill
 
 `mindos` (EN) + `mindos-zh` (ZH) + 28 条 evals。定义结构感知路由、搜索回退、多文件审批等最佳实践。
 
-同步：`skills/` → `app/data/skills/` 手动同步。
+同步：`skills/` → `packages/web/data/skills/` 手动同步。
 
-### 6. IM Integration — 即时通讯平台集成
+### 7. IM Integration — 即时通讯平台集成
 
 **支持的平台（8 个）：**
 
@@ -304,7 +289,7 @@ mindos/
 
 参考：`wiki/refs/im-integration-research-2026-04-09.md`（详细的平台对比与 SDK 选型）、`wiki/specs/spec-im-integration.md`（完整架构）。
 
-### 7. A2A Protocol — Agent 间通信
+### 6. A2A Protocol — Agent 间通信
 
 **协议：** Google A2A (Agent-to-Agent) 标准协议
 
@@ -316,7 +301,7 @@ mindos/
 
 **Agent 工具 (6)：** `list_remote_agents`, `discover_agent`, `discover_agents`, `delegate_to_agent`, `check_task_status`, `orchestrate`
 
-### 8. ACP Protocol — Agent Client Protocol
+### 7. packages/protocols/acp + Web ACP adapters — Agent Client Protocol
 
 **协议：** ACP 标准协议，基于 `@agentclientprotocol/sdk` 官方 SDK，通过 JSON-RPC 2.0 over stdio 与本地 Agent 子进程通信
 
@@ -324,13 +309,17 @@ mindos/
 
 **注册表：** 31+ 个 ACP Agent 可用
 
-**SDK 集成：** `subprocess.ts` 使用 SDK `ClientSideConnection` + `ndJsonStream` 建立连接，`session.ts` 通过 SDK 方法管理完整生命周期（initialize → authenticate → session/new → prompt → cancel → close）
+**核心包：** `packages/protocols/acp` 是 ACP source of truth，负责类型、Agent descriptor、注册表、安装探测、subprocess 生命周期和 session 管理。
+
+**Web 适配：** `packages/web/lib/acp` 只保留 thin adapters、A2A bridge 和 `acp-tools`。用户配置通过 Web settings 注入为 `overrides`，核心包不读取 Web-only settings。
+
+**SDK 集成：** `packages/protocols/acp/src/subprocess.ts` 使用 SDK `ClientSideConnection` + `ndJsonStream` 建立连接，`packages/protocols/acp/src/session.ts` 通过 SDK 方法管理完整生命周期（initialize → authenticate → session/new → prompt → cancel → close）
 
 **Agent 工具 (2)：** `list_acp_agents`, `call_acp_agent`
 
-### 9. Agent 支持体系
+### 8. Agent 支持体系
 
-**当前支持 25 个 Agent**（`app/lib/mcp-agents.ts`，单一真实来源）：
+**当前支持 26 个 Agent**（`packages/web/lib/mcp-agents.ts` 为 Web/API 单一真实来源，`packages/mindos/bin/lib/mcp-agents.js` 为 CLI 同步入口）：
 
 | # | Agent | 全局配置路径 | 格式 | 配置 Key | CLI |
 |---|-------|-------------|------|---------|-----|
@@ -359,20 +348,23 @@ mindos/
 | 23 | WorkBuddy | `~/.workbuddy/mcp.json` | json | `mcpServers` | `workbuddy` |
 | 24 | Lingma | `~/.lingma/mcp.json` | json | `mcpServers` | — |
 | 25 | CoPaw | `~/.copaw/config.json` | json | **`mcp`** | `copaw` |
+| 26 | Hermes | `~/.hermes/config.yaml` | yaml | **`mcp_servers`** | `hermes` |
 
 **特殊格式 Agent：**
 - **GitHub Copilot**：配置 key 为 `servers`（非 `mcpServers`）
 - **Codex**：TOML 格式，key 为 `mcp_servers`
 - **CoPaw**：key 为 `mcp`，嵌套路径 `mcp.clients`
+- **Hermes**：YAML 格式，key 为 `mcp_servers`
 
-**所有 Agent 均使用 stdio 传输。** CLI 和 TS 注册表共享同一数据源（`bin/lib/mcp-agents.js` 导入自 TS 编译产物）。
+**所有 Agent 均使用 stdio 传输。** CLI 和 TS 注册表共享同一数据源（`packages/mindos/bin/lib/mcp-agents.js` 导入自 TS 编译产物）。
 
 新增 Agent 支持时需改动的文件：
 
 | 文件 | 改什么 | 说明 |
 |------|--------|------|
-| `app/lib/mcp-agents.ts` | `MCP_AGENTS` 对象新增 `AgentDef` | **主定义**，MCP 配置路径、传输方式、存在检测。UI 和 API 自动读取 |
-| `app/app/api/mcp/install-skill/route.ts` | `UNIVERSAL_AGENTS` / `AGENT_NAME_MAP` / `SKILL_UNSUPPORTED` | Skill 安装时判断是否需要 `-a` flag |
+| `packages/web/lib/mcp-agents.ts` | `MCP_AGENTS` 对象新增 `AgentDef` | **主定义**，MCP 配置路径、传输方式、存在检测。UI 和 API 自动读取 |
+| `packages/web/app/api/mcp/install-skill/route.ts` | `UNIVERSAL_AGENTS` / `AGENT_NAME_MAP` / `SKILL_UNSUPPORTED` | Skill 安装时判断是否需要 `-a` flag |
+| `packages/mindos/bin/lib/mcp-agents.js` | 同步 CLI 侧注册入口 | CLI `mindos agent` / `mindos mcp install` 需要读到同一 Agent 列表 |
 
 自动生效（不需要改）：`/api/mcp/agents`（遍历 `MCP_AGENTS`）、`SetupWizard.tsx`、`McpTab.tsx`（动态渲染）。
 
@@ -391,7 +383,7 @@ mindos/
 ### 外部 Agent (MCP)
 
 ```
-Agent → stdio: spawn node mcp/dist/index.js ← stdin/stdout → MCP Server ← fs → my-mind/
+Agent → stdio: spawn node packages/protocols/mcp-server/dist/index.cjs ← stdin/stdout → MCP Server ← App API → my-mind/
      → HTTP:  POST http://host:8781/mcp ← Bearer Token → MCP Server ← fs → my-mind/
 ```
 

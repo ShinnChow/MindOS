@@ -71,6 +71,30 @@
 - 测试是否**快速**？（单个测试 <100ms，全量 <30s）
 - 测试是否**明确**？（失败时能直接看出哪里错了）
 
+#### 测试目录分层
+
+测试按“归属边界”放置，不追求单一目录：
+- `packages/<domain>/<pkg>/src/*.test.ts`：package 内部单元测试，靠近源码；多模块 package 用行为/模块名，只有单模块或 public entrypoint contract 才用 `index.test.ts`
+- `packages/web/__tests__/`、`packages/desktop/src/*.test.ts`、`packages/mobile/__tests__/`：App 专属组件、运行时和业务逻辑测试
+- `tests/*.test.ts`：repo 级 contract（迁移、发布包、workflow、legacy cleanup）
+- `tests/unit/*.test.ts`：根 CLI、packaging、跨 package 的纯单元测试
+- `tests/integration/*.test.ts` 与 `tests/e2e/*.spec.ts`：真实服务/端口/浏览器测试，手动运行，不进入默认 `pnpm test`
+- `.next/`、`_standalone/`、`.turbo/` 中的测试文件是生成物/缓存，不作为源码测试入口
+
+### Package 依赖边界
+
+- `packages/{web,desktop,mobile,browser-extension,desktop-tauri}/package.json` 只声明该 app/client 源码直接 `import @mindos/*` 的 workspace package，不声明“以后可能用”的包
+- 间接依赖由被 import 的 package 自己声明；例如 Web import `@geminilight/mindos`，产品主包内部拥有 knowledge-ops / permissions / security 等能力
+- `packages/mindos/package.json.files` 是 npm 发布白名单，只包含 CLI/Web/MCP 运行时需要的包闭包，不等于 workspace 全量清单
+- `packages/web` 是唯一 Web 源码；npm 发布包不包含 `packages/mindos/packages/web` 源码副本，只包含 `packages/mindos/_standalone` 这种 Web runtime artifact
+- `packages/mindos/packages/`、`packages/mindos/_standalone/` 是 pack/publish 生成物，不是源码；正常开发后用 `pnpm run clean:product-stage` 清理，本地 `npm pack` 会通过 `postpack` 自动清理
+- 产品主包固定为 `packages/mindos`（`@geminilight/mindos`），foundation / knowledge 必须位于 `packages/mindos/src/*`，不再拆成 workspace package
+- 正式 `mindos` CLI 固定在 `packages/mindos/bin/*`，不再保留单独的 `packages/cli` 主入口 package；可复用逻辑沉到 `packages/mindos/src/*`
+- 当前保留的低层 domain 为 `retrieval`、`protocols`
+- `retrieval` 的核心 contracts / chunking / SearchEngine / VectorDatabase 抽象归 `@geminilight/mindos/retrieval`；`packages/retrieval/*` 只放 MeiliSearch / LanceDB / Express / chokidar 等可选 adapter/service，默认不进入 Web 直接依赖或主 runtime 闭包
+- `protocols` 只做 transport host / SDK adapter，MCP/ACP/A2A 的业务规则归 `@geminilight/mindos`，避免协议包复制产品逻辑
+- 长期方向是 OpenCode 式 `@geminilight/mindos` 内聚核心业务；不要为“目录好看”新增细碎 package
+
 ### 视觉回归验证
 
 UI 改动（TSX / CSS / 布局）时，commit 前用 Playwright 截图关键页面，保存到 `/tmp/<component>-<state>.png`。纯后端 / 文档改动不需要。
@@ -155,11 +179,11 @@ MindOS 开发时使用 `mindos-srv` tmux session 运行，包含两个窗口：
 tmux attach -t mindos-srv       # 如果已存在，直接 attach
 
 # 或者手动创建：
-tmux new-session -s mindos-srv -n web -c ~/code/sop_note/app
+tmux new-session -s mindos-srv -n web -c /Users/geminilight/code/mindos-dev-v1
 # web 窗口：
-MINDOS_WEB_PORT=4567 npm run dev
+MINDOS_WEB_PORT=4567 pnpm --filter @mindos/web dev
 # 新建 mcp 窗口：
-MCP_TRANSPORT=http MINDOS_MCP_PORT=8567 MINDOS_WEB_PORT=4567 node bin/cli.js mcp
+MCP_TRANSPORT=http MINDOS_MCP_PORT=8567 MINDOS_WEB_PORT=4567 node packages/mindos/bin/cli.js mcp
 ```
 
 ### 访问
@@ -215,11 +239,11 @@ npm test                          # 手动跑测试，不杀 dev server
 
 版本号一旦发到 npm 就不能复用，以下步骤**必须严格执行**，防止构建失败导致版本号跳跃：
 
-1. **确保 cwd 在项目根目录**：`cd /data/home/geminitwang/code/sop_note`，不要在 `app/` 子目录操作
-2. **先跑 tsc**：`cd app && npx tsc --noEmit && cd ..`（确认零编译错误再发版）
-3. **同时修改两个 package.json**：根目录 `package.json` 和 `app/package.json` 的 `version` 必须保持一致
-4. **验证 tag 内容**：`git show vX.Y.Z:package.json | grep version`，确认版本号正确后再 push tag
-5. **push tag 到公开仓前确保代码已同步**：先 `git push public main --no-verify`，再 push tag
+1. **确保 cwd 在项目根目录**：`cd /Users/geminilight/code/mindos-dev-v1`，不要在 `packages/web/` 子目录操作
+2. **先跑 tsc**：`pnpm --filter @mindos/web typecheck`（确认零编译错误再发版）
+3. **版本主轴**：npm 产品版本以 `packages/mindos/package.json` 为准；根目录 `package.json` 只作为 private monorepo 编排版本保持同步，`packages/web/package.json` 是 workspace 包元数据，不作为 npm 发布版本源
+4. **验证 tag 内容**：`git show vX.Y.Z:packages/mindos/package.json | grep version`，确认版本号正确后再 push tag
+5. **公开仓同步**：不要手动 push public branch；先等 `sync-to-mindos` workflow 同步完成，再只 push `vX.Y.Z` tag（如需要）
 6. **一次做对**：不要 "先发再修"，修了再发又占一个版本号
 
 **npm 与 MindOS Desktop 对齐（精简）**
@@ -242,7 +266,7 @@ npm test                          # 手动跑测试，不杀 dev server
      -f tag=desktop-v<VERSION>
    ```
    - `publish=true`：构建完成后自动创建 GitHub Release（默认已开启）
-   - `tag=desktop-v<VERSION>`：**必须传**，workflow 会从 tag 提取版本号写入 `desktop/package.json`，确保安装包文件名正确（如 `MindOS-0.1.13.dmg`）
+   - `tag=desktop-v<VERSION>`：**必须传**，workflow 会从 tag 提取版本号写入 `packages/desktop/package.json`，确保安装包文件名正确（如 `MindOS-0.1.13.dmg`）
    - `sign_mac=true`：macOS 签名+公证（默认已开启）
 4. **验证 Release**：`gh release view desktop-v<VERSION> --repo GeminiLight/MindOS`
    - 检查 assets 包含所有平台：`.dmg`（arm64 + x64）、`.exe`、`.AppImage`、`.deb`
@@ -254,7 +278,7 @@ npm test                          # 手动跑测试，不杀 dev server
    ```
 
 **常见踩坑：**
-- 忘传 `tag` → 安装包文件名用 `desktop/package.json` 的旧版本号
+- 忘传 `tag` → 安装包文件名用 `packages/desktop/package.json` 的旧版本号
 - 忘传 `publish=true`（旧默认值）→ finalize job 跳过，不创建 Release
 - 公开仓未同步最新代码 → 构建的是旧版本，等 `sync-to-mindos` 完成再触发
 
@@ -263,8 +287,8 @@ npm test                          # 手动跑测试，不杀 dev server
 ### 文档一致性规则
 
 - `CLAUDE.md` → `AGENTS.md` 的 symlink，无需单独维护
-- `README.md` 和 `README-zh.md` 必须保持一致
-- `skills/mindos/SKILL.md` 和 `app/data/skills/mindos/SKILL.md` 必须保持一致（不一致时以 `skills/` 为准）
+- `README.md` 和 `README_zh.md` 必须保持一致
+- `skills/mindos/SKILL.md` 和 `packages/web/data/skills/mindos/SKILL.md` 必须保持一致（不一致时以 `skills/` 为准）
 
 ### Backlog 与 Changelog
 
@@ -286,7 +310,7 @@ npm test                          # 手动跑测试，不杀 dev server
 5. **用户确认**：等用户确认方向后再动手
 6. **同步更新所有副本**：
    - `skills/<name>/SKILL.md`（中文版同步修改英文版，反之亦然）
-   - `app/data/skills/<name>/SKILL.md`（按 AGENTS.md 规则与 skills/ 保持一致）
+   - `packages/web/data/skills/<name>/SKILL.md`（按 AGENTS.md 规则与 skills/ 保持一致）
    - `.claude-internal/skills/<name>/SKILL.md`（若存在）
 7. **验证一致性**：用命令行 diff 确认所有副本内容相同
 

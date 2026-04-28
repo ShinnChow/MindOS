@@ -4,12 +4,12 @@ import os from 'os';
 import path from 'path';
 
 /**
- * Tests for app/lib/custom-agents.ts — slugify, inferDefaults, toAgentDef,
+ * Tests for packages/web/lib/custom-agents.ts — slugify, inferDefaults, toAgentDef,
  * generateUniqueKey, validateCustomAgentInput, detectBaseDir.
  */
 
 // We need to mock mcp-agents to avoid importing the full agent registry
-vi.mock('../../app/lib/mcp-agents', () => ({
+vi.mock('../../packages/web/lib/mcp-agents', () => ({
   expandHome: (p: string) => p.replace(/^~/, os.homedir()),
   MCP_AGENTS: {
     cursor: { name: 'Cursor', project: '.cursor/mcp.json', global: '~/.cursor/mcp.json', key: 'mcpServers', preferredTransport: 'stdio' },
@@ -20,7 +20,7 @@ vi.mock('../../app/lib/mcp-agents', () => ({
 
 // Mock settings to avoid file system dependency
 let mockCustomAgents: unknown[] = [];
-vi.mock('../../app/lib/settings', () => ({
+vi.mock('../../packages/web/lib/settings', () => ({
   readSettings: () => ({ customAgents: mockCustomAgents, ai: {}, mindRoot: '' }),
   writeSettings: vi.fn((settings: Record<string, unknown>) => {
     mockCustomAgents = (settings.customAgents as unknown[]) ?? [];
@@ -28,20 +28,20 @@ vi.mock('../../app/lib/settings', () => ({
 }));
 
 // Dynamic import after mocks are set up
-let slugify: typeof import('../../app/lib/custom-agents').slugify;
-let generateUniqueKey: typeof import('../../app/lib/custom-agents').generateUniqueKey;
-let inferDefaults: typeof import('../../app/lib/custom-agents').inferDefaults;
-let toAgentDef: typeof import('../../app/lib/custom-agents').toAgentDef;
-let validateCustomAgentInput: typeof import('../../app/lib/custom-agents').validateCustomAgentInput;
-let detectBaseDir: typeof import('../../app/lib/custom-agents').detectBaseDir;
-let loadCustomAgents: typeof import('../../app/lib/custom-agents').loadCustomAgents;
-let saveCustomAgents: typeof import('../../app/lib/custom-agents').saveCustomAgents;
-let getAllAgents: typeof import('../../app/lib/custom-agents').getAllAgents;
-let scanCustomAgentSkills: typeof import('../../app/lib/custom-agents').scanCustomAgentSkills;
+let slugify: typeof import('../../packages/web/lib/custom-agents').slugify;
+let generateUniqueKey: typeof import('../../packages/web/lib/custom-agents').generateUniqueKey;
+let inferDefaults: typeof import('../../packages/web/lib/custom-agents').inferDefaults;
+let toAgentDef: typeof import('../../packages/web/lib/custom-agents').toAgentDef;
+let validateCustomAgentInput: typeof import('../../packages/web/lib/custom-agents').validateCustomAgentInput;
+let detectBaseDir: typeof import('../../packages/web/lib/custom-agents').detectBaseDir;
+let loadCustomAgents: typeof import('../../packages/web/lib/custom-agents').loadCustomAgents;
+let saveCustomAgents: typeof import('../../packages/web/lib/custom-agents').saveCustomAgents;
+let getAllAgents: typeof import('../../packages/web/lib/custom-agents').getAllAgents;
+let scanCustomAgentSkills: typeof import('../../packages/web/lib/custom-agents').scanCustomAgentSkills;
 
 beforeEach(async () => {
   mockCustomAgents = [];
-  const mod = await import('../../app/lib/custom-agents');
+  const mod = await import('../../packages/web/lib/custom-agents');
   slugify = mod.slugify;
   generateUniqueKey = mod.generateUniqueKey;
   inferDefaults = mod.inferDefaults;

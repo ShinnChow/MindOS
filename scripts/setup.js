@@ -30,7 +30,7 @@ import { execSync, spawn } from 'node:child_process';
 import { randomBytes, createHash } from 'node:crypto';
 import { createConnection } from 'node:net';
 import http from 'node:http';
-import { MCP_AGENTS, SKILL_AGENT_REGISTRY, detectAgentPresence } from '../bin/lib/mcp-agents.js';
+import { MCP_AGENTS, SKILL_AGENT_REGISTRY, detectAgentPresence } from '../packages/mindos/bin/lib/mcp-agents.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -588,7 +588,7 @@ async function applyTemplate(tpl, mindDir) {
   }
 }
 
-// MCP_AGENTS imported from bin/lib/mcp-agents.js
+// MCP_AGENTS imported from packages/mindos/bin/lib/mcp-agents.js
 
 function expandHomePath(p) {
   return p.startsWith('~/') ? resolve(homedir(), p.slice(2)) : p;
@@ -903,7 +903,7 @@ async function startGuiSetup() {
   // Clean up zombie process from a previous abandoned setup session.
   if (config.setupPort) {
     try {
-      const { killByPort } = await import('../bin/lib/stop.js');
+      const { killByPort } = await import('../packages/mindos/bin/lib/stop.js');
       killByPort(Number(config.setupPort));
       // Brief wait for port to free
       await new Promise(r => setTimeout(r, 500));
@@ -935,11 +935,11 @@ async function startGuiSetup() {
     if (await isPortInUse(existingPort)) {
       // Port occupied — try stopping leftover MindOS processes first
       try {
-        const { stopMindos } = await import('../bin/lib/stop.js');
+        const { stopMindos } = await import('../packages/mindos/bin/lib/stop.js');
         stopMindos();
         // stopMindos() sends SIGTERM synchronously — wait for both web and mcp
         // ports to free, since `start` will assertPortFree on both.
-        const { waitForPortFree } = await import('../bin/lib/gateway.js');
+        const { waitForPortFree } = await import('../packages/mindos/bin/lib/gateway.js');
         const mcpPort = config.mcpPort || 8781;
         const [webFreed, mcpFreed] = await Promise.all([
           waitForPortFree(existingPort),
@@ -964,7 +964,7 @@ async function startGuiSetup() {
 
   // Pass MINDOS_WEB_PORT (not PORT) so loadConfig() won't override with the
   // config file port — this is critical when we need a temporary port.
-  const cliPath = resolve(__dirname, '../bin/cli.js');
+  const cliPath = resolve(__dirname, '../packages/mindos/bin/cli.js');
   const logFd = openSync(LOG_PATH, 'a');
   const child = spawn(process.execPath, [cliPath, 'start'], {
     detached: true,
@@ -979,7 +979,7 @@ async function startGuiSetup() {
   }
 
   // Wait for the server to be ready (10min timeout — first run involves npm install + build)
-  const { waitForHttp } = await import('../bin/lib/gateway.js');
+  const { waitForHttp } = await import('../packages/mindos/bin/lib/gateway.js');
   const ready = await waitForHttp(usePort, { retries: 600, intervalMs: 1000, label: 'MindOS', logFile: LOG_PATH });
 
   if (!ready) {
@@ -1328,7 +1328,7 @@ async function main() {
   // ── Sync setup (optional) ──────────────────────────────────────────────────
   const wantSync = await askYesNo('syncSetup');
   if (wantSync) {
-    const { initSync } = await import('../bin/lib/sync.js');
+    const { initSync } = await import('../packages/mindos/bin/lib/sync.js');
     await initSync(mindDir);
   } else {
     console.log(c.dim(t('syncLater')));
@@ -1388,7 +1388,7 @@ async function finish(mindDir, startMode = 'start', mcpPort = 8781, authToken = 
       write(c.yellow(t('restartRequired') + '\n'));
       const doRestart = await askYesNoDefault('restartNow');
       if (doRestart) {
-        const cliPath = resolve(__dirname, '../bin/cli.js');
+        const cliPath = resolve(__dirname, '../packages/mindos/bin/cli.js');
         // Use 'restart' (stop → start) instead of bare 'start' which would
         // fail assertPortFree because the old process is still running.
         execSync(`node "${cliPath}" restart`, { stdio: 'inherit' });
@@ -1410,7 +1410,7 @@ async function finish(mindDir, startMode = 'start', mcpPort = 8781, authToken = 
   const doStart = await askYesNoDefault('startNow');
   if (doStart) {
     const { execSync: exec } = await import('node:child_process');
-    const cliPath = resolve(__dirname, '../bin/cli.js');
+    const cliPath = resolve(__dirname, '../packages/mindos/bin/cli.js');
     if (installDaemon) {
       // Install and start as background service — returns immediately
       exec(`node "${cliPath}" start --daemon`, { stdio: 'inherit' });

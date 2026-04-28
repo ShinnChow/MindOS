@@ -63,8 +63,8 @@ description: >
 
 先确认插件的四类事实来源：
 
-- 代码入口：`app/components/renderers/<plugin>/manifest.ts`
-- 注册入口：`app/lib/renderers/index.ts`（自动生成）
+- 代码入口：`packages/web/components/renderers/<plugin>/manifest.ts`
+- 注册入口：`packages/web/lib/renderers/index.ts`（自动生成）
 - 使用入口：`resolveRenderer()` 调用链（如 `ViewPageClient`）
 - 展示入口：插件面板/设置页（优先使用 `getPluginRenderers()`）
 
@@ -83,7 +83,7 @@ description: >
 
 如果插件要被替换/下线：
 - 删除旧 renderer 文件
-- 重新生成 `app/lib/renderers/index.ts`
+- 重新生成 `packages/web/lib/renderers/index.ts`
 
 ### Step 3) 统一注册机制（防漂移）
 
@@ -175,4 +175,3 @@ npm --prefix app run test -- __tests__/core/content-changes.test.ts __tests__/ap
 - [ ] 插件页/设置页状态正确（含 appBuiltinFeature 隐藏策略）
 - [ ] 文档已同步更新
 - [ ] 测试通过
-

@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * Module-load smoke tests — verify every bin/ JS module can be parsed by
+ * Module-load smoke tests — verify every product CLI JS module can be parsed by
  * the Node.js ESM loader without SyntaxError.
  *
  * Catches issues like premature comment termination (e.g. `MINDOS_*​/` inside
@@ -12,7 +12,7 @@ import path from 'path';
  */
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const BIN = path.join(ROOT, 'bin');
+const BIN = path.join(ROOT, 'packages', 'mindos', 'bin');
 
 /** Collect all .js files under a directory (non-recursive, single level). */
 function listJs(dir: string): string[] {
@@ -24,14 +24,14 @@ function listJs(dir: string): string[] {
     .map((f) => path.join(dir, f));
 }
 
-// Gather every module under bin/
+// Gather every module under packages/mindos/bin.
 const modules = [
   ...listJs(BIN),
   ...listJs(path.join(BIN, 'commands')),
   ...listJs(path.join(BIN, 'lib')),
 ];
 
-describe('bin/ modules can be parsed by Node.js ESM loader', () => {
+describe('packages/mindos/bin modules can be parsed by Node.js ESM loader', () => {
   it.each(modules.map((m) => [path.relative(ROOT, m), m]))(
     '%s loads without SyntaxError',
     (_label, modulePath) => {

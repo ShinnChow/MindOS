@@ -38,20 +38,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install mobile dependencies
-        run: cd mobile && npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Typecheck mobile app
-        run: cd mobile && npm run typecheck
+        run: pnpm --filter @mindos/mobile run typecheck
 
       - name: Test mobile app
-        run: cd mobile && npm test
+        run: pnpm --filter @mindos/mobile run test
 
   build:
     needs: verify
@@ -62,20 +66,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: mobile/package-lock.json
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install mobile dependencies
-        run: cd mobile && npm ci
-
-      - name: Setup Expo and EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+        run: pnpm install --frozen-lockfile
 
       - name: Validate Expo token exists
         run: |
@@ -86,10 +88,10 @@ jobs:
 
       - name: Check EAS project config
         run: |
-          if ! grep -q '"projectId"' mobile/app.json; then
+          if ! grep -q '"projectId"' packages/mobile/app.json; then
             echo "## Warning" >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "- mobile/app.json does not include expo.extra.eas.projectId." >> "$GITHUB_STEP_SUMMARY"
+            echo "- packages/mobile/app.json does not include expo.extra.eas.projectId." >> "$GITHUB_STEP_SUMMARY"
             echo "- If this repository has not been linked to an EAS project yet, run one local 'eas build' first to initialize it." >> "$GITHUB_STEP_SUMMARY"
             echo "" >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -119,17 +121,18 @@ jobs:
           fi
 
       - name: Build mobile app with EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          cd mobile
-          npx eas-cli build \
+          pnpm --filter @mindos/mobile exec eas build \
             --non-interactive \
             --no-wait \
             --json \
             --message "GitHub Actions ${SHORT_SHA} (${GITHUB_REF_NAME}) - ${{ github.event.inputs.platform }} / ${{ github.event.inputs.profile }}" \
             --platform "${{ github.event.inputs.platform }}" \
             --profile "${{ github.event.inputs.profile }}" \
-            > ../eas-build.json
+            > eas-build.json
 
       - name: Summarize submitted build
         run: |

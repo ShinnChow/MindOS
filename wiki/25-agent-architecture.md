@@ -1,6 +1,6 @@
 # MindOS Agent 架构
 
-> 最后更新: 2026-04-04
+> 最后更新: 2026-04-27
 > 
 > **2026-04-10 更新**：Ask Panel UX 改进已上线。参见"Ask Panel 近期改进"部分。
 
@@ -16,7 +16,7 @@
                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Next.js API Route Layer                       │
-│                  app/app/api/ask/route.ts                        │
+│                  packages/web/app/api/ask/route.ts                   │
 │                                                                 │
 │  1. System Prompt 组装                                           │
 │  2. Tools 组装 (内置 + Skills + MCP)                             │
@@ -58,10 +58,10 @@ Agent 能使用的工具分四类：
 
 | 类别 | 数量 | 来源文件 | 工具列表 |
 |---|---|---|---|
-| 知识库工具 | 24 | `app/lib/agent/tools.ts` | list_files, read_file, read_file_chunk, search, write_file, create_file, batch_create_files, append_to_file, insert_after_heading, update_section, edit_lines, delete_file, rename_file, move_file, get_backlinks, get_history, get_file_at_version, append_csv, get_recent, web_search, web_fetch, load_skill, lint, compile |
-| A2A 工具 | 6 | `app/lib/a2a/a2a-tools.ts` | list_remote_agents, discover_agent, discover_agents, delegate_to_agent, check_task_status, orchestrate |
-| ACP 工具 | 2 | `app/lib/acp/acp-tools.ts` | list_acp_agents, call_acp_agent |
-| IM 工具 | 2 | `app/lib/im/index.ts` | send_im_message, list_im_channels |
+| 知识库工具 | 24 | `packages/web/lib/agent/tools.ts` | list_files, read_file, read_file_chunk, search, write_file, create_file, batch_create_files, append_to_file, insert_after_heading, update_section, edit_lines, delete_file, rename_file, move_file, get_backlinks, get_history, get_file_at_version, append_csv, get_recent, web_search, web_fetch, load_skill, lint, compile |
+| A2A 工具 | 6 | `packages/web/lib/a2a/a2a-tools.ts` | list_remote_agents, discover_agent, discover_agents, delegate_to_agent, check_task_status, orchestrate |
+| ACP 工具 | 2 | `packages/web/lib/acp/acp-tools.ts` | list_acp_agents, call_acp_agent |
+| IM 工具 | 2 | `packages/web/lib/im/index.ts` | send_im_message, list_im_channels |
 | **合计** | **34** | | |
 
 ### 工具执行安全机制
@@ -138,7 +138,7 @@ MindOS 支持两种对话模式，用户可在 Ask 面板顶部切换：
 
 | 优先级 | 目录 | 类型 | 可编辑 |
 |---|---|---|---|
-| 1 | `app/data/skills/` | MindOS 内置 | 否 |
+| 1 | `packages/web/data/skills/` | MindOS 内置 | 否 |
 | 2 | `skills/` | 项目级内置 | 否 |
 | 3 | `{mindRoot}/.skills/` | 知识库用户自定义 | 是 |
 | 4 | `~/.mindos/skills` | 全局用户自定义 | 是 |
@@ -155,7 +155,7 @@ MindOS 支持两种对话模式，用户可在 Ask 面板顶部切换：
 
 ### MCP Tools（外部服务工具）
 
-- **内置**：MindOS MCP server 始终可用（通过 `mcp/` 目录内置）
+- **内置**：MindOS MCP server 始终可用（通过 `packages/protocols/mcp-server/` 目录内置）
 - **扩展**：额外 MCP servers 通过 `~/.mindos/mcp.json` 配置
 - **接入方式**：
   - 静态桥接：`list_mcp_tools` / `call_mcp_tool`（通用入口）
@@ -167,7 +167,7 @@ MindOS 支持两种对话模式，用户可在 Ask 面板顶部切换：
 
 | 段落 | 内容 | 来源 |
 |---|---|---|
-| AGENT_SYSTEM_PROMPT | 身份、7 条 Core Directives、Context Mechanics、Output 格式 | `app/lib/agent/prompt.ts` |
+| AGENT_SYSTEM_PROMPT | 身份、7 条 Core Directives、Context Mechanics、Output 格式 | `packages/web/lib/agent/prompt.ts` |
 | Time Context | 当前 UTC / 本地时间 / Unix 时间戳 | 运行时生成 |
 | Init Status | bootstrap 加载结果 | 运行时检测 |
 | Init Context | SKILL.md + 用户规则 + INSTRUCTION.md + 首页 + config | 知识库文件 |
@@ -188,7 +188,7 @@ MindOS 支持两种对话模式，用户可在 Ask 面板顶部切换：
 MindOS 把自己注册为和其他 coding agent 同类的 agent：
 
 ```
-MCP_AGENTS 注册表 (app/lib/mcp-agents.ts)
+MCP_AGENTS 注册表 (packages/web/lib/mcp-agents.ts)
 ├─ claude-code    检测 ~/.claude/
 ├─ cursor         检测 ~/.cursor/
 ├─ windsurf       检测 ~/.codeium/windsurf/
@@ -241,39 +241,39 @@ MindOS 集成了 ACP 协议，可作为客户端调用远程 ACP Agent：
 
 | 文件 | 职责 |
 |---|---|
-| `app/app/api/ask/route.ts` | 核心入口：prompt 组装、session 创建、SSE 流 |
-| `app/lib/agent/prompt.ts` | 静态 system prompt 模板 |
-| `app/lib/agent/tools.ts` | 工具定义 + request-scoped 动态组装 |
-| `app/lib/agent/to-agent-messages.ts` | 前端消息 → pi AgentMessage 转换 |
-| `app/lib/agent/model.ts` | 模型配置（provider/key/model 选择） |
-| `app/lib/agent/log.ts` | 工具操作日志 |
-| `app/lib/pi-integration/skills.ts` | skill 扫描（app-builtin / project-builtin / mindos-user） |
-| `app/lib/pi-integration/extensions.ts` | Extension 发现与加载 |
-| `app/lib/pi-integration/mcp-config.ts` | MCP 配置读取与热刷新 |
-| `app/lib/pi-integration/session-store.ts` | session 路径管理 (~/.mindos/sessions/) |
-| `app/lib/mcp-agents.ts` | agent 注册表（含 MindOS） |
-| `app/lib/settings.ts` | 持久化配置（disabledSkills/Extensions） |
-| `app/lib/im/index.ts` | IM Extension 注册（pi 兼容） |
-| `app/components/ask/AskContent.tsx` | 前端发消息入口 |
-| `app/hooks/useAskSession.ts` | 前端 session 管理 |
+| `packages/web/app/api/ask/route.ts` | 核心入口：prompt 组装、session 创建、SSE 流 |
+| `packages/web/lib/agent/prompt.ts` | 静态 system prompt 模板 |
+| `packages/web/lib/agent/tools.ts` | 工具定义 + request-scoped 动态组装 |
+| `packages/web/lib/agent/to-agent-messages.ts` | 前端消息 → pi AgentMessage 转换 |
+| `packages/web/lib/agent/model.ts` | 模型配置（provider/key/model 选择） |
+| `packages/web/lib/agent/log.ts` | 工具操作日志 |
+| `packages/web/lib/pi-integration/skills.ts` | skill 扫描（app-builtin / project-builtin / mindos-user） |
+| `packages/web/lib/pi-integration/extensions.ts` | Extension 发现与加载 |
+| `packages/web/lib/pi-integration/mcp-config.ts` | MCP 配置读取与热刷新 |
+| `packages/web/lib/pi-integration/session-store.ts` | session 路径管理 (~/.mindos/sessions/) |
+| `packages/web/lib/mcp-agents.ts` | agent 注册表（含 MindOS） |
+| `packages/web/lib/settings.ts` | 持久化配置（disabledSkills/Extensions） |
+| `packages/web/lib/im/index.ts` | IM Extension 注册（pi 兼容） |
+| `packages/web/components/ask/AskContent.tsx` | 前端发消息入口 |
+| `packages/web/hooks/useAskSession.ts` | 前端 session 管理 |
 
 ## 十一、Ask Panel 近期改进（2026-04-10）
 
 ### Portal Popover 优化
 - **改进**：从 inline expand 改为 portal popover（不受 z-index 限制）
 - **影响**：Ask Panel 在 sidebar 导航时不再被遮挡
-- **代码**：`app/components/ask/SaveSessionPopover.tsx` (新建，复用于单消息/全会话保存)
+- **代码**：`packages/web/components/ask/SaveSessionPopover.tsx` (新建，复用于单消息/全会话保存)
 
 ### Session Switcher 增强
 - **改进 1**：提升 hit target（更易点击）
 - **改进 2**：列表过长时自动滚动，保证当前 session 可见
 - **改进 3**：显示 provider name 而非 protocol name（用户更友好）
-- **代码**：`app/components/ask/AskPanel.tsx`, `app/components/ask/SessionSwitcher.tsx`
+- **代码**：`packages/web/components/ask/AskPanel.tsx`, `packages/web/components/ask/SessionSwitcher.tsx`
 
 ### 导航同步
 - **改进 1**：点击 Sidebar 导航时自动关闭 Ask 最大化状态（同步进行）
 - **改进 2**：导航到 Home 时自动关闭 Ask Panel，清理界面
-- **代码**：`app/components/Sidebar.tsx` → `AskPanel` 通信
+- **代码**：`packages/web/components/Sidebar.tsx` → `AskPanel` 通信
 
 ### Save Session 新功能
 - **功能**：一键保存整个对话到知识库，支持 AI 自动总结
@@ -281,10 +281,10 @@ MindOS 集成了 ACP 协议，可作为客户端调用远程 ACP Agent：
 - **详见**：`wiki/specs/spec-save-session.md`
 
 
-| `app/components/settings/McpSkillsSection.tsx` | 设置页：skills + extensions + toggle |
-| `app/lib/a2a/a2a-tools.ts` | A2A 工具定义（6 个） |
-| `app/lib/a2a/agent-card.ts` | Agent Card 生成 |
-| `app/lib/a2a/task-handler.ts` | A2A 任务处理 |
-| `app/lib/acp/acp-tools.ts` | ACP 工具定义（2 个） |
-| `app/lib/acp/session.ts` | ACP Session 管理 |
-| `app/lib/acp/registry.ts` | ACP Agent 注册表 |
+| `packages/web/components/settings/McpSkillsSection.tsx` | 设置页：skills + extensions + toggle |
+| `packages/web/lib/a2a/a2a-tools.ts` | A2A 工具定义（6 个） |
+| `packages/web/lib/a2a/agent-card.ts` | Agent Card 生成 |
+| `packages/web/lib/a2a/task-handler.ts` | A2A 任务处理 |
+| `packages/web/lib/acp/acp-tools.ts` | ACP 工具定义（2 个） |
+| `packages/web/lib/acp/session.ts` | ACP Session 管理 |
+| `packages/web/lib/acp/registry.ts` | ACP Agent 注册表 |

@@ -3,20 +3,24 @@
  * Write .mindos-build-version stamp after `next build`.
  *
  * This ensures Desktop's isNextBuildCurrent() recognizes builds
- * done via `npm run build` (app/package.json) without going through
+ * done via `npm run build` (packages/web/package.json) without going through
  * the CLI's `mindos build` command.
  *
  * The stamp file is read by:
- *   - desktop/src/mindos-runtime-layout.ts (isNextBuildCurrent)
- *   - bin/lib/build.js (needsBuild / writeBuildStamp)
+ *   - packages/desktop/src/mindos-runtime-layout.ts (isNextBuildCurrent)
+ *   - packages/mindos/bin/lib/build.js (needsBuild / writeBuildStamp)
  *
  * Safe to run multiple times (idempotent).
  */
-const { readFileSync, writeFileSync, existsSync } = require('fs');
-const { resolve } = require('path');
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const STAMP_NAME = '.mindos-build-version';
-const appDir = resolve(__dirname, '..', 'app');
+const appDir = resolve(__dirname, '..', 'packages', 'web');
 const nextDir = resolve(appDir, '.next');
 const stampPath = resolve(nextDir, STAMP_NAME);
 const pkgPath = resolve(__dirname, '..', 'package.json');

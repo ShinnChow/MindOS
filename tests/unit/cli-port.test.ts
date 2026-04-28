@@ -2,13 +2,13 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { createServer, Server } from 'net';
 
 /**
- * Tests for bin/lib/port.js — isPortInUse.
+ * Tests for packages/mindos/bin/lib/port.js — isPortInUse.
  * Uses real TCP servers to verify port detection accuracy.
  */
 
 // Dynamic import to match ESM module
 async function importPort() {
-  return await import('../../bin/lib/port.js') as {
+  return await import('../../packages/mindos/bin/lib/port.js') as {
     isPortInUse: (port: number) => Promise<boolean>;
   };
 }

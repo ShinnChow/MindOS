@@ -6,17 +6,17 @@ import path from 'path';
 /**
  * Tests for TOML support in MCP install — entry format and config file merging.
  *
- * Mirrors the TypeScript tests in app/__tests__/api/mcp-install.test.ts
+ * Mirrors the TypeScript tests in packages/web/__tests__/api/mcp-install.test.ts
  * for the Codex TOML path (lines 133-177).
  *
  * Tests two modules:
- *   1. bin/lib/toml.js  — buildTomlEntry(), mergeTomlEntry()
- *   2. bin/lib/mcp-install.js — TOML-aware install flow
+ *   1. packages/mindos/bin/lib/toml.js  — buildTomlEntry(), mergeTomlEntry()
+ *   2. packages/mindos/bin/lib/mcp-install.js — TOML-aware install flow
  */
 
-// Dynamic import because bin/lib uses ESM
+// Dynamic import because product CLI libs use ESM.
 async function importToml() {
-  return await import('../../bin/lib/toml.js');
+  return await import('../../packages/mindos/bin/lib/toml.js');
 }
 
 let tempDir: string;

@@ -1,6 +1,7 @@
 {
-  "name": "@geminilight/mindos",
-  "version": "0.7.5",
+  "name": "mindos-dev",
+  "version": "1.0.0",
+  "private": true,
   "description": "MindOS — Human-Agent Collaborative Mind System. Local-first knowledge base that syncs your mind to all AI Agents via MCP.",
   "keywords": [
     "mindos",
@@ -23,41 +24,42 @@
   "bugs": {
     "url": "https://github.com/GeminiLight/MindOS/issues"
   },
-  "bin": {
-    "mindos": "bin/cli.js"
-  },
-  "files": [
-    "bin/",
-    "app/",
-    "mcp/",
-    "scripts/",
-    "assets/",
-    "skills/",
-    "templates/",
-    "_standalone/",
-    "README.md",
-    "README_zh.md",
-    "LICENSE"
-  ],
   "scripts": {
-    "prepack": "rm -rf _standalone && cd mcp && npm install --include=dev && npm run build && cd ../app && npm install --no-workspaces && NODE_OPTIONS=\"--max-old-space-size=8192\" ./node_modules/.bin/next build --webpack && cd .. && node scripts/prepare-standalone.mjs && rm -rf app/node_modules app/.next mcp/node_modules _standalone/node_modules",
     "setup": "node scripts/setup.js",
-    "dev": "mindos dev",
-    "build": "mindos build",
-    "start": "mindos start",
-    "mcp": "mindos mcp",
-    "test": "cd app && npx vitest run",
+    "dev": "node packages/mindos/bin/cli.js dev",
+    "build": "node packages/mindos/bin/cli.js build",
+    "start": "node packages/mindos/bin/cli.js start",
+    "mcp": "node packages/mindos/bin/cli.js mcp",
+    "test": "pnpm run test:contracts && pnpm run test:unit && turbo run test",
+    "test:contracts": "vitest run tests/*.test.ts",
+    "test:unit": "vitest run tests/unit/*.test.ts",
+    "test:integration": "vitest run --config tests/integration/vitest.config.ts",
+    "test:e2e": "playwright test -c tests/e2e/playwright.config.ts",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
     "verify:standalone": "node scripts/verify-standalone.mjs",
+    "clean:product-stage": "node scripts/clean-product-stage.mjs --include-package-docs",
     "release": "bash scripts/release.sh",
+    "clean": "turbo run clean && rm -rf node_modules",
     "prepare": "git config core.hooksPath scripts/hooks 2>/dev/null || true"
   },
+  "packageManager": "pnpm@10.18.3",
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
     "chokidar": "^5.0.0"
   },
+  "pnpm": {
+    "overrides": {
+      "@types/react": "^19.0.0"
+    }
+  },
   "devDependencies": {
-    "source-map-js": "^1.2.1"
+    "@types/node": "^22.10.5",
+    "tsx": "^4.21.0",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
   }
 }

@@ -43,7 +43,7 @@ const PLUGINS = [
   },
 ];
 
-const OUTPUT_DIR = path.join(__dirname, '../app/__fixtures__/real-plugins');
+const OUTPUT_DIR = path.join(__dirname, '../packages/web/__fixtures__/real-plugins');
 
 function download(url, dest) {
   return new Promise((resolve, reject) => {

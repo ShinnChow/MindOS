@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseLogHint } from '../../bin/lib/gateway.js';
+import { parseLogHint } from '../../packages/mindos/bin/lib/gateway.js';
 
 describe('parseLogHint', () => {
   // ── npm install lines ──
@@ -8,7 +8,7 @@ describe('parseLogHint', () => {
   });
 
   it('detects "Updating app dependencies"', () => {
-    expect(parseLogHint('Updating app dependencies (package-lock.json changed)...\n')).toBe('updating dependencies…');
+    expect(parseLogHint('Updating app dependencies (dependency metadata changed)...\n')).toBe('updating dependencies…');
   });
 
   it('detects "added N packages"', () => {

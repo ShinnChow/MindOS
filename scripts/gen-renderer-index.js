@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Scans app/components/renderers/*/manifest.ts and generates
-// app/lib/renderers/index.ts with auto-discovered imports.
+// Scans packages/web/components/renderers/*/manifest.ts and generates
+// packages/web/lib/renderers/index.ts with auto-discovered imports.
 //
 // Run: node scripts/gen-renderer-index.js
 // Hooked into: npm run build (via prebuild)
@@ -10,8 +10,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const renderersDir = path.resolve(__dirname, '../app/components/renderers');
-const outputFile = path.resolve(__dirname, '../app/lib/renderers/index.ts');
+const renderersDir = path.resolve(__dirname, '../packages/web/components/renderers');
+const outputFile = path.resolve(__dirname, '../packages/web/lib/renderers/index.ts');
 
 // Scan for manifest.ts in immediate subdirectories
 const dirs = fs.readdirSync(renderersDir, { withFileTypes: true })

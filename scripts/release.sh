@@ -20,14 +20,13 @@ echo ""
 
 # 3. Verify Next.js build
 echo "🔨 Verifying Next.js build..."
-cd app
-if npx next build --webpack 2>&1 | tail -5; then
+pnpm --filter @geminilight/mindos build
+if pnpm --filter @mindos/web run build 2>&1 | tail -5; then
   echo "   ✅ Next.js build succeeded"
 else
   echo "❌ Next.js build failed"
   exit 1
 fi
-cd ..
 echo "🩺 Verifying standalone server (/api/health)..."
 if node scripts/verify-standalone.mjs; then
   echo "   ✅ Standalone smoke OK"
@@ -35,14 +34,12 @@ else
   echo "❌ Standalone verify failed (trace / serverExternalPackages?)"
   exit 1
 fi
-# Restore any files modified by next build (e.g. next-env.d.ts)
-git checkout -- . 2>/dev/null || true
 echo ""
 
 # 4. Smoke test: pack → install in temp dir → verify CLI works
 echo "🔍 Smoke testing package..."
 SMOKE_DIR=$(mktemp -d)
-TARBALL=$(npm pack --pack-destination "$SMOKE_DIR" 2>/dev/null | tail -1)
+TARBALL=$(cd packages/mindos && npm pack --pack-destination "$SMOKE_DIR" 2>/dev/null | tail -1)
 TARBALL_PATH="$SMOKE_DIR/$TARBALL"
 
 if [ ! -f "$TARBALL_PATH" ]; then
@@ -85,7 +82,7 @@ fi
 echo "   ✅ mindos --help works"
 
 # Verify key files are present in the installed package
-for f in bin/cli.js app/package.json app/next.config.ts skills/mindos/SKILL.md; do
+for f in bin/cli.js _standalone/server.js _standalone/__next/server/app-paths-manifest.json skills/mindos/SKILL.md dist/foundation.js packages/protocols/acp/dist/index.js packages/protocols/mcp-server/dist/index.cjs; do
   if [ ! -f "$SMOKE_DIR/node_modules/@geminilight/mindos/$f" ]; then
     echo "❌ Missing file in package: $f"
     rm -rf "$SMOKE_DIR"
@@ -100,10 +97,14 @@ cd - >/dev/null
 echo "   🟢 Smoke test passed"
 echo ""
 
-# 5. Bump version (creates commit + tag automatically)
+# 5. Bump version in the private root and published product package
 echo "📦 Bumping version ($BUMP)..."
-npm version "$BUMP" -m "%s"
-VERSION="v$(node -p "require('./package.json').version")"
+npm version "$BUMP" --no-git-tag-version
+(cd packages/mindos && npm version "$BUMP" --no-git-tag-version)
+VERSION="v$(node -p "require('./packages/mindos/package.json').version")"
+git add package.json packages/mindos/package.json
+git commit -m "$VERSION"
+git tag "$VERSION"
 echo "   Version: $VERSION"
 echo ""
 

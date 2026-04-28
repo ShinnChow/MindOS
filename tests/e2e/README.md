@@ -5,7 +5,7 @@ Browser-based end-to-end tests using Playwright.
 ## Prerequisites
 
 ```bash
-cd app && npx playwright install
+cd packages/web && npx playwright install
 ```
 
 ## Running

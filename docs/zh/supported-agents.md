@@ -46,6 +46,7 @@
 | WorkBuddy | ✅ | - | `~/.workbuddy/mcp.json` | - |
 | Lingma | ✅ | - | `~/.lingma/mcp.json` | - |
 | CoPaw | ✅ | - | `~/.copaw/config.json`（嵌套键：`mcp.clients`） | - |
+| Hermes | ✅ | - | `~/.hermes/config.yaml`（YAML 格式，键名：`mcp_servers`） | - |
 
 > **注意：** 以上路径均为 **全局（推荐）** 安装位置。部分 Agent 也支持项目级配置（如 Claude Code: `.mcp.json`，Cursor: `.cursor/mcp.json`，Trae: `.trae/mcp.json`）。不带 `-g` 运行 `mindos mcp install` 可交互选择项目级安装。
 >
@@ -197,3 +198,7 @@ CoPaw 在 `~/.copaw/config.json` 中使用嵌套路径 `mcp.clients`：
   }
 }
 ```
+
+### Hermes：YAML 配置
+
+Hermes 使用 `~/.hermes/config.yaml`，键名为 `mcp_servers`。推荐直接运行 `mindos mcp install`，由 CLI 自动写入正确结构。

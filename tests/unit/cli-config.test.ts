@@ -38,7 +38,7 @@ beforeEach(() => {
   vi.resetModules();
 
   // Mock constants to point CONFIG_PATH to our temp file
-  vi.doMock('../../bin/lib/constants.js', () => ({
+  vi.doMock('../../packages/mindos/bin/lib/constants.js', () => ({
     CONFIG_PATH: configPath,
     ROOT: path.resolve(__dirname, '..', '..'),
     MINDOS_DIR: tempDir,
@@ -67,7 +67,7 @@ function writeConfig(config: Record<string, unknown>) {
 }
 
 async function importConfig() {
-  return await import('../../bin/lib/config.js') as {
+  return await import('../../packages/mindos/bin/lib/config.js') as {
     loadConfig: () => void;
     getStartMode: () => string;
     isDaemonMode: () => boolean;

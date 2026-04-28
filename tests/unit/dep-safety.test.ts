@@ -12,7 +12,7 @@ import path from 'path';
  */
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const MCP_DIR = path.join(ROOT, 'mcp');
+const MCP_DIR = path.join(ROOT, 'packages', 'protocols', 'mcp-server');
 const MCP_SRC = path.join(MCP_DIR, 'src', 'index.ts');
 const MCP_NODE_MODULES = path.join(MCP_DIR, 'node_modules');
 
@@ -83,9 +83,10 @@ describe.skipIf(!hasMcpSrc)('MCP dependency safety', () => {
 
 describe('npm install patterns', () => {
   it('no raw --prefer-offline without fallback in CLI scripts', () => {
-    // Scan bin/ for direct --prefer-offline usage that bypasses npmInstall()
-    const binDir = path.join(ROOT, 'bin');
+    // Scan product CLI modules for direct --prefer-offline usage that bypasses npmInstall().
+    const binDir = path.join(ROOT, 'packages', 'mindos', 'bin');
     const files = collectJsFiles(binDir);
+    expect(files.length).toBeGreaterThan(0);
 
     const violations: string[] = [];
     for (const file of files) {

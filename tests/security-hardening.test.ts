@@ -15,13 +15,14 @@ import {
   mkdirSync, writeFileSync, readFileSync, unlinkSync, symlinkSync,
   existsSync, statSync, rmdirSync, rmSync, realpathSync,
 } from 'fs';
+
 import {
   isSymlink, assertNotSymlink, assertNoSymlinksInPath,
   safeRmSync, safeMkdir, getSafeStats, assessDeletionRisk,
-} from '../../desktop/src/safe-rm';
+} from '../packages/desktop/src/safe-rm';
 import {
   validateRuntimePath, getRuntimePaths, isValidDirName, sanitizeDirName,
-} from '../../desktop/src/safe-paths';
+} from '../packages/desktop/src/safe-paths';
 
 describe('Security Hardening - Symlink Protection', () => {
   let tempDir: string;

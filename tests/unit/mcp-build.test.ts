@@ -32,7 +32,7 @@ function writeBuildDeps() {
 
 beforeEach(() => {
   tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mindos-mcp-build-test-'));
-  mcpDir = path.join(tempDir, 'mcp');
+  mcpDir = path.join(tempDir, 'packages', 'protocols', 'mcp-server');
   srcDir = path.join(mcpDir, 'src');
   distDir = path.join(mcpDir, 'dist');
   bundlePath = path.join(distDir, 'index.cjs');
@@ -41,8 +41,7 @@ beforeEach(() => {
 
   fs.mkdirSync(srcDir, { recursive: true });
   fs.writeFileSync(path.join(srcDir, 'index.ts'), 'export const ok = true;');
-  fs.writeFileSync(path.join(mcpDir, 'package.json'), JSON.stringify({ name: 'mindos-mcp', version: '1.0.0' }));
-  fs.writeFileSync(path.join(mcpDir, 'package-lock.json'), JSON.stringify({ lockfileVersion: 3 }));
+  fs.writeFileSync(path.join(mcpDir, 'package.json'), JSON.stringify({ name: '@mindos/mcp-server', version: '1.0.0' }));
 
   mockInstall = vi.fn(() => {
     writeBuildDeps();
@@ -54,8 +53,10 @@ beforeEach(() => {
   });
 
   vi.resetModules();
-  vi.doMock('../../bin/lib/constants.js', () => ({
+  vi.doMock('../../packages/mindos/bin/lib/constants.js', () => ({
     ROOT: tempDir,
+    PACKAGE_ROOT: tempDir,
+    PRODUCT_PACKAGE_JSON: path.join(tempDir, 'package.json'),
     BUILD_STAMP: path.join(tempDir, 'app', '.next', '.mindos-build-version'),
     DEPS_STAMP: path.join(tempDir, 'deps-hash'),
     CONFIG_PATH: path.join(tempDir, 'config.json'),
@@ -68,7 +69,7 @@ beforeEach(() => {
     STANDALONE_SERVER: path.join(tempDir, '_standalone', 'server.js'),
     STANDALONE_STAMP: path.join(tempDir, '_standalone', '.mindos-build-version'),
   }));
-  vi.doMock('../../bin/lib/shell.js', () => ({
+  vi.doMock('../../packages/mindos/bin/lib/shell.js', () => ({
     execInherited: mockRun,
     npmInstall: mockInstall,
   }));
@@ -80,7 +81,7 @@ afterEach(() => {
 });
 
 async function importMcpBuild() {
-  return await import('../../bin/lib/mcp-build.js') as {
+  return await import('../../packages/mindos/bin/lib/mcp-build.js') as {
     needsMcpBuild: () => boolean;
     ensureMcpBundle: () => void;
   };
@@ -98,7 +99,6 @@ describe('needsMcpBuild', () => {
     setMtime(srcDir, now - 10_000);
     setMtime(path.join(srcDir, 'index.ts'), now - 10_000);
     setMtime(path.join(mcpDir, 'package.json'), now - 10_000);
-    setMtime(path.join(mcpDir, 'package-lock.json'), now - 10_000);
     setMtime(bundlePath, now);
 
     const { needsMcpBuild } = await importMcpBuild();
@@ -113,6 +113,18 @@ describe('needsMcpBuild', () => {
 
     const { needsMcpBuild } = await importMcpBuild();
     expect(needsMcpBuild()).toBe(true);
+  });
+
+  it('uses the prebuilt bundle in packaged npm installs even when source mtimes are newer', async () => {
+    writeBundle();
+    fs.mkdirSync(path.join(tempDir, '_standalone', '__next'), { recursive: true });
+    fs.mkdirSync(path.join(tempDir, '_standalone', '__node_modules'), { recursive: true });
+    const now = Date.now();
+    setMtime(bundlePath, now - 20_000);
+    setMtime(path.join(srcDir, 'index.ts'), now);
+
+    const { needsMcpBuild } = await importMcpBuild();
+    expect(needsMcpBuild()).toBe(false);
   });
 });
 
@@ -149,7 +161,6 @@ describe('ensureMcpBundle', () => {
     setMtime(srcDir, now - 10_000);
     setMtime(path.join(srcDir, 'index.ts'), now - 10_000);
     setMtime(path.join(mcpDir, 'package.json'), now - 10_000);
-    setMtime(path.join(mcpDir, 'package-lock.json'), now - 10_000);
     setMtime(bundlePath, now);
 
     const { ensureMcpBundle } = await importMcpBuild();

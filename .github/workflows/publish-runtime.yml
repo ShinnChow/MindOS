@@ -21,39 +21,45 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.3
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install dependencies
         run: |
-          cd app && npm install --no-workspaces
-          cd ../mcp && npm install --include=dev && npm run build
+          pnpm install --frozen-lockfile
+          pnpm --filter @mindos/acp build
+          pnpm --filter @geminilight/mindos build
+          pnpm --filter @mindos/mcp-server build
 
       - name: Cache Next.js build
         uses: actions/cache@v4
         with:
-          path: app/.next/cache
-          key: nextjs-runtime-${{ hashFiles('app/package-lock.json') }}-${{ hashFiles('app/**/*.ts', 'app/**/*.tsx') }}
+          path: packages/web/.next/cache
+          key: nextjs-runtime-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('packages/web/**/*.ts', 'packages/web/**/*.tsx', 'packages/**/*.ts') }}
           restore-keys: |
-            nextjs-runtime-${{ hashFiles('app/package-lock.json') }}-
+            nextjs-runtime-${{ hashFiles('pnpm-lock.yaml') }}-
             nextjs-runtime-
 
       - name: Build Next.js standalone
-        run: cd app && npx next build --webpack
+        run: pnpm --filter @mindos/web run build
         env:
           NODE_ENV: production
 
-      - name: Materialize standalone assets
-        run: |
-          node scripts/prepare-standalone.mjs 2>/dev/null || echo 'Standalone assets already materialized'
+      - name: Smoke test standalone server
+        run: node scripts/verify-standalone.mjs
 
       - name: Build runtime archive
         id: archive
         run: |
           bash scripts/build-runtime-archive.sh
-          VERSION=$(node -p "require('./package.json').version")
+          VERSION=$(node -p "require('./packages/mindos/package.json').version")
           ARCHIVE="/tmp/mindos-runtime-${VERSION}.tar.gz"
           SHA256=$(sha256sum "$ARCHIVE" | cut -d' ' -f1)
           SIZE=$(stat -c%s "$ARCHIVE")

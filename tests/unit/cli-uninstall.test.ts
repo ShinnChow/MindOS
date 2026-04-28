@@ -15,7 +15,7 @@ import path from 'path';
  */
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const CLI = path.join(ROOT, 'bin', 'cli.js');
+const CLI = path.join(ROOT, 'packages', 'mindos', 'bin', 'cli.js');
 
 let tempHome: string;
 let savedHome: string | undefined;

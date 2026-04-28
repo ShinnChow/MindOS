@@ -34,4 +34,4 @@ echo "(Tip: use SKIP_TESTS=1 git push to skip)"
 MINDOS_WEB_PORT=19456 MINDOS_MCP_PORT=19781 npm test
 
 echo "Running TypeScript type check..."
-cd app && npx tsc --noEmit
+pnpm --filter @mindos/web typecheck

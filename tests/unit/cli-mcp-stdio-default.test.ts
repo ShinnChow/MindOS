@@ -10,11 +10,11 @@ import { join } from 'path';
  * `mindos mcp` via an MCP client would start the MCP server in HTTP mode
  * (the default) and crash with EADDRINUSE on port 8781.
  *
- * Root cause: bin/cli.js `mcp` handler did not set MCP_TRANSPORT, so
- * mcp/src/index.ts fell through to the default "http" transport.
+ * Root cause: packages/mindos/bin/cli.js `mcp` handler did not set MCP_TRANSPORT, so
+ * packages/protocols/mcp-server/src/index.ts fell through to the default "http" transport.
  */
 
-const CLI = join(__dirname, '../../bin/cli.js');
+const CLI = join(__dirname, '../../packages/mindos/bin/cli.js');
 
 const children: ChildProcess[] = [];
 

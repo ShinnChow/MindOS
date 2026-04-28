@@ -11,10 +11,10 @@ Help me upgrade my MindOS installation from the old source-based setup to the ne
 
 **Old setup (what I have now):**
 - Cloned the MindOS repo
-- Ran `cd app && npm install` and `cd mcp && npm install && npm run build`
-- Configured via `app/.env.local` (with MIND_ROOT, ANTHROPIC_API_KEY, etc.)
-- Started with `cd app && npm run dev`
-- MCP was started separately via `cd mcp && npm run start` or similar
+- Ran `pnpm install`, `pnpm --filter @mindos/web build`, and `pnpm --filter @mindos/mcp-server build`
+- Configured via `packages/web/.env.local` (with MIND_ROOT, ANTHROPIC_API_KEY, etc.)
+- Started with `pnpm --filter @mindos/web dev`
+- MCP was started separately via `pnpm --filter @mindos/mcp-server start` or similar
 
 **New setup (target):**
 - Installed as a global npm package: `npm install -g mindos@latest`
@@ -28,7 +28,7 @@ Help me upgrade my MindOS installation from the old source-based setup to the ne
    npm install -g mindos@latest
    ```
 
-2. **Read my current `app/.env.local`** to extract my existing configuration:
+2. **Read my current `packages/web/.env.local`** to extract my existing configuration:
    - `MIND_ROOT` → knowledge base path
    - `AI_PROVIDER`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL`
    - `AUTH_TOKEN` (if set)
@@ -83,9 +83,9 @@ Do not delete the old cloned repository — keep it as a backup. The `app/.env.l
 
 **旧版安装方式（我现在的状态）：**
 - 克隆了 MindOS 仓库
-- 分别执行了 `cd app && npm install` 和 `cd mcp && npm install && npm run build`
-- 通过 `app/.env.local` 配置（包含 MIND_ROOT、ANTHROPIC_API_KEY 等）
-- 用 `cd app && npm run dev` 启动
+- 执行过 `pnpm install`、`pnpm --filter @mindos/web build` 和 `pnpm --filter @mindos/mcp-server build`
+- 通过 `packages/web/.env.local` 配置（包含 MIND_ROOT、ANTHROPIC_API_KEY 等）
+- 用 `pnpm --filter @mindos/web dev` 启动
 - MCP 需要单独启动
 
 **新版安装方式（目标）：**
@@ -100,7 +100,7 @@ Do not delete the old cloned repository — keep it as a backup. The `app/.env.l
    npm install -g mindos@latest
    ```
 
-2. **读取我现有的 `app/.env.local`**，提取以下配置：
+2. **读取我现有的 `packages/web/.env.local`**，提取以下配置：
    - `MIND_ROOT` → 知识库路径
    - `AI_PROVIDER`、`ANTHROPIC_API_KEY`、`ANTHROPIC_MODEL`、`OPENAI_API_KEY`、`OPENAI_MODEL`、`OPENAI_BASE_URL`
    - `AUTH_TOKEN`（如果有）

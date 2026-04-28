@@ -4,7 +4,17 @@
 
 ## v0.6.82+ (未发布)
 
+### 架构
+
+- **v1 package domain layout**：`packages/` 从平铺的 `packages/<pkg>` 收敛为 `packages/<domain>/<pkg>`，当前域为 `foundation`、`knowledge`、`retrieval`、`protocols`。包名和 import surface 保持稳定，目录结构更清楚地区分基础设施、知识库领域、检索能力和外部协议。
+- **runtime-first 架构方向**：OpenCode 调研文档已更新为 MindOS 的演进原则：先做强 runtime，再让 Web/CLI/Desktop/Mobile 成为薄客户端，协议、SDK、插件能力按独立契约维护，避免为了目录美观拆出无主 package。
+- **v1 package 完整度：ACP 核心迁移到 `packages/protocols/acp`**：Agent Client Protocol 的类型、注册表、Agent descriptor、安装探测、subprocess 生命周期和 session 管理已从 Web-local 代码抽成 workspace package。Web 侧仅保留 settings 注入、A2A bridge 和知识库工具适配。
+- **发布清单补齐**：根 npm package 的 `prepack` 会先构建 `@mindos/acp`，`files` 精确包含 ACP/MCP 的运行时产物和必要源码，避免 ACP core 缺包；`packages/web/.npmignore` 也已补齐，Web tests、Vitest/ESLint config、tsbuildinfo、缓存和 nested `node_modules` 不再混入 tarball。
+- **OpenCode 式 workspace 扁平化**：README、CLI docs、Supported Agents 和系统架构 Wiki 已按单一 `packages/` 源码根更新；Web/Desktop/Mobile/Browser Extension/CLI/Tauri spike 都是 `packages/*` sibling package，Agent 支持矩阵补齐 Hermes（YAML `mcp_servers`）。
+
 ### 修复
+
+- **v1 发布自举修复**：`prepack` 不再删除 `packages/web/node_modules`，重复执行 `npm pack` 不会因为缺少 `next` 失败；Web 脚本解析、Skill 内置冲突检测、community plugin fixture 下载和 `mindos update` fallback build 路径已统一到 `packages/web`。
 
 **跨模块 Bug 审计 (2026-04-13)**
 
@@ -72,7 +82,7 @@
 - `lib/parsing/parse-todos.ts` — TODO 解析器、行操作、日期、样式、计数（纯函数）
 
 ### 构建优化
-- **生产构建切换到 webpack**：Turbopack 16.1.x 的 `serverExternalPackages` 不影响 standalone trace（[#88842](https://github.com/vercel/next.js/discussions/88842)），切换后 standalone 从 200MB 降至 110MB（-45%），koffi 87MB 被正确排除。dev 模式仍用 Turbopack
+- **构建与开发入口切换到 webpack**：Turbopack 16.1.x 的 `serverExternalPackages` 不影响 standalone trace（[#88842](https://github.com/vercel/next.js/discussions/88842)），且 pnpm workspace 下 dev root/symlink 解析不稳定。生产 build 与 dev 入口统一走 webpack，standalone 从 200MB 降至 110MB（-45%），koffi 87MB 被正确排除。
 - **清理过期 mcp/node_modules**：Desktop runtime 中 73MB 的 mcp/node_modules 是 v0.6.6 esbuild 方案落地前的旧产物，重跑 prepare 脚本后替换为 1.2MB 的 dist/index.cjs
 - **Desktop 安装包体积**：macOS arm64 zip 144MB → 129MB（-10%），runtime 层 198MB → 133MB（-33%）
 
